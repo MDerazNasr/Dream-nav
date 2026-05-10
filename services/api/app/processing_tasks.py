@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Protocol
 
 from .jobs import ProcessingStep, StoredJob
+from .video_probe import VideoProbeError, probe_video_file
 
 
 class ProcessingTaskFailed(Exception):
@@ -91,17 +92,21 @@ def default_processing_tasks() -> list[ProcessingTask]:
 
 
 def validate_capture_quality(context: ProcessingTaskContext) -> ProcessingTaskResult:
-    file_size_bytes = context.upload_path.stat().st_size
-
-    if file_size_bytes == 0:
-        raise ProcessingTaskFailed("Uploaded file is empty.")
+    try:
+        probe = probe_video_file(context.upload_path)
+    except VideoProbeError as error:
+        raise ProcessingTaskFailed(str(error)) from error
 
     return _result(
         "capture_quality.json",
         context,
-        capture_score=0.84,
-        file_size_bytes=file_size_bytes,
-        validation_status=context.job.validation_status,
+        duration_sec=probe.duration_sec,
+        extension=probe.extension,
+        file_size_bytes=probe.file_size_bytes,
+        probe_backend=probe.probe_backend,
+        supported_extension=probe.supported_extension,
+        validation_status="warning" if probe.warnings else "pass",
+        warnings=probe.warnings,
     )
 
 

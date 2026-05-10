@@ -34,7 +34,10 @@ def test_worker_completes_queued_job(tmp_path: Path) -> None:
     assert status.output_scene_id == "warehouse_01"
     artifact_path = tmp_path / "data" / "jobs" / response.job_id / "artifacts" / "capture_quality.json"
     assert artifact_path.is_file()
-    assert loads(artifact_path.read_text(encoding="utf-8"))["job_id"] == response.job_id
+    capture_quality = loads(artifact_path.read_text(encoding="utf-8"))
+    assert capture_quality["job_id"] == response.job_id
+    assert capture_quality["file_size_bytes"] == len(b"video-bytes")
+    assert capture_quality["extension"] == ".mp4"
 
 
 def test_worker_reads_legacy_elapsed_time_job(tmp_path: Path) -> None:
@@ -106,6 +109,43 @@ def test_worker_fails_job_when_task_fails(tmp_path: Path) -> None:
     assert status.state == "failed"
     assert status.stage == "failed"
     assert status.error_message == "camera motion failed"
+
+
+def test_worker_fails_empty_capture_validation(tmp_path: Path) -> None:
+    repo = JobRepository(
+        jobs_root=tmp_path / "data" / "jobs",
+        uploads_root=tmp_path / "data" / "uploads",
+    )
+    response = anyio.run(
+        repo.create_upload_job,
+        UploadFile(filename="walkthrough.mp4", file=BytesIO(b"")),
+    )
+    worker = ProcessingWorker(repo, step_delay_sec=0)
+
+    worker.process_next_job()
+    status = repo.get_status(response.job_id)
+
+    assert status.state == "failed"
+    assert status.error_message == "Uploaded file is empty."
+
+
+def test_worker_records_unsupported_extension_warning(tmp_path: Path) -> None:
+    repo = JobRepository(
+        jobs_root=tmp_path / "data" / "jobs",
+        uploads_root=tmp_path / "data" / "uploads",
+    )
+    response = anyio.run(
+        repo.create_upload_job,
+        UploadFile(filename="walkthrough.txt", file=BytesIO(b"video-bytes")),
+    )
+    worker = ProcessingWorker(repo, step_delay_sec=0)
+
+    worker.process_next_job()
+    artifact_path = tmp_path / "data" / "jobs" / response.job_id / "artifacts" / "capture_quality.json"
+    capture_quality = loads(artifact_path.read_text(encoding="utf-8"))
+
+    assert capture_quality["validation_status"] == "warning"
+    assert "Use MP4, MOV, or M4V walkthrough videos for reconstruction." in capture_quality["warnings"]
 
 
 def _failing_task() -> ProcessingTask:
