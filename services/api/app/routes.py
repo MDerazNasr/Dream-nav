@@ -1,7 +1,16 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 
-from .schemas import DemoScene, HealthResponse, QualityReport, SceneAssetStatus, SceneAssets
+from .jobs import JobDataError, JobNotFoundError, JobRepository
 from .repository import SceneDataError, SceneNotFoundError, SceneRepository
+from .schemas import (
+    DemoScene,
+    HealthResponse,
+    JobStatus,
+    QualityReport,
+    SceneAssetStatus,
+    SceneAssets,
+    UploadResponse,
+)
 
 router = APIRouter()
 
@@ -43,8 +52,25 @@ def scene_asset_status(scene_id: str, request: Request) -> SceneAssetStatus:
     return _repository(request).get_asset_status(scene_id)
 
 
+@router.post("/upload", response_model=UploadResponse)
+async def upload_walkthrough(
+    request: Request,
+    file: UploadFile = File(...),
+) -> UploadResponse:
+    return await _job_repository(request).create_upload_job(file)
+
+
+@router.get("/status/{job_id}", response_model=JobStatus)
+def job_status(job_id: str, request: Request) -> JobStatus:
+    return _job_repository(request).get_status(job_id)
+
+
 def _repository(request: Request) -> SceneRepository:
     return request.app.state.scene_repository
+
+
+def _job_repository(request: Request) -> JobRepository:
+    return request.app.state.job_repository
 
 
 def map_scene_errors(error: Exception) -> HTTPException:
@@ -53,5 +79,15 @@ def map_scene_errors(error: Exception) -> HTTPException:
 
     if isinstance(error, SceneDataError):
         return HTTPException(status_code=500, detail="Scene data invalid")
+
+    return HTTPException(status_code=500, detail="Unexpected API error")
+
+
+def map_job_errors(error: Exception) -> HTTPException:
+    if isinstance(error, JobNotFoundError):
+        return HTTPException(status_code=404, detail="Job not found")
+
+    if isinstance(error, JobDataError):
+        return HTTPException(status_code=500, detail="Job data invalid")
 
     return HTTPException(status_code=500, detail="Unexpected API error")

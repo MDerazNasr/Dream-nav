@@ -29,6 +29,21 @@ class SceneAssetStatus(StrictModel):
     missing_assets: list[str]
 
 
+class UploadResponse(StrictModel):
+    job_id: str
+    validation_status: str
+    warnings: list[str]
+    estimated_processing_time_sec: int = Field(ge=0)
+
+
+class JobStatus(StrictModel):
+    job_id: str
+    stage: str
+    progress: float = Field(ge=0, le=1)
+    elapsed_sec: int = Field(ge=0)
+    message: str
+
+
 class QualityReport(StrictModel):
     scene_id: str
     pose_backend: str

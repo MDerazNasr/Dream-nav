@@ -1,5 +1,8 @@
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
+from app.config import ApiSettings
 from app.main import create_app
 
 
@@ -74,3 +77,59 @@ def test_static_scene_metadata_is_served() -> None:
 
     assert response.status_code == 200
     assert response.json()["scene_id"] == "warehouse_01"
+
+
+def test_upload_creates_processing_job(tmp_path: Path) -> None:
+    client = TestClient(create_app(ApiSettings(repo_root=tmp_path)))
+
+    response = client.post(
+        "/upload",
+        files={"file": ("walkthrough.mp4", b"video-bytes", "video/mp4")},
+    )
+
+    payload = response.json()
+    assert response.status_code == 200
+    assert payload["job_id"].startswith("scene_")
+    assert payload["validation_status"] == "pass"
+    assert payload["warnings"] == []
+    assert (tmp_path / "data" / "uploads" / payload["job_id"] / "walkthrough.mp4").is_file()
+
+
+def test_upload_warns_for_unsupported_video_extension(tmp_path: Path) -> None:
+    client = TestClient(create_app(ApiSettings(repo_root=tmp_path)))
+
+    response = client.post(
+        "/upload",
+        files={"file": ("walkthrough.txt", b"not-video", "text/plain")},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["validation_status"] == "warning"
+    assert response.json()["warnings"] == [
+        "Use MP4, MOV, or M4V walkthrough videos for reconstruction."
+    ]
+
+
+def test_status_returns_processing_progress(tmp_path: Path) -> None:
+    client = TestClient(create_app(ApiSettings(repo_root=tmp_path)))
+    upload_response = client.post(
+        "/upload",
+        files={"file": ("walkthrough.mov", b"video-bytes", "video/quicktime")},
+    )
+    job_id = upload_response.json()["job_id"]
+
+    response = client.get(f"/status/{job_id}")
+
+    assert response.status_code == 200
+    assert response.json()["job_id"] == job_id
+    assert response.json()["stage"] == "checking_capture_quality"
+    assert response.json()["progress"] == 0.08
+
+
+def test_missing_job_returns_404() -> None:
+    client = TestClient(create_app())
+
+    response = client.get("/status/scene_missing")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Job not found"

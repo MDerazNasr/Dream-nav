@@ -1,0 +1,162 @@
+from __future__ import annotations
+
+from dataclasses import asdict, dataclass
+from json import JSONDecodeError, dumps, loads
+from pathlib import Path
+from re import sub
+from secrets import token_hex
+from time import time
+
+from fastapi import UploadFile
+
+from .schemas import JobStatus, UploadResponse
+
+SUPPORTED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v"}
+ESTIMATED_PROCESSING_TIME_SEC = 240
+
+
+class JobNotFoundError(Exception):
+    pass
+
+
+class JobDataError(Exception):
+    pass
+
+
+@dataclass(frozen=True)
+class StoredJob:
+    job_id: str
+    original_filename: str
+    stored_filename: str
+    created_at_sec: float
+    validation_status: str
+    warnings: list[str]
+    estimated_processing_time_sec: int
+
+
+@dataclass(frozen=True)
+class ProcessingStep:
+    stage: str
+    progress: float
+    message: str
+
+
+PROCESSING_STEPS = [
+    ProcessingStep("checking_capture_quality", 0.08, "Checking capture quality"),
+    ProcessingStep("estimating_camera_motion", 0.2, "Estimating camera motion"),
+    ProcessingStep("building_gaussian_scene", 0.36, "Building Gaussian scene"),
+    ProcessingStep("computing_visibility_support", 0.48, "Computing visibility support"),
+    ProcessingStep("rendering_training_views", 0.58, "Rendering training views from the splat"),
+    ProcessingStep(
+        "training_scene_model",
+        0.72,
+        "Training geometrically consistent scene-specific completion model",
+    ),
+    ProcessingStep("evaluating_heldout_viewpoints", 0.82, "Evaluating held-out viewpoints"),
+    ProcessingStep("applying_quality_gate", 0.9, "Applying held-out PSNR quality gate"),
+    ProcessingStep("preparing_explorer", 0.97, "Preparing explorer"),
+    ProcessingStep("completed", 1, "Explorer ready"),
+]
+
+
+class JobRepository:
+    def __init__(
+        self,
+        jobs_root: Path,
+        uploads_root: Path,
+        now_func=time,
+    ) -> None:
+        self.jobs_root = jobs_root
+        self.uploads_root = uploads_root
+        self.now_func = now_func
+
+    async def create_upload_job(self, upload: UploadFile) -> UploadResponse:
+        job_id = self._new_job_id()
+        job_root = self.uploads_root / job_id
+        job_root.mkdir(parents=True, exist_ok=False)
+
+        stored_filename = self._safe_filename(upload.filename or "walkthrough.mp4")
+        stored_path = job_root / stored_filename
+        content = await upload.read()
+        stored_path.write_bytes(content)
+
+        warnings = self._validation_warnings(stored_filename, len(content))
+        validation_status = "warning" if warnings else "pass"
+        job = StoredJob(
+            job_id=job_id,
+            original_filename=upload.filename or stored_filename,
+            stored_filename=stored_filename,
+            created_at_sec=self.now_func(),
+            validation_status=validation_status,
+            warnings=warnings,
+            estimated_processing_time_sec=ESTIMATED_PROCESSING_TIME_SEC,
+        )
+        self._write_job(job)
+
+        return UploadResponse(
+            job_id=job.job_id,
+            validation_status=job.validation_status,
+            warnings=job.warnings,
+            estimated_processing_time_sec=job.estimated_processing_time_sec,
+        )
+
+    def get_status(self, job_id: str) -> JobStatus:
+        job = self._read_job(job_id)
+        elapsed_sec = max(0, int(self.now_func() - job.created_at_sec))
+        elapsed_ratio = min(elapsed_sec / job.estimated_processing_time_sec, 1)
+
+        step = PROCESSING_STEPS[-1]
+        for candidate in PROCESSING_STEPS:
+            if elapsed_ratio <= candidate.progress:
+                step = candidate
+                break
+
+        return JobStatus(
+            job_id=job.job_id,
+            stage=step.stage,
+            progress=max(step.progress, round(elapsed_ratio, 2)),
+            elapsed_sec=elapsed_sec,
+            message=step.message,
+        )
+
+    def _new_job_id(self) -> str:
+        self.jobs_root.mkdir(parents=True, exist_ok=True)
+        for _ in range(5):
+            job_id = f"scene_{token_hex(4)}"
+            if not (self.jobs_root / f"{job_id}.json").exists():
+                return job_id
+
+        raise JobDataError("Could not allocate a unique job id")
+
+    def _write_job(self, job: StoredJob) -> None:
+        self.jobs_root.mkdir(parents=True, exist_ok=True)
+        path = self.jobs_root / f"{job.job_id}.json"
+        temp_path = path.with_suffix(".json.tmp")
+        temp_path.write_text(dumps(asdict(job), indent=2), encoding="utf-8")
+        temp_path.replace(path)
+
+    def _read_job(self, job_id: str) -> StoredJob:
+        try:
+            payload = loads((self.jobs_root / f"{job_id}.json").read_text(encoding="utf-8"))
+            return StoredJob(**payload)
+        except FileNotFoundError as error:
+            raise JobNotFoundError(job_id) from error
+        except (JSONDecodeError, TypeError) as error:
+            raise JobDataError(f"Invalid job data for {job_id}") from error
+
+    def _validation_warnings(self, filename: str, file_size_bytes: int) -> list[str]:
+        warnings = []
+
+        if Path(filename).suffix.lower() not in SUPPORTED_VIDEO_EXTENSIONS:
+            warnings.append("Use MP4, MOV, or M4V walkthrough videos for reconstruction.")
+
+        if file_size_bytes == 0:
+            warnings.append("Uploaded file is empty.")
+
+        return warnings
+
+    def _safe_filename(self, filename: str) -> str:
+        stem = Path(filename).stem or "walkthrough"
+        suffix = Path(filename).suffix.lower() or ".mp4"
+        safe_stem = sub(r"[^A-Za-z0-9_.-]+", "_", stem).strip("._") or "walkthrough"
+        return f"{safe_stem}{suffix}"
