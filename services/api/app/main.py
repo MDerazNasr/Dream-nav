@@ -31,7 +31,10 @@ def create_app(settings: ApiSettings | None = None) -> FastAPI:
         resolved_settings.jobs_root,
         resolved_settings.uploads_root,
     )
-    app.state.processing_worker = ProcessingWorker(app.state.job_repository)
+    app.state.processing_worker = ProcessingWorker(
+        app.state.job_repository,
+        processing_settings=resolved_settings.processing,
+    )
     app.include_router(router)
     app.add_exception_handler(SceneNotFoundError, _scene_exception_handler)
     app.add_exception_handler(SceneDataError, _scene_exception_handler)

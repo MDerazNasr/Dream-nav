@@ -1,11 +1,20 @@
 from dataclasses import dataclass
+from os import environ
 from pathlib import Path
+
+
+@dataclass(frozen=True)
+class ProcessingSettings:
+    pose_backend: str = "stub"
+    pose_command: str | None = None
+    pose_timeout_sec: float = 30
 
 
 @dataclass(frozen=True)
 class ApiSettings:
     repo_root: Path
     auto_start_worker: bool = True
+    processing: ProcessingSettings = ProcessingSettings()
 
     @property
     def data_root(self) -> Path:
@@ -25,4 +34,11 @@ class ApiSettings:
 
 
 def default_settings() -> ApiSettings:
-    return ApiSettings(repo_root=Path(__file__).resolve().parents[3])
+    return ApiSettings(
+        repo_root=Path(__file__).resolve().parents[3],
+        processing=ProcessingSettings(
+            pose_backend=environ.get("DREAMNAV_POSE_BACKEND", "stub"),
+            pose_command=environ.get("DREAMNAV_POSE_COMMAND"),
+            pose_timeout_sec=float(environ.get("DREAMNAV_POSE_TIMEOUT_SEC", "30")),
+        ),
+    )
