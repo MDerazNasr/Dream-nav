@@ -286,12 +286,37 @@ button {
   background: rgba(245, 247, 244, 0.05);
 }
 
-.upload-target label {
+.upload-title {
   font-weight: 650;
 }
 
-.upload-target input {
-  max-width: 100%;
+.file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.file-picker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid rgba(245, 247, 244, 0.16);
+  border-radius: 8px;
+  background: rgba(245, 247, 244, 0.08);
+  color: #f5f7f4;
+  cursor: pointer;
+}
+
+.file-input:focus-visible + span,
+.file-picker:focus-visible {
+  outline: 2px solid #77d7c8;
+  outline-offset: 2px;
 }
 
 .upload-target span,

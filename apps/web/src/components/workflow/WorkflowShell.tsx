@@ -152,9 +152,14 @@ export function WorkflowShell({ sceneBundle }: WorkflowShellProps) {
 
         <div className="upload-target">
           <Upload size={24} aria-hidden="true" />
-          <label htmlFor="walkthrough-upload">Walkthrough video</label>
+          <span className="upload-title">Walkthrough video</span>
+          <label className="file-picker" htmlFor="walkthrough-upload">
+            Choose video
+          </label>
           <input
+            aria-label="Walkthrough video"
             accept="video/mp4,video/quicktime,.mp4,.mov,.m4v"
+            className="file-input"
             id="walkthrough-upload"
             onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
             type="file"
