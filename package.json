@@ -8,9 +8,12 @@
     "services/*"
   ],
   "scripts": {
+    "api:dev": ".venv/bin/uvicorn app.main:app --app-dir services/api --host 127.0.0.1 --port 8000",
+    "api:install": "python3.12 -m venv .venv && .venv/bin/python -m pip install -r services/api/requirements.txt",
+    "api:test": ".venv/bin/python -m pytest services/api",
     "build": "npm run build -w @dream-nav/shared && npm run build -w @dream-nav/scene-registry && npm run build -w @dream-nav/web",
     "lint": "npm run lint --workspaces --if-present",
-    "test": "npm run build -w @dream-nav/shared && npm run build -w @dream-nav/scene-registry && npm run test --workspaces --if-present",
+    "test": "npm run build -w @dream-nav/shared && npm run build -w @dream-nav/scene-registry && npm run test --workspaces --if-present && npm run api:test",
     "typecheck": "npm run typecheck -w @dream-nav/shared && npm run build -w @dream-nav/shared && npm run typecheck -w @dream-nav/scene-registry && npm run build -w @dream-nav/scene-registry && npm run typecheck -w @dream-nav/web"
   },
   "engines": {
