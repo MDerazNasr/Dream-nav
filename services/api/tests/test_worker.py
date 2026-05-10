@@ -69,6 +69,7 @@ def test_worker_completes_queued_job(tmp_path: Path) -> None:
     assert camera_motion["backend"] == "stub"
     assert camera_motion["command_mode"] == "stub"
     assert camera_motion["camera_path"] == "camera_path.json"
+    assert camera_motion["intrinsics_source"] == "default"
     assert camera_motion["pose_count"] == 3
     assert camera_path["scene_id"] == response.job_id
     assert camera_path["coordinate_system"] == "dreamnav_viewer_v1"
@@ -207,7 +208,16 @@ def test_worker_runs_configured_colmap_command(tmp_path: Path) -> None:
     fake_colmap = tmp_path / "fake_colmap.py"
     fake_colmap.write_text(
         "#!/usr/bin/env python3\n"
+        "from pathlib import Path\n"
         "import sys\n"
+        "root = Path('colmap')\n"
+        "root.mkdir(exist_ok=True)\n"
+        "(root / 'cameras.txt').write_text('1 PINHOLE 1920 1080 1200 1210 960 540\\n')\n"
+        "(root / 'images.txt').write_text(\n"
+        "    '1 1 0 0 0 0 0 0 1 frame_0000.jpg\\n\\n'\n"
+        "    '2 1 0 0 0 -1 -2 -3 1 frame_0001.jpg\\n\\n'\n"
+        "    '3 1 0 0 0 -2 -4 -6 1 frame_0002.jpg\\n\\n'\n"
+        ")\n"
         "print('fake colmap ' + ' '.join(sys.argv[1:]))\n",
         encoding="utf-8",
     )
@@ -237,6 +247,11 @@ def test_worker_runs_configured_colmap_command(tmp_path: Path) -> None:
             encoding="utf-8"
         )
     )
+    camera_path = loads(
+        (tmp_path / "data" / "jobs" / response.job_id / "artifacts" / "camera_path.json").read_text(
+            encoding="utf-8"
+        )
+    )
 
     assert status.state == "completed"
     assert command_artifact["exit_code"] == 0
@@ -245,6 +260,9 @@ def test_worker_runs_configured_colmap_command(tmp_path: Path) -> None:
     assert camera_motion["backend"] == "colmap"
     assert camera_motion["command_mode"] == "external"
     assert camera_motion["camera_path"] == "camera_path.json"
+    assert camera_motion["intrinsics_source"] == "colmap"
+    assert camera_path["intrinsics"]["fx"] == 1200
+    assert camera_path["poses"][1]["position"] == [1, 2, 3]
     assert str(tmp_path / "data" / "jobs" / response.job_id / "artifacts" / "frames") in command_artifact["command"]
 
 

@@ -7,6 +7,7 @@ from shutil import which
 import sys
 from typing import Protocol
 
+from .colmap_pose_parser import ColmapPoseParseError, parse_colmap_text_model
 from .config import ProcessingSettings
 from .jobs import ProcessingStep, StoredJob
 from .pose_normalization import PoseNormalizationError, normalize_camera_path, stub_raw_poses_from_frames
@@ -160,8 +161,8 @@ def estimate_camera_motion(context: ProcessingTaskContext) -> ProcessingTaskResu
     backend = _normalized_pose_backend(context.processing_settings)
     frames = _frame_inventory(_frames_root(context)).frames
     try:
-        raw_poses = stub_raw_poses_from_frames(frames, context.processing_settings.frame_rate)
-        camera_path = normalize_camera_path(context.job.job_id, raw_poses)
+        raw_poses, intrinsics = _raw_camera_poses(context, backend, frames)
+        camera_path = normalize_camera_path(context.job.job_id, raw_poses, intrinsics=intrinsics)
     except PoseNormalizationError as error:
         raise ProcessingTaskFailed(str(error)) from error
 
@@ -178,6 +179,7 @@ def estimate_camera_motion(context: ProcessingTaskContext) -> ProcessingTaskResu
         command_mode="stub" if backend == "stub" else "external",
         camera_path=camera_path_name,
         coordinate_system=camera_path["coordinate_system"],
+        intrinsics_source="default" if intrinsics is None else backend,
         pose_count=len(camera_path["poses"]),
     )
 
@@ -336,6 +338,27 @@ def _normalized_frame_backend(settings: ProcessingSettings) -> str:
 
 def _frames_root(context: ProcessingTaskContext) -> Path:
     return context.artifacts_root / "frames"
+
+
+def _raw_camera_poses(
+    context: ProcessingTaskContext,
+    backend: str,
+    frames: list[Path],
+):
+    if backend == "stub":
+        return stub_raw_poses_from_frames(frames, context.processing_settings.frame_rate), None
+
+    if backend == "colmap":
+        try:
+            return parse_colmap_text_model(
+                context.artifacts_root / "colmap",
+                frames,
+                context.processing_settings.frame_rate,
+            )
+        except ColmapPoseParseError as error:
+            raise ProcessingTaskFailed(str(error)) from error
+
+    raise ProcessingTaskFailed(f"Unsupported pose backend: {context.processing_settings.pose_backend}")
 
 
 def _frame_inventory(frames_root: Path) -> FrameInventory:
