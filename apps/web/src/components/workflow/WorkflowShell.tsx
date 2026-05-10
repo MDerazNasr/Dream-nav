@@ -1,7 +1,7 @@
 "use client";
 
-import type { JobStatus, UploadResponse } from "@dream-nav/shared";
-import { CheckCircle2, Film, LoaderCircle, Upload } from "lucide-react";
+import type { JobStatus, ProcessingStage, UploadResponse } from "@dream-nav/shared";
+import { AlertTriangle, CheckCircle2, Film, LoaderCircle, RotateCcw, Upload, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ExplorerShell } from "../explorer/ExplorerShell";
 import type { ViewerSceneBundle } from "../../lib/dreamnav-api";
@@ -11,16 +11,22 @@ type WorkflowShellProps = {
   sceneBundle: ViewerSceneBundle;
 };
 
-const processingStages = [
-  "Checking capture quality",
-  "Estimating camera motion",
-  "Building Gaussian scene",
-  "Computing visibility support",
-  "Rendering training views",
-  "Training scene-specific model",
-  "Evaluating held-out viewpoints",
-  "Applying quality gate",
-  "Preparing explorer"
+type ProcessingStageItem = {
+  stage: Exclude<ProcessingStage, "completed" | "failed">;
+  label: string;
+};
+
+const processingStages: ProcessingStageItem[] = [
+  { stage: "checking_capture_quality", label: "Checking capture quality" },
+  { stage: "extracting_video_frames", label: "Extracting video frames" },
+  { stage: "estimating_camera_motion", label: "Estimating camera motion" },
+  { stage: "building_gaussian_scene", label: "Building Gaussian scene" },
+  { stage: "computing_visibility_support", label: "Computing visibility support" },
+  { stage: "rendering_training_views", label: "Rendering training views" },
+  { stage: "training_scene_model", label: "Training scene-specific model" },
+  { stage: "evaluating_heldout_viewpoints", label: "Evaluating held-out viewpoints" },
+  { stage: "applying_quality_gate", label: "Applying quality gate" },
+  { stage: "preparing_explorer", label: "Preparing explorer" }
 ];
 
 export function WorkflowShell({ sceneBundle }: WorkflowShellProps) {
@@ -39,6 +45,7 @@ export function WorkflowShell({ sceneBundle }: WorkflowShellProps) {
     () => Math.min(processingStages.length, Math.ceil(activeProgress * processingStages.length)),
     [activeProgress]
   );
+  const failureGuidance = getFailureGuidance(jobStatus?.error_message);
 
   useEffect(() => {
     if (!uploadResponse || view !== "processing") {
@@ -89,6 +96,14 @@ export function WorkflowShell({ sceneBundle }: WorkflowShellProps) {
     }
   };
 
+  const returnToUpload = () => {
+    setView("select");
+    setUploadResponse(null);
+    setJobStatus(null);
+    setUploadError(null);
+    setIsUploading(false);
+  };
+
   if (view === "explorer") {
     return <ExplorerShell sceneBundle={sceneBundle} />;
   }
@@ -98,40 +113,58 @@ export function WorkflowShell({ sceneBundle }: WorkflowShellProps) {
       <main className="workflow-screen">
         <section className="workflow-panel processing-panel" aria-label="Processing timeline">
           <div className="workflow-heading">
-            <span className="workflow-icon">
-              <LoaderCircle size={18} aria-hidden="true" />
+            <span className="workflow-icon" data-state={jobFailed ? "failed" : "running"}>
+              {jobFailed ? (
+                <AlertTriangle size={18} aria-hidden="true" />
+              ) : (
+                <LoaderCircle size={18} aria-hidden="true" />
+              )}
             </span>
             <div>
-              <h1>Processing walkthrough</h1>
-              <p>{jobStatus?.message ?? "Creating processing job"}</p>
+              <h1>{jobFailed ? "Processing stopped" : "Processing walkthrough"}</h1>
+              <p>{jobFailed ? failureGuidance.summary : jobStatus?.message ?? "Creating processing job"}</p>
             </div>
           </div>
 
-          <div className="progress-track" aria-label="Processing progress">
+          <div className="progress-track" data-state={jobFailed ? "failed" : "running"} aria-label="Processing progress">
             <span style={{ width: `${percent}%` }} />
           </div>
           <div className="progress-meta">
             <span>{percent}%</span>
-            <span>{uploadResponse?.estimated_processing_time_sec ?? 240}s estimate</span>
+            <span>{jobFailed ? "Stopped" : `${uploadResponse?.estimated_processing_time_sec ?? 240}s estimate`}</span>
           </div>
 
           <ol className="stage-list">
             {processingStages.map((stage, index) => (
-              <li data-active={index < completedStageCount} key={stage}>
-                <CheckCircle2 size={16} aria-hidden="true" />
-                {stage}
+              <li data-active={index < completedStageCount} data-state={jobFailed ? "failed" : "running"} key={stage.stage}>
+                {jobFailed && index === completedStageCount - 1 ? (
+                  <XCircle size={16} aria-hidden="true" />
+                ) : (
+                  <CheckCircle2 size={16} aria-hidden="true" />
+                )}
+                {stage.label}
               </li>
             ))}
           </ol>
 
           {uploadError ? <p className="workflow-error">{uploadError}</p> : null}
           {jobFailed ? (
-            <p className="workflow-error">{jobStatus.error_message ?? "Processing failed"}</p>
+            <section className="failure-panel" aria-label="Processing failure details">
+              <strong>{jobStatus.error_message ?? "Processing failed"}</strong>
+              <p>{failureGuidance.nextStep}</p>
+            </section>
           ) : null}
 
           <div className="workflow-actions">
-            <button className="secondary-action" onClick={() => setView("select")} type="button">
-              Back
+            <button className="secondary-action" onClick={returnToUpload} type="button">
+              {jobFailed ? (
+                <>
+                  <RotateCcw size={16} aria-hidden="true" />
+                  Choose another video
+                </>
+              ) : (
+                "Back"
+              )}
             </button>
             <button
               className="primary-action"
@@ -202,4 +235,34 @@ export function WorkflowShell({ sceneBundle }: WorkflowShellProps) {
       </section>
     </main>
   );
+}
+
+function getFailureGuidance(errorMessage: string | null | undefined): { summary: string; nextStep: string } {
+  const message = errorMessage?.toLowerCase() ?? "";
+
+  if (message.includes("empty")) {
+    return {
+      summary: "The uploaded file did not contain usable video data.",
+      nextStep: "Choose a non-empty MP4, MOV, or M4V walkthrough and start processing again."
+    };
+  }
+
+  if (message.includes("frame extraction") || message.includes("ffmpeg") || message.includes("jpeg")) {
+    return {
+      summary: "DreamNav could not turn the walkthrough into usable image frames.",
+      nextStep: "Try a shorter, standard phone video with steady motion and good lighting."
+    };
+  }
+
+  if (message.includes("colmap") || message.includes("pose")) {
+    return {
+      summary: "DreamNav could not recover the camera path for this walkthrough.",
+      nextStep: "Try a slower walkthrough with more textured surfaces and less motion blur."
+    };
+  }
+
+  return {
+    summary: "DreamNav could not finish this processing job.",
+    nextStep: "Choose another video or use the demo scene while this pipeline stage is being checked."
+  };
 }

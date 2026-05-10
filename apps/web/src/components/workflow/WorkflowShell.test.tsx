@@ -180,6 +180,7 @@ describe("WorkflowShell", () => {
     await waitFor(() => {
       expect(screen.getByText("Training geometrically consistent scene-specific completion model")).not.toBeNull();
     });
+    expect(screen.getByText("Extracting video frames")).not.toBeNull();
     expect(screen.getByRole("button", { name: "Open explorer" }).hasAttribute("disabled")).toBe(true);
   });
 
@@ -205,5 +206,35 @@ describe("WorkflowShell", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Open explorer" }).hasAttribute("disabled")).toBe(false);
     });
+  });
+
+  it("shows failed job guidance and lets the user return to upload", async () => {
+    vi.mocked(fetchJobStatus).mockResolvedValueOnce({
+      job_id: "scene_abc123",
+      state: "failed",
+      stage: "failed",
+      progress: 0.14,
+      elapsed_sec: 18,
+      message: "Processing failed",
+      output_scene_id: null,
+      error_message: "Frame extraction produced no JPG frames."
+    });
+    render(<WorkflowShell sceneBundle={sceneBundle} />);
+    const input = screen.getByLabelText("Walkthrough video");
+
+    fireEvent.change(input, {
+      target: { files: [new File(["video"], "walkthrough.mp4", { type: "video/mp4" })] }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Start processing" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Processing stopped" })).not.toBeNull();
+    });
+    expect(screen.getByText("DreamNav could not turn the walkthrough into usable image frames.")).not.toBeNull();
+    expect(screen.getByText("Frame extraction produced no JPG frames.")).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Choose another video" }));
+
+    expect(screen.getByRole("button", { name: "Start processing" })).not.toBeNull();
   });
 });
