@@ -27,4 +27,22 @@ describe("camera path schema", () => {
 
     expect(path.poses[0]?.fov_degrees).toBe(60);
   });
+
+  it("rejects camera paths without poses", () => {
+    expect(() =>
+      parseCameraPath({
+        scene_id: "warehouse_01",
+        coordinate_system: "dreamnav_viewer_v1",
+        intrinsics: {
+          width: 1920,
+          height: 1080,
+          fx: 1240,
+          fy: 1240,
+          cx: 960,
+          cy: 540
+        },
+        poses: []
+      })
+    ).toThrow();
+  });
 });

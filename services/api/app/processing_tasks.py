@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from json import dumps
 from pathlib import Path
 from shutil import which
 import sys
@@ -8,6 +9,7 @@ from typing import Protocol
 
 from .config import ProcessingSettings
 from .jobs import ProcessingStep, StoredJob
+from .pose_normalization import PoseNormalizationError, normalize_camera_path, stub_raw_poses_from_frames
 from .video_probe import VideoProbeError, probe_video_file
 
 
@@ -156,12 +158,27 @@ def validate_capture_quality(context: ProcessingTaskContext) -> ProcessingTaskRe
 
 def estimate_camera_motion(context: ProcessingTaskContext) -> ProcessingTaskResult:
     backend = _normalized_pose_backend(context.processing_settings)
+    frames = _frame_inventory(_frames_root(context)).frames
+    try:
+        raw_poses = stub_raw_poses_from_frames(frames, context.processing_settings.frame_rate)
+        camera_path = normalize_camera_path(context.job.job_id, raw_poses)
+    except PoseNormalizationError as error:
+        raise ProcessingTaskFailed(str(error)) from error
+
+    camera_path_name = "camera_path.json"
+    (context.artifacts_root / camera_path_name).write_text(
+        dumps(camera_path, indent=2),
+        encoding="utf-8",
+    )
+
     return _result(
         "camera_motion.json",
         context,
         backend=backend,
         command_mode="stub" if backend == "stub" else "external",
-        pose_count=3,
+        camera_path=camera_path_name,
+        coordinate_system=camera_path["coordinate_system"],
+        pose_count=len(camera_path["poses"]),
     )
 
 

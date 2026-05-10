@@ -63,9 +63,16 @@ def test_worker_completes_queued_job(tmp_path: Path) -> None:
     assert command_artifact["exit_code"] == 0
     assert "pose_backend=stub" in command_artifact["stdout"]
     camera_motion_path = tmp_path / "data" / "jobs" / response.job_id / "artifacts" / "camera_motion.json"
+    camera_path_path = tmp_path / "data" / "jobs" / response.job_id / "artifacts" / "camera_path.json"
     camera_motion = loads(camera_motion_path.read_text(encoding="utf-8"))
+    camera_path = loads(camera_path_path.read_text(encoding="utf-8"))
     assert camera_motion["backend"] == "stub"
     assert camera_motion["command_mode"] == "stub"
+    assert camera_motion["camera_path"] == "camera_path.json"
+    assert camera_motion["pose_count"] == 3
+    assert camera_path["scene_id"] == response.job_id
+    assert camera_path["coordinate_system"] == "dreamnav_viewer_v1"
+    assert camera_path["poses"][1]["timestamp_sec"] == 0.5
 
 
 def test_worker_reads_legacy_elapsed_time_job(tmp_path: Path) -> None:
@@ -237,6 +244,7 @@ def test_worker_runs_configured_colmap_command(tmp_path: Path) -> None:
     assert "feature_extractor" in command_artifact["stdout"]
     assert camera_motion["backend"] == "colmap"
     assert camera_motion["command_mode"] == "external"
+    assert camera_motion["camera_path"] == "camera_path.json"
     assert str(tmp_path / "data" / "jobs" / response.job_id / "artifacts" / "frames") in command_artifact["command"]
 
 
