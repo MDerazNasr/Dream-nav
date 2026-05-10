@@ -6,6 +6,7 @@ import sys
 import anyio
 from fastapi import UploadFile
 
+from app.config import ProcessingSettings
 from app.jobs import JobRepository, ProcessingStep
 from app.processing_tasks import (
     ProcessingCommand,
@@ -45,7 +46,11 @@ def test_worker_completes_queued_job(tmp_path: Path) -> None:
     )
     command_artifact = loads(command_path.read_text(encoding="utf-8"))
     assert command_artifact["exit_code"] == 0
-    assert "pose_backend=COLMAP" in command_artifact["stdout"]
+    assert "pose_backend=stub" in command_artifact["stdout"]
+    camera_motion_path = tmp_path / "data" / "jobs" / response.job_id / "artifacts" / "camera_motion.json"
+    camera_motion = loads(camera_motion_path.read_text(encoding="utf-8"))
+    assert camera_motion["backend"] == "stub"
+    assert camera_motion["command_mode"] == "stub"
 
 
 def test_worker_reads_legacy_elapsed_time_job(tmp_path: Path) -> None:
@@ -139,6 +144,78 @@ def test_worker_fails_job_when_task_command_fails(tmp_path: Path) -> None:
     assert status.error_message is not None
     assert "exit code 12" in status.error_message
     assert command_artifact["exit_code"] == 12
+
+
+def test_worker_fails_when_colmap_backend_is_missing(tmp_path: Path) -> None:
+    repo = JobRepository(
+        jobs_root=tmp_path / "data" / "jobs",
+        uploads_root=tmp_path / "data" / "uploads",
+    )
+    response = anyio.run(
+        repo.create_upload_job,
+        UploadFile(filename="walkthrough.mp4", file=BytesIO(b"video-bytes")),
+    )
+    worker = ProcessingWorker(
+        repo,
+        processing_settings=ProcessingSettings(
+            pose_backend="colmap",
+            pose_command=str(tmp_path / "missing_colmap"),
+        ),
+        step_delay_sec=0,
+    )
+
+    worker.process_next_job()
+    status = repo.get_status(response.job_id)
+
+    assert status.state == "failed"
+    assert status.error_message == "Pose backend colmap selected but COLMAP binary was not found."
+
+
+def test_worker_runs_configured_colmap_command(tmp_path: Path) -> None:
+    repo = JobRepository(
+        jobs_root=tmp_path / "data" / "jobs",
+        uploads_root=tmp_path / "data" / "uploads",
+    )
+    fake_colmap = tmp_path / "fake_colmap.py"
+    fake_colmap.write_text(
+        "#!/usr/bin/env python3\n"
+        "import sys\n"
+        "print('fake colmap ' + ' '.join(sys.argv[1:]))\n",
+        encoding="utf-8",
+    )
+    fake_colmap.chmod(0o755)
+    response = anyio.run(
+        repo.create_upload_job,
+        UploadFile(filename="walkthrough.mp4", file=BytesIO(b"video-bytes")),
+    )
+    worker = ProcessingWorker(
+        repo,
+        processing_settings=ProcessingSettings(
+            pose_backend="colmap",
+            pose_command=str(fake_colmap),
+            pose_timeout_sec=5,
+        ),
+        step_delay_sec=0,
+    )
+
+    worker.process_next_job()
+    status = repo.get_status(response.job_id)
+    command_path = (
+        tmp_path / "data" / "jobs" / response.job_id / "artifacts" / "camera_motion_command.json"
+    )
+    command_artifact = loads(command_path.read_text(encoding="utf-8"))
+    camera_motion = loads(
+        (tmp_path / "data" / "jobs" / response.job_id / "artifacts" / "camera_motion.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert status.state == "completed"
+    assert command_artifact["exit_code"] == 0
+    assert command_artifact["command"][0] == str(fake_colmap)
+    assert "feature_extractor" in command_artifact["stdout"]
+    assert camera_motion["backend"] == "colmap"
+    assert camera_motion["command_mode"] == "external"
 
 
 def test_worker_fails_empty_capture_validation(tmp_path: Path) -> None:

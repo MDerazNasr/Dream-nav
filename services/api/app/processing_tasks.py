@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from shutil import which
 import sys
 from typing import Protocol
 
+from .config import ProcessingSettings
 from .jobs import ProcessingStep, StoredJob
 from .video_probe import VideoProbeError, probe_video_file
 
@@ -18,6 +20,7 @@ class ProcessingTaskContext:
     job: StoredJob
     upload_path: Path
     artifacts_root: Path
+    processing_settings: ProcessingSettings
 
 
 @dataclass(frozen=True)
@@ -127,7 +130,14 @@ def validate_capture_quality(context: ProcessingTaskContext) -> ProcessingTaskRe
 
 
 def estimate_camera_motion(context: ProcessingTaskContext) -> ProcessingTaskResult:
-    return _result("camera_motion.json", context, backend="COLMAP", pose_count=3)
+    backend = _normalized_pose_backend(context.processing_settings)
+    return _result(
+        "camera_motion.json",
+        context,
+        backend=backend,
+        command_mode="stub" if backend == "stub" else "external",
+        pose_count=3,
+    )
 
 
 def build_gaussian_scene(context: ProcessingTaskContext) -> ProcessingTaskResult:
@@ -164,10 +174,36 @@ def prepare_explorer(context: ProcessingTaskContext) -> ProcessingTaskResult:
 
 
 def build_camera_motion_command(context: ProcessingTaskContext) -> ProcessingCommand:
-    return _placeholder_command(
-        "camera_motion_command.json",
-        f"pose_backend=COLMAP source={context.upload_path.name}",
-    )
+    backend = _normalized_pose_backend(context.processing_settings)
+
+    if backend == "stub":
+        return _placeholder_command(
+            "camera_motion_command.json",
+            f"pose_backend=stub source={context.upload_path.name}",
+        )
+
+    if backend == "colmap":
+        colmap_command = _resolve_pose_command(context.processing_settings.pose_command, "colmap")
+        if not colmap_command:
+            raise ProcessingTaskFailed("Pose backend colmap selected but COLMAP binary was not found.")
+
+        return ProcessingCommand(
+            artifact_name="camera_motion_command.json",
+            command=[
+                colmap_command,
+                "feature_extractor",
+                "--database_path",
+                str(context.artifacts_root / "colmap.db"),
+                "--image_path",
+                str(context.upload_path.parent),
+            ],
+            timeout_sec=context.processing_settings.pose_timeout_sec,
+        )
+
+    if backend == "droid_slam":
+        raise ProcessingTaskFailed("Pose backend droid_slam is configured but not implemented yet.")
+
+    raise ProcessingTaskFailed(f"Unsupported pose backend: {context.processing_settings.pose_backend}")
 
 
 def build_gaussian_scene_command(context: ProcessingTaskContext) -> ProcessingCommand:
@@ -175,6 +211,21 @@ def build_gaussian_scene_command(context: ProcessingTaskContext) -> ProcessingCo
         "gaussian_scene_command.json",
         f"gaussian_backend=3DGS artifacts={context.artifacts_root}",
     )
+
+
+def _normalized_pose_backend(settings: ProcessingSettings) -> str:
+    return settings.pose_backend.strip().lower()
+
+
+def _resolve_pose_command(configured_command: str | None, default_command: str) -> str | None:
+    if not configured_command:
+        return which(default_command)
+
+    configured_path = Path(configured_command)
+    if configured_path.parent != Path("."):
+        return str(configured_path) if configured_path.is_file() else None
+
+    return which(configured_command)
 
 
 def _result(

@@ -1,6 +1,7 @@
 from time import sleep
 
 from .command_runner import CommandRunner
+from .config import ProcessingSettings
 from .jobs import JobRepository
 from .processing_tasks import (
     ProcessingCommand,
@@ -20,12 +21,14 @@ class ProcessingWorker:
         job_repository: JobRepository,
         tasks: list[ProcessingTask] | None = None,
         command_runner: CommandRunner | None = None,
+        processing_settings: ProcessingSettings | None = None,
         step_delay_sec: float = STEP_DELAY_SEC,
         output_scene_id: str = DEMO_OUTPUT_SCENE_ID,
     ) -> None:
         self.job_repository = job_repository
         self.tasks = tasks or default_processing_tasks()
         self.command_runner = command_runner or CommandRunner()
+        self.processing_settings = processing_settings or ProcessingSettings()
         self.step_delay_sec = step_delay_sec
         self.output_scene_id = output_scene_id
 
@@ -42,6 +45,7 @@ class ProcessingWorker:
                     job=job,
                     upload_path=self.job_repository.upload_path(job),
                     artifacts_root=self.job_repository.artifact_root(job.job_id),
+                    processing_settings=self.processing_settings,
                 )
 
                 if task.command_builder:
