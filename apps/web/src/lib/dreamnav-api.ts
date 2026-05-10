@@ -4,10 +4,17 @@ import {
   parseCompletionManifest,
   parseDemoScenesResponse,
   parseQualityReport,
+  parseSceneAssetStatus,
   parseSceneAssets,
   parseSceneMetadata,
   parseVisibilityManifest
 } from "@dream-nav/shared";
+
+import type { SceneAssetStatus } from "@dream-nav/shared";
+
+export type ViewerSceneBundle = SceneBundle & {
+  assetStatus: SceneAssetStatus;
+};
 
 const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000";
 
@@ -28,7 +35,7 @@ export function getDreamNavApiBaseUrl(): string {
 export async function fetchSceneBundle(
   sceneId: string,
   apiBaseUrl = getDreamNavApiBaseUrl()
-): Promise<SceneBundle> {
+): Promise<ViewerSceneBundle> {
   const demoScenes = parseDemoScenesResponse(await fetchJson(apiBaseUrl, "/demo-scenes"));
   const demoScene = demoScenes.find((scene) => scene.scene_id === sceneId);
 
@@ -48,6 +55,9 @@ export async function fetchSceneBundle(
   const completion = parseCompletionManifest(
     await fetchJson(apiBaseUrl, assets.completion_manifest_url)
   );
+  const assetStatus = parseSceneAssetStatus(
+    await fetchJson(apiBaseUrl, `/scene/${sceneId}/asset-status`)
+  );
 
   return {
     demoScene,
@@ -56,7 +66,8 @@ export async function fetchSceneBundle(
     quality,
     cameraPath,
     visibility,
-    completion
+    completion,
+    assetStatus
   };
 }
 

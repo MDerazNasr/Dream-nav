@@ -1,6 +1,6 @@
 "use client";
 
-import type { CameraPath, LensMode, VisibilityManifest } from "@dream-nav/shared";
+import type { CameraPath, LensMode, ViewerRenderMode, VisibilityManifest } from "@dream-nav/shared";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { getLensFov } from "../../lib/lens";
@@ -9,6 +9,7 @@ type SceneViewportProps = {
   cameraPath: CameraPath;
   lensMode: LensMode;
   overlayEnabled: boolean;
+  renderMode: ViewerRenderMode;
   visibility: VisibilityManifest;
 };
 
@@ -16,6 +17,7 @@ export function SceneViewport({
   cameraPath,
   lensMode,
   overlayEnabled,
+  renderMode,
   visibility
 }: SceneViewportProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -43,7 +45,7 @@ export function SceneViewport({
     renderer.domElement.dataset.testid = "scene-canvas";
     mount.appendChild(renderer.domElement);
 
-    const objects = createPlaceholderScene(visibility, overlayEnabled);
+    const objects = createSceneObjects(visibility, overlayEnabled, renderMode);
     objects.forEach((object) => scene.add(object));
 
     const light = new THREE.HemisphereLight("#f5f7f4", "#24312d", 1.8);
@@ -88,16 +90,20 @@ export function SceneViewport({
       renderer.dispose();
       mount.replaceChildren();
     };
-  }, [cameraPath, lensMode, overlayEnabled, visibility]);
+  }, [cameraPath, lensMode, overlayEnabled, renderMode, visibility]);
 
   return <div className="viewport" data-testid="scene-viewport" ref={mountRef} />;
 }
 
-function createPlaceholderScene(visibility: VisibilityManifest, overlayEnabled: boolean): THREE.Object3D[] {
+function createSceneObjects(
+  visibility: VisibilityManifest,
+  overlayEnabled: boolean,
+  renderMode: ViewerRenderMode
+): THREE.Object3D[] {
   const objects: THREE.Object3D[] = [];
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(16, 16),
-    new THREE.MeshStandardMaterial({ color: "#2a2f2b", roughness: 0.82 })
+    new THREE.MeshStandardMaterial({ color: renderMode === "splat" ? "#242c28" : "#2a2f2b", roughness: 0.82 })
   );
   floor.rotation.x = -Math.PI / 2;
   objects.push(floor);

@@ -1,13 +1,13 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ExplorerShell } from "./ExplorerShell";
-import type { SceneBundle } from "@dream-nav/scene-registry";
+import type { ViewerSceneBundle } from "../../lib/dreamnav-api";
 
 vi.mock("./SceneViewport", () => ({
   SceneViewport: () => <div data-testid="scene-viewport" />
 }));
 
-const sceneBundle: SceneBundle = {
+const sceneBundle: ViewerSceneBundle = {
   demoScene: {
     scene_id: "warehouse_01",
     title: "Warehouse Scout",
@@ -138,6 +138,13 @@ const sceneBundle: SceneBundle = {
     heldout_psnr_median: 21.4,
     cache_strategy: "planned_path",
     cached_predictions: []
+  },
+  assetStatus: {
+    scene_id: "warehouse_01",
+    splat_url: "/scenes/warehouse_01/splat.ply",
+    splat_available: false,
+    viewer_render_mode: "placeholder",
+    missing_assets: ["splat.ply"]
   }
 };
 
@@ -149,6 +156,7 @@ describe("ExplorerShell", () => {
     expect(screen.getByRole("button", { name: "24mm" })).not.toBeNull();
     expect(screen.getByLabelText("Camera path")).not.toBeNull();
     expect(screen.getByText("torch_fp16")).not.toBeNull();
+    expect(screen.getByLabelText("Render mode").textContent).toContain("Placeholder");
   });
 
   it("toggles the confidence overlay button state", () => {

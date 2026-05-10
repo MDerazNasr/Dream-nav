@@ -1,16 +1,16 @@
 "use client";
 
-import type { SceneBundle } from "@dream-nav/scene-registry";
 import type { LensMode } from "@dream-nav/shared";
 import { BookmarkPlus, Gauge, Layers, Video } from "lucide-react";
 import { useState } from "react";
+import type { ViewerSceneBundle } from "../../lib/dreamnav-api";
 import { LensSelector } from "./LensSelector";
 import { MetricsPanel } from "./MetricsPanel";
 import { Minimap } from "./Minimap";
 import { SceneViewport } from "./SceneViewport";
 
 type ExplorerShellProps = {
-  sceneBundle: SceneBundle;
+  sceneBundle: ViewerSceneBundle;
 };
 
 export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
@@ -24,6 +24,7 @@ export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
         cameraPath={sceneBundle.cameraPath}
         lensMode={selectedLens}
         overlayEnabled={overlayEnabled}
+        renderMode={sceneBundle.assetStatus.viewer_render_mode}
         visibility={sceneBundle.visibility}
       />
 
@@ -62,6 +63,9 @@ export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
       </aside>
 
       <div className="bottom-bar">
+        <span className="badge" aria-label="Render mode">
+          {sceneBundle.assetStatus.viewer_render_mode === "splat" ? "3DGS" : "Placeholder"}
+        </span>
         <button
           aria-label="Toggle confidence overlay"
           className="icon-button"
