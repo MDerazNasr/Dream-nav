@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DreamNavApiError, fetchSceneBundle, getDreamNavApiBaseUrl } from "./dreamnav-api";
+import {
+  DreamNavApiError,
+  fetchJobStatus,
+  fetchSceneBundle,
+  getDreamNavApiBaseUrl,
+  uploadWalkthrough
+} from "./dreamnav-api";
 
 const apiPayloads: Record<string, unknown> = {
   "http://api.test/demo-scenes": [
@@ -186,6 +192,48 @@ describe("DreamNav API client", () => {
     await expect(fetchSceneBundle("warehouse_01", "http://api.test")).rejects.toMatchObject({
       status: 404
     });
+  });
+
+  it("uploads walkthrough videos through the processing contract", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        job_id: "scene_abc123",
+        validation_status: "pass",
+        warnings: [],
+        estimated_processing_time_sec: 240
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await uploadWalkthrough(
+      new File(["video"], "walkthrough.mp4", { type: "video/mp4" }),
+      "http://api.test"
+    );
+
+    expect(response.job_id).toBe("scene_abc123");
+    expect(fetchMock).toHaveBeenCalledWith(
+      new URL("http://api.test/upload"),
+      expect.objectContaining({
+        body: expect.any(FormData),
+        method: "POST"
+      })
+    );
+  });
+
+  it("loads processing job status", async () => {
+    mockFetchFromPayloads({
+      "http://api.test/status/scene_abc123": {
+        job_id: "scene_abc123",
+        stage: "training_scene_model",
+        progress: 0.62,
+        elapsed_sec: 148,
+        message: "Training geometrically consistent scene-specific completion model"
+      }
+    });
+
+    const response = await fetchJobStatus("scene_abc123", "http://api.test");
+
+    expect(response.stage).toBe("training_scene_model");
   });
 });
 

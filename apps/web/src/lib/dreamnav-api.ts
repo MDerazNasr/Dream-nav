@@ -3,14 +3,16 @@ import {
   parseCameraPath,
   parseCompletionManifest,
   parseDemoScenesResponse,
+  parseJobStatus,
   parseQualityReport,
   parseSceneAssetStatus,
   parseSceneAssets,
   parseSceneMetadata,
+  parseUploadResponse,
   parseVisibilityManifest
 } from "@dream-nav/shared";
 
-import type { SceneAssetStatus } from "@dream-nav/shared";
+import type { DemoScene, JobStatus, SceneAssetStatus, UploadResponse } from "@dream-nav/shared";
 
 export type ViewerSceneBundle = SceneBundle & {
   assetStatus: SceneAssetStatus;
@@ -29,14 +31,20 @@ export class DreamNavApiError extends Error {
 }
 
 export function getDreamNavApiBaseUrl(): string {
-  return process.env.DREAMNAV_API_URL ?? DEFAULT_API_BASE_URL;
+  return process.env.NEXT_PUBLIC_DREAMNAV_API_URL ?? process.env.DREAMNAV_API_URL ?? DEFAULT_API_BASE_URL;
+}
+
+export async function fetchDemoScenes(
+  apiBaseUrl = getDreamNavApiBaseUrl()
+): Promise<DemoScene[]> {
+  return parseDemoScenesResponse(await fetchJson(apiBaseUrl, "/demo-scenes"));
 }
 
 export async function fetchSceneBundle(
   sceneId: string,
   apiBaseUrl = getDreamNavApiBaseUrl()
 ): Promise<ViewerSceneBundle> {
-  const demoScenes = parseDemoScenesResponse(await fetchJson(apiBaseUrl, "/demo-scenes"));
+  const demoScenes = await fetchDemoScenes(apiBaseUrl);
   const demoScene = demoScenes.find((scene) => scene.scene_id === sceneId);
 
   if (!demoScene) {
@@ -75,9 +83,34 @@ export async function fetchSceneBundle(
   };
 }
 
-async function fetchJson(apiBaseUrl: string, path: string): Promise<unknown> {
+export async function uploadWalkthrough(
+  file: File,
+  apiBaseUrl = getDreamNavApiBaseUrl()
+): Promise<UploadResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  return parseUploadResponse(await fetchJson(apiBaseUrl, "/upload", {
+    body: formData,
+    method: "POST"
+  }));
+}
+
+export async function fetchJobStatus(
+  jobId: string,
+  apiBaseUrl = getDreamNavApiBaseUrl()
+): Promise<JobStatus> {
+  return parseJobStatus(await fetchJson(apiBaseUrl, `/status/${jobId}`));
+}
+
+async function fetchJson(
+  apiBaseUrl: string,
+  path: string,
+  init?: RequestInit
+): Promise<unknown> {
   const response = await fetch(new URL(path, normalizeBaseUrl(apiBaseUrl)), {
-    cache: "no-store"
+    cache: "no-store",
+    ...init
   });
 
   if (!response.ok) {
