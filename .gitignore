@@ -1,0 +1,13 @@
+.context/
+.env
+.env.*
+!.env.example
+.next/
+coverage/
+dist/
+node_modules/
+__pycache__/
+.pytest_cache/
+.venv/
+*.pyc
+npm-debug.log*
