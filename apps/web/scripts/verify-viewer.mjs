@@ -28,6 +28,12 @@ try {
     });
 
     await page.goto(baseUrl, { waitUntil: "networkidle" });
+    const openDemoButton = page.getByRole("button", { name: "Open demo" });
+
+    if (await openDemoButton.isVisible()) {
+      await openDemoButton.click();
+    }
+
     await page.locator("[data-testid='scene-canvas']").waitFor();
     const renderMode = await page.locator("[aria-label='Render mode']").textContent();
 
