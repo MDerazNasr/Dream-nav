@@ -8,10 +8,10 @@
     "services/*"
   ],
   "scripts": {
-    "build": "npm run build -w @dream-nav/shared && npm run build -w @dream-nav/scene-registry",
+    "build": "npm run build -w @dream-nav/shared && npm run build -w @dream-nav/scene-registry && npm run build -w @dream-nav/web",
     "lint": "npm run lint --workspaces --if-present",
-    "test": "npm run build -w @dream-nav/shared && npm run test --workspaces --if-present",
-    "typecheck": "npm run typecheck -w @dream-nav/shared && npm run build -w @dream-nav/shared && npm run typecheck -w @dream-nav/scene-registry"
+    "test": "npm run build -w @dream-nav/shared && npm run build -w @dream-nav/scene-registry && npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck -w @dream-nav/shared && npm run build -w @dream-nav/shared && npm run typecheck -w @dream-nav/scene-registry && npm run build -w @dream-nav/scene-registry && npm run typecheck -w @dream-nav/web"
   },
   "engines": {
     "node": ">=20"

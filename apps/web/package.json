@@ -1,0 +1,28 @@
+{
+  "name": "@dream-nav/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "next build",
+    "dev": "next dev",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@dream-nav/scene-registry": "0.1.0",
+    "@dream-nav/shared": "0.1.0",
+    "lucide-react": "1.14.0",
+    "next": "16.2.6",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "three": "0.184.0"
+  },
+  "devDependencies": {
+    "@testing-library/react": "16.3.2",
+    "@types/react": "19.2.8",
+    "@types/react-dom": "19.2.3",
+    "@types/three": "0.184.1",
+    "jsdom": "29.1.1"
+  }
+}
