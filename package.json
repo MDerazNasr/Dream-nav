@@ -14,7 +14,8 @@
     "build": "npm run build -w @dream-nav/shared && npm run build -w @dream-nav/scene-registry && npm run build -w @dream-nav/web",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run build -w @dream-nav/shared && npm run build -w @dream-nav/scene-registry && npm run test --workspaces --if-present && npm run api:test",
-    "typecheck": "npm run typecheck -w @dream-nav/shared && npm run build -w @dream-nav/shared && npm run typecheck -w @dream-nav/scene-registry && npm run build -w @dream-nav/scene-registry && npm run typecheck -w @dream-nav/web"
+    "typecheck": "npm run typecheck -w @dream-nav/shared && npm run build -w @dream-nav/shared && npm run typecheck -w @dream-nav/scene-registry && npm run build -w @dream-nav/scene-registry && npm run typecheck -w @dream-nav/web",
+    "generate:demo-splat": "node scripts/generate-demo-splat.mjs"
   },
   "engines": {
     "node": ">=20"

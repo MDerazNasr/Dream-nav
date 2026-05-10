@@ -39,14 +39,14 @@ def test_quality_returns_scene_metrics() -> None:
     assert response.json()["runtime_path"] == "torch_fp16"
 
 
-def test_asset_status_reports_placeholder_when_splat_is_missing() -> None:
+def test_asset_status_reports_splat_mode_when_splat_exists() -> None:
     client = TestClient(create_app())
 
     response = client.get("/scene/warehouse_01/asset-status")
 
     assert response.status_code == 200
-    assert response.json()["viewer_render_mode"] == "placeholder"
-    assert response.json()["missing_assets"] == ["splat.ply"]
+    assert response.json()["viewer_render_mode"] == "splat"
+    assert response.json()["missing_assets"] == []
 
 
 def test_missing_scene_returns_404() -> None:
