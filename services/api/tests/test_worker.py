@@ -1,12 +1,14 @@
 from pathlib import Path
 from io import BytesIO
 from json import dumps, loads
+import sys
 
 import anyio
 from fastapi import UploadFile
 
 from app.jobs import JobRepository, ProcessingStep
 from app.processing_tasks import (
+    ProcessingCommand,
     ProcessingTask,
     ProcessingTaskContext,
     ProcessingTaskFailed,
@@ -38,6 +40,12 @@ def test_worker_completes_queued_job(tmp_path: Path) -> None:
     assert capture_quality["job_id"] == response.job_id
     assert capture_quality["file_size_bytes"] == len(b"video-bytes")
     assert capture_quality["extension"] == ".mp4"
+    command_path = (
+        tmp_path / "data" / "jobs" / response.job_id / "artifacts" / "camera_motion_command.json"
+    )
+    command_artifact = loads(command_path.read_text(encoding="utf-8"))
+    assert command_artifact["exit_code"] == 0
+    assert "pose_backend=COLMAP" in command_artifact["stdout"]
 
 
 def test_worker_reads_legacy_elapsed_time_job(tmp_path: Path) -> None:
@@ -111,6 +119,28 @@ def test_worker_fails_job_when_task_fails(tmp_path: Path) -> None:
     assert status.error_message == "camera motion failed"
 
 
+def test_worker_fails_job_when_task_command_fails(tmp_path: Path) -> None:
+    repo = JobRepository(
+        jobs_root=tmp_path / "data" / "jobs",
+        uploads_root=tmp_path / "data" / "uploads",
+    )
+    response = anyio.run(
+        repo.create_upload_job,
+        UploadFile(filename="walkthrough.mp4", file=BytesIO(b"video-bytes")),
+    )
+    worker = ProcessingWorker(repo, tasks=[_command_failing_task()], step_delay_sec=0)
+
+    worker.process_next_job()
+    status = repo.get_status(response.job_id)
+    command_path = tmp_path / "data" / "jobs" / response.job_id / "artifacts" / "bad_command.json"
+    command_artifact = loads(command_path.read_text(encoding="utf-8"))
+
+    assert status.state == "failed"
+    assert status.error_message is not None
+    assert "exit code 12" in status.error_message
+    assert command_artifact["exit_code"] == 12
+
+
 def test_worker_fails_empty_capture_validation(tmp_path: Path) -> None:
     repo = JobRepository(
         jobs_root=tmp_path / "data" / "jobs",
@@ -157,4 +187,24 @@ def _failing_task() -> ProcessingTask:
         step=ProcessingStep("estimating_camera_motion", 0.2, "Estimating camera motion"),
         artifact_name="camera_motion.json",
         run=run,
+    )
+
+
+def _command_failing_task() -> ProcessingTask:
+    def run(context: ProcessingTaskContext) -> ProcessingTaskResult:
+        return ProcessingTaskResult("bad.json", {"job_id": context.job.job_id})
+
+    def command_builder(context: ProcessingTaskContext) -> ProcessingCommand:
+        del context
+        return ProcessingCommand(
+            artifact_name="bad_command.json",
+            command=[sys.executable, "-c", "import sys; print('failed', file=sys.stderr); sys.exit(12)"],
+            timeout_sec=5,
+        )
+
+    return ProcessingTask(
+        step=ProcessingStep("estimating_camera_motion", 0.2, "Estimating camera motion"),
+        artifact_name="bad.json",
+        run=run,
+        command_builder=command_builder,
     )

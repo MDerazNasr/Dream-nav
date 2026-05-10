@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import sys
 from typing import Protocol
 
 from .jobs import ProcessingStep, StoredJob
@@ -25,8 +26,20 @@ class ProcessingTaskResult:
     payload: dict[str, object]
 
 
+@dataclass(frozen=True)
+class ProcessingCommand:
+    artifact_name: str
+    command: list[str]
+    timeout_sec: float = 60
+
+
 class ProcessingTaskRunner(Protocol):
     def __call__(self, context: ProcessingTaskContext) -> ProcessingTaskResult:
+        pass
+
+
+class ProcessingCommandBuilder(Protocol):
+    def __call__(self, context: ProcessingTaskContext) -> ProcessingCommand:
         pass
 
 
@@ -35,6 +48,7 @@ class ProcessingTask:
     step: ProcessingStep
     artifact_name: str
     run: ProcessingTaskRunner
+    command_builder: ProcessingCommandBuilder | None = None
 
 
 def default_processing_tasks() -> list[ProcessingTask]:
@@ -48,11 +62,13 @@ def default_processing_tasks() -> list[ProcessingTask]:
             ProcessingStep("estimating_camera_motion", 0.2, "Estimating camera motion"),
             "camera_motion.json",
             estimate_camera_motion,
+            build_camera_motion_command,
         ),
         ProcessingTask(
             ProcessingStep("building_gaussian_scene", 0.36, "Building Gaussian scene"),
             "gaussian_scene.json",
             build_gaussian_scene,
+            build_gaussian_scene_command,
         ),
         ProcessingTask(
             ProcessingStep("computing_visibility_support", 0.48, "Computing visibility support"),
@@ -147,6 +163,20 @@ def prepare_explorer(context: ProcessingTaskContext) -> ProcessingTaskResult:
     return _result("explorer_bundle.json", context, output_scene_id="warehouse_01")
 
 
+def build_camera_motion_command(context: ProcessingTaskContext) -> ProcessingCommand:
+    return _placeholder_command(
+        "camera_motion_command.json",
+        f"pose_backend=COLMAP source={context.upload_path.name}",
+    )
+
+
+def build_gaussian_scene_command(context: ProcessingTaskContext) -> ProcessingCommand:
+    return _placeholder_command(
+        "gaussian_scene_command.json",
+        f"gaussian_backend=3DGS artifacts={context.artifacts_root}",
+    )
+
+
 def _result(
     artifact_name: str,
     context: ProcessingTaskContext,
@@ -159,4 +189,12 @@ def _result(
             "source_video": context.job.stored_filename,
             **payload,
         },
+    )
+
+
+def _placeholder_command(artifact_name: str, message: str) -> ProcessingCommand:
+    return ProcessingCommand(
+        artifact_name=artifact_name,
+        command=[sys.executable, "-c", f"print({message!r})"],
+        timeout_sec=5,
     )
