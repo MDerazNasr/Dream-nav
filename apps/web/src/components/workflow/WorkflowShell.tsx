@@ -45,7 +45,8 @@ export function WorkflowShell({ sceneBundle }: WorkflowShellProps) {
     () => Math.min(processingStages.length, Math.ceil(activeProgress * processingStages.length)),
     [activeProgress]
   );
-  const failureGuidance = getFailureGuidance(jobStatus?.error_message);
+  const failedStageLabel = getStageLabel(jobStatus?.failed_stage);
+  const failureGuidance = getFailureGuidance(jobStatus?.failed_stage, jobStatus?.error_message);
 
   useEffect(() => {
     if (!uploadResponse || view !== "processing") {
@@ -122,7 +123,13 @@ export function WorkflowShell({ sceneBundle }: WorkflowShellProps) {
             </span>
             <div>
               <h1>{jobFailed ? "Processing stopped" : "Processing walkthrough"}</h1>
-              <p>{jobFailed ? failureGuidance.summary : jobStatus?.message ?? "Creating processing job"}</p>
+              <p>
+                {jobFailed && failedStageLabel
+                  ? `Failed while ${failedStageLabel.toLowerCase()}.`
+                  : jobFailed
+                    ? failureGuidance.summary
+                    : jobStatus?.message ?? "Creating processing job"}
+              </p>
             </div>
           </div>
 
@@ -150,7 +157,9 @@ export function WorkflowShell({ sceneBundle }: WorkflowShellProps) {
           {uploadError ? <p className="workflow-error">{uploadError}</p> : null}
           {jobFailed ? (
             <section className="failure-panel" aria-label="Processing failure details">
+              {failedStageLabel ? <p>Pipeline stage: {failedStageLabel}</p> : null}
               <strong>{jobStatus.error_message ?? "Processing failed"}</strong>
+              {jobStatus.failed_artifact ? <p>Debug artifact: {jobStatus.failed_artifact}</p> : null}
               <p>{failureGuidance.nextStep}</p>
             </section>
           ) : null}
@@ -237,24 +246,36 @@ export function WorkflowShell({ sceneBundle }: WorkflowShellProps) {
   );
 }
 
-function getFailureGuidance(errorMessage: string | null | undefined): { summary: string; nextStep: string } {
+function getStageLabel(stage: JobStatus["failed_stage"]): string | null {
+  return processingStages.find((stageItem) => stageItem.stage === stage)?.label ?? null;
+}
+
+function getFailureGuidance(
+  failedStage: JobStatus["failed_stage"],
+  errorMessage: string | null | undefined
+): { summary: string; nextStep: string } {
   const message = errorMessage?.toLowerCase() ?? "";
 
-  if (message.includes("empty")) {
+  if (failedStage === "checking_capture_quality" || message.includes("empty")) {
     return {
       summary: "The uploaded file did not contain usable video data.",
       nextStep: "Choose a non-empty MP4, MOV, or M4V walkthrough and start processing again."
     };
   }
 
-  if (message.includes("frame extraction") || message.includes("ffmpeg") || message.includes("jpeg")) {
+  if (
+    failedStage === "extracting_video_frames" ||
+    message.includes("frame extraction") ||
+    message.includes("ffmpeg") ||
+    message.includes("jpeg")
+  ) {
     return {
       summary: "DreamNav could not turn the walkthrough into usable image frames.",
       nextStep: "Try a shorter, standard phone video with steady motion and good lighting."
     };
   }
 
-  if (message.includes("colmap") || message.includes("pose")) {
+  if (failedStage === "estimating_camera_motion" || message.includes("colmap") || message.includes("pose")) {
     return {
       summary: "DreamNav could not recover the camera path for this walkthrough.",
       nextStep: "Try a slower walkthrough with more textured surfaces and less motion blur."

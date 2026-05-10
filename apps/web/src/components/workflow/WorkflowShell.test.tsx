@@ -21,7 +21,9 @@ vi.mock("../../lib/dreamnav-api", async (importOriginal) => {
       elapsed_sec: 148,
       message: "Training geometrically consistent scene-specific completion model",
       output_scene_id: null,
-      error_message: null
+      error_message: null,
+      failed_stage: null,
+      failed_artifact: null
     })),
     uploadWalkthrough: vi.fn(async () => ({
       job_id: "scene_abc123",
@@ -193,7 +195,9 @@ describe("WorkflowShell", () => {
       elapsed_sec: 240,
       message: "Explorer ready",
       output_scene_id: "warehouse_01",
-      error_message: null
+      error_message: null,
+      failed_stage: null,
+      failed_artifact: null
     });
     render(<WorkflowShell sceneBundle={sceneBundle} />);
     const input = screen.getByLabelText("Walkthrough video");
@@ -217,7 +221,9 @@ describe("WorkflowShell", () => {
       elapsed_sec: 18,
       message: "Processing failed",
       output_scene_id: null,
-      error_message: "Frame extraction produced no JPG frames."
+      error_message: "Frame extraction produced no JPG frames.",
+      failed_stage: "extracting_video_frames",
+      failed_artifact: "frame_extraction_command.json"
     });
     render(<WorkflowShell sceneBundle={sceneBundle} />);
     const input = screen.getByLabelText("Walkthrough video");
@@ -230,8 +236,10 @@ describe("WorkflowShell", () => {
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: "Processing stopped" })).not.toBeNull();
     });
-    expect(screen.getByText("DreamNav could not turn the walkthrough into usable image frames.")).not.toBeNull();
+    expect(screen.getByText("Failed while extracting video frames.")).not.toBeNull();
+    expect(screen.getByText("Pipeline stage: Extracting video frames")).not.toBeNull();
     expect(screen.getByText("Frame extraction produced no JPG frames.")).not.toBeNull();
+    expect(screen.getByText("Debug artifact: frame_extraction_command.json")).not.toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Choose another video" }));
 
