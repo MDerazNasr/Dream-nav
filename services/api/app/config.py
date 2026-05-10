@@ -9,6 +9,8 @@ class ProcessingSettings:
     frame_command: str | None = None
     frame_timeout_sec: float = 30
     frame_rate: float = 2
+    frame_max_count: int = 240
+    frame_max_duration_sec: float = 60
     pose_backend: str = "stub"
     pose_command: str | None = None
     pose_timeout_sec: float = 30
@@ -45,6 +47,8 @@ def default_settings() -> ApiSettings:
             frame_command=environ.get("DREAMNAV_FRAME_COMMAND"),
             frame_timeout_sec=float(environ.get("DREAMNAV_FRAME_TIMEOUT_SEC", "30")),
             frame_rate=float(environ.get("DREAMNAV_FRAME_RATE", "2")),
+            frame_max_count=int(environ.get("DREAMNAV_FRAME_MAX_COUNT", "240")),
+            frame_max_duration_sec=float(environ.get("DREAMNAV_FRAME_MAX_DURATION_SEC", "60")),
             pose_backend=environ.get("DREAMNAV_POSE_BACKEND", "stub"),
             pose_command=environ.get("DREAMNAV_POSE_COMMAND"),
             pose_timeout_sec=float(environ.get("DREAMNAV_POSE_TIMEOUT_SEC", "30")),
