@@ -62,6 +62,12 @@ def default_processing_tasks() -> list[ProcessingTask]:
             validate_capture_quality,
         ),
         ProcessingTask(
+            ProcessingStep("extracting_video_frames", 0.14, "Extracting video frames"),
+            "frame_extraction.json",
+            extract_video_frames,
+            build_frame_extraction_command,
+        ),
+        ProcessingTask(
             ProcessingStep("estimating_camera_motion", 0.2, "Estimating camera motion"),
             "camera_motion.json",
             estimate_camera_motion,
@@ -140,6 +146,31 @@ def estimate_camera_motion(context: ProcessingTaskContext) -> ProcessingTaskResu
     )
 
 
+def extract_video_frames(context: ProcessingTaskContext) -> ProcessingTaskResult:
+    backend = _normalized_frame_backend(context.processing_settings)
+    frames_root = _frames_root(context)
+    frames_root.mkdir(parents=True, exist_ok=True)
+    frame_count = len(list(frames_root.glob("*.jpg")))
+
+    if backend == "stub" and frame_count == 0:
+        for frame_index in range(3):
+            (frames_root / f"frame_{frame_index:04d}.jpg").write_text(
+                f"stub frame {frame_index}\n",
+                encoding="utf-8",
+            )
+        frame_count = 3
+
+    return _result(
+        "frame_extraction.json",
+        context,
+        backend=backend,
+        command_mode="stub" if backend == "stub" else "external",
+        frame_count=frame_count,
+        frame_rate=context.processing_settings.frame_rate,
+        frames_path=str(frames_root),
+    )
+
+
 def build_gaussian_scene(context: ProcessingTaskContext) -> ProcessingTaskResult:
     return _result("gaussian_scene.json", context, splat_file="splat.ply", gaussian_count=6)
 
@@ -183,7 +214,7 @@ def build_camera_motion_command(context: ProcessingTaskContext) -> ProcessingCom
         )
 
     if backend == "colmap":
-        colmap_command = _resolve_pose_command(context.processing_settings.pose_command, "colmap")
+        colmap_command = _resolve_command(context.processing_settings.pose_command, "colmap")
         if not colmap_command:
             raise ProcessingTaskFailed("Pose backend colmap selected but COLMAP binary was not found.")
 
@@ -195,7 +226,7 @@ def build_camera_motion_command(context: ProcessingTaskContext) -> ProcessingCom
                 "--database_path",
                 str(context.artifacts_root / "colmap.db"),
                 "--image_path",
-                str(context.upload_path.parent),
+                str(_frames_root(context)),
             ],
             timeout_sec=context.processing_settings.pose_timeout_sec,
         )
@@ -204,6 +235,39 @@ def build_camera_motion_command(context: ProcessingTaskContext) -> ProcessingCom
         raise ProcessingTaskFailed("Pose backend droid_slam is configured but not implemented yet.")
 
     raise ProcessingTaskFailed(f"Unsupported pose backend: {context.processing_settings.pose_backend}")
+
+
+def build_frame_extraction_command(context: ProcessingTaskContext) -> ProcessingCommand:
+    backend = _normalized_frame_backend(context.processing_settings)
+    frames_root = _frames_root(context)
+    frames_root.mkdir(parents=True, exist_ok=True)
+
+    if backend == "stub":
+        return _placeholder_command(
+            "frame_extraction_command.json",
+            f"frame_backend=stub source={context.upload_path.name} frames={frames_root}",
+        )
+
+    if backend == "ffmpeg":
+        ffmpeg_command = _resolve_command(context.processing_settings.frame_command, "ffmpeg")
+        if not ffmpeg_command:
+            raise ProcessingTaskFailed("Frame backend ffmpeg selected but ffmpeg binary was not found.")
+
+        return ProcessingCommand(
+            artifact_name="frame_extraction_command.json",
+            command=[
+                ffmpeg_command,
+                "-y",
+                "-i",
+                str(context.upload_path),
+                "-vf",
+                f"fps={context.processing_settings.frame_rate}",
+                str(frames_root / "frame_%04d.jpg"),
+            ],
+            timeout_sec=context.processing_settings.frame_timeout_sec,
+        )
+
+    raise ProcessingTaskFailed(f"Unsupported frame backend: {context.processing_settings.frame_backend}")
 
 
 def build_gaussian_scene_command(context: ProcessingTaskContext) -> ProcessingCommand:
@@ -217,7 +281,15 @@ def _normalized_pose_backend(settings: ProcessingSettings) -> str:
     return settings.pose_backend.strip().lower()
 
 
-def _resolve_pose_command(configured_command: str | None, default_command: str) -> str | None:
+def _normalized_frame_backend(settings: ProcessingSettings) -> str:
+    return settings.frame_backend.strip().lower()
+
+
+def _frames_root(context: ProcessingTaskContext) -> Path:
+    return context.artifacts_root / "frames"
+
+
+def _resolve_command(configured_command: str | None, default_command: str) -> str | None:
     if not configured_command:
         return which(default_command)
 

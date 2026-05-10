@@ -44,7 +44,20 @@ def test_worker_completes_queued_job(tmp_path: Path) -> None:
     command_path = (
         tmp_path / "data" / "jobs" / response.job_id / "artifacts" / "camera_motion_command.json"
     )
+    frame_artifact_path = (
+        tmp_path / "data" / "jobs" / response.job_id / "artifacts" / "frame_extraction.json"
+    )
+    frame_command_path = (
+        tmp_path / "data" / "jobs" / response.job_id / "artifacts" / "frame_extraction_command.json"
+    )
+    frames_root = tmp_path / "data" / "jobs" / response.job_id / "artifacts" / "frames"
+    frame_artifact = loads(frame_artifact_path.read_text(encoding="utf-8"))
     command_artifact = loads(command_path.read_text(encoding="utf-8"))
+    frame_command = loads(frame_command_path.read_text(encoding="utf-8"))
+    assert frame_artifact["backend"] == "stub"
+    assert frame_artifact["frame_count"] == 3
+    assert (frames_root / "frame_0000.jpg").is_file()
+    assert "frame_backend=stub" in frame_command["stdout"]
     assert command_artifact["exit_code"] == 0
     assert "pose_backend=stub" in command_artifact["stdout"]
     camera_motion_path = tmp_path / "data" / "jobs" / response.job_id / "artifacts" / "camera_motion.json"
@@ -216,6 +229,89 @@ def test_worker_runs_configured_colmap_command(tmp_path: Path) -> None:
     assert "feature_extractor" in command_artifact["stdout"]
     assert camera_motion["backend"] == "colmap"
     assert camera_motion["command_mode"] == "external"
+    assert str(tmp_path / "data" / "jobs" / response.job_id / "artifacts" / "frames") in command_artifact["command"]
+
+
+def test_worker_fails_when_ffmpeg_backend_is_missing(tmp_path: Path) -> None:
+    repo = JobRepository(
+        jobs_root=tmp_path / "data" / "jobs",
+        uploads_root=tmp_path / "data" / "uploads",
+    )
+    response = anyio.run(
+        repo.create_upload_job,
+        UploadFile(filename="walkthrough.mp4", file=BytesIO(b"video-bytes")),
+    )
+    worker = ProcessingWorker(
+        repo,
+        processing_settings=ProcessingSettings(
+            frame_backend="ffmpeg",
+            frame_command=str(tmp_path / "missing_ffmpeg"),
+        ),
+        step_delay_sec=0,
+    )
+
+    worker.process_next_job()
+    status = repo.get_status(response.job_id)
+
+    assert status.state == "failed"
+    assert status.error_message == "Frame backend ffmpeg selected but ffmpeg binary was not found."
+
+
+def test_worker_runs_configured_ffmpeg_command(tmp_path: Path) -> None:
+    repo = JobRepository(
+        jobs_root=tmp_path / "data" / "jobs",
+        uploads_root=tmp_path / "data" / "uploads",
+    )
+    fake_ffmpeg = tmp_path / "fake_ffmpeg.py"
+    fake_ffmpeg.write_text(
+        "#!/usr/bin/env python3\n"
+        "from pathlib import Path\n"
+        "import sys\n"
+        "Path(sys.argv[-1].replace('%04d', '0001')).write_text('frame')\n"
+        "print('fake ffmpeg ' + ' '.join(sys.argv[1:]))\n",
+        encoding="utf-8",
+    )
+    fake_ffmpeg.chmod(0o755)
+    response = anyio.run(
+        repo.create_upload_job,
+        UploadFile(filename="walkthrough.mp4", file=BytesIO(b"video-bytes")),
+    )
+    worker = ProcessingWorker(
+        repo,
+        processing_settings=ProcessingSettings(
+            frame_backend="ffmpeg",
+            frame_command=str(fake_ffmpeg),
+            frame_rate=4,
+            frame_timeout_sec=5,
+        ),
+        step_delay_sec=0,
+    )
+
+    worker.process_next_job()
+    status = repo.get_status(response.job_id)
+    frame_command = loads(
+        (
+            tmp_path
+            / "data"
+            / "jobs"
+            / response.job_id
+            / "artifacts"
+            / "frame_extraction_command.json"
+        ).read_text(encoding="utf-8")
+    )
+    frame_artifact = loads(
+        (
+            tmp_path / "data" / "jobs" / response.job_id / "artifacts" / "frame_extraction.json"
+        ).read_text(encoding="utf-8")
+    )
+
+    assert status.state == "completed"
+    assert frame_command["exit_code"] == 0
+    assert frame_command["command"][0] == str(fake_ffmpeg)
+    assert "fps=4" in frame_command["command"]
+    assert frame_artifact["backend"] == "ffmpeg"
+    assert frame_artifact["command_mode"] == "external"
+    assert frame_artifact["frame_count"] == 1
 
 
 def test_worker_fails_empty_capture_validation(tmp_path: Path) -> None:
