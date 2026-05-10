@@ -13,6 +13,7 @@
   "dependencies": {
     "@dream-nav/scene-registry": "0.1.0",
     "@dream-nav/shared": "0.1.0",
+    "@mkkellogg/gaussian-splats-3d": "0.4.7",
     "lucide-react": "1.14.0",
     "next": "16.2.6",
     "react": "19.2.6",

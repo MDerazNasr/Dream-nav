@@ -25,6 +25,7 @@ export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
         lensMode={selectedLens}
         overlayEnabled={overlayEnabled}
         renderMode={sceneBundle.assetStatus.viewer_render_mode}
+        splatUrl={sceneBundle.assetStatus.splat_url}
         visibility={sceneBundle.visibility}
       />
 

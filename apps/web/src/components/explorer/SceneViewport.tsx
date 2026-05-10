@@ -4,12 +4,14 @@ import type { CameraPath, LensMode, ViewerRenderMode, VisibilityManifest } from 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { getLensFov } from "../../lib/lens";
+import { loadSplatScene } from "../../lib/splat-loader";
 
 type SceneViewportProps = {
   cameraPath: CameraPath;
   lensMode: LensMode;
   overlayEnabled: boolean;
   renderMode: ViewerRenderMode;
+  splatUrl: string;
   visibility: VisibilityManifest;
 };
 
@@ -18,6 +20,7 @@ export function SceneViewport({
   lensMode,
   overlayEnabled,
   renderMode,
+  splatUrl,
   visibility
 }: SceneViewportProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -47,6 +50,29 @@ export function SceneViewport({
 
     const objects = createSceneObjects(visibility, overlayEnabled, renderMode);
     objects.forEach((object) => scene.add(object));
+    const fallbackObjects: THREE.Object3D[] = [];
+    let disposeSplatViewer: (() => Promise<void>) | null = null;
+    let cleanupStarted = false;
+
+    if (renderMode === "splat") {
+      void loadSplatScene(scene, splatUrl)
+        .then((dispose) => {
+          if (cleanupStarted) {
+            void dispose();
+            return;
+          }
+
+          disposeSplatViewer = dispose;
+        })
+        .catch(() => {
+          if (cleanupStarted) {
+            return;
+          }
+
+          fallbackObjects.push(...createVisibilityObjects(visibility, overlayEnabled));
+          fallbackObjects.forEach((object) => scene.add(object));
+        });
+    }
 
     const light = new THREE.HemisphereLight("#f5f7f4", "#24312d", 1.8);
     scene.add(light);
@@ -83,14 +109,17 @@ export function SceneViewport({
     window.addEventListener("resize", resize);
 
     return () => {
+      cleanupStarted = true;
       window.cancelAnimationFrame(animationFrame);
       window.removeEventListener("resize", resize);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
+      void disposeSplatViewer?.();
+      [...objects, ...fallbackObjects].forEach(disposeObjectResources);
       renderer.dispose();
       mount.replaceChildren();
     };
-  }, [cameraPath, lensMode, overlayEnabled, renderMode, visibility]);
+  }, [cameraPath, lensMode, overlayEnabled, renderMode, splatUrl, visibility]);
 
   return <div className="viewport" data-testid="scene-viewport" ref={mountRef} />;
 }
@@ -103,12 +132,26 @@ function createSceneObjects(
   const objects: THREE.Object3D[] = [];
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(16, 16),
-    new THREE.MeshStandardMaterial({ color: renderMode === "splat" ? "#242c28" : "#2a2f2b", roughness: 0.82 })
+    new THREE.MeshStandardMaterial({
+      color: renderMode === "splat" ? "#242c28" : "#2a2f2b",
+      roughness: 0.82
+    })
   );
   floor.rotation.x = -Math.PI / 2;
   objects.push(floor);
 
-  visibility.cells.forEach((cell) => {
+  if (renderMode === "placeholder") {
+    objects.push(...createVisibilityObjects(visibility, overlayEnabled));
+  }
+
+  return objects;
+}
+
+function createVisibilityObjects(
+  visibility: VisibilityManifest,
+  overlayEnabled: boolean
+): THREE.Object3D[] {
+  return visibility.cells.map((cell) => {
     const material = new THREE.MeshStandardMaterial({
       color: overlayEnabled ? zoneColor(cell.zone) : "#8d948c",
       opacity: overlayEnabled && cell.zone !== "observed" ? 0.72 : 1,
@@ -116,10 +159,16 @@ function createSceneObjects(
     });
     const cube = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.45, 0.45), material);
     cube.position.set(cell.center[0], cell.center[1], cell.center[2]);
-    objects.push(cube);
+    return cube;
   });
+}
 
-  return objects;
+function disposeObjectResources(object: THREE.Object3D): void {
+  if (object instanceof THREE.Mesh) {
+    object.geometry.dispose();
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    materials.forEach((material) => material.dispose());
+  }
 }
 
 function moveCamera(

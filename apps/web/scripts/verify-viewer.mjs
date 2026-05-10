@@ -17,8 +17,34 @@ const browser = await chromium.launch();
 try {
   for (const viewport of viewports) {
     const page = await browser.newPage({ viewport });
+    const pageErrors = [];
+    const splatResponseStatuses = [];
+
+    page.on("pageerror", (error) => pageErrors.push(error.message));
+    page.on("response", (response) => {
+      if (response.url().endsWith("/splat.ply")) {
+        splatResponseStatuses.push(response.status());
+      }
+    });
+
     await page.goto(baseUrl, { waitUntil: "networkidle" });
     await page.locator("[data-testid='scene-canvas']").waitFor();
+    const renderMode = await page.locator("[aria-label='Render mode']").textContent();
+
+    if (!renderMode?.includes("3DGS")) {
+      throw new Error(`Expected 3DGS render mode in ${viewport.name} viewport`);
+    }
+
+    await page.waitForTimeout(2000);
+
+    if (pageErrors.length > 0) {
+      throw new Error(`Browser error in ${viewport.name} viewport: ${pageErrors.join("; ")}`);
+    }
+
+    if (!splatResponseStatuses.some((status) => status >= 200 && status < 300)) {
+      throw new Error(`Splat asset did not load in ${viewport.name} viewport`);
+    }
+
     await page.screenshot({ path: join(outputDir, `${viewport.name}.png`), fullPage: true });
 
     const pixelStats = await page.locator("[data-testid='scene-canvas']").evaluate((canvas) => {

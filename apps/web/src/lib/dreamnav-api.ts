@@ -58,6 +58,10 @@ export async function fetchSceneBundle(
   const assetStatus = parseSceneAssetStatus(
     await fetchJson(apiBaseUrl, `/scene/${sceneId}/asset-status`)
   );
+  const resolvedAssetStatus = {
+    ...assetStatus,
+    splat_url: new URL(assetStatus.splat_url, normalizeBaseUrl(apiBaseUrl)).toString()
+  };
 
   return {
     demoScene,
@@ -67,7 +71,7 @@ export async function fetchSceneBundle(
     cameraPath,
     visibility,
     completion,
-    assetStatus
+    assetStatus: resolvedAssetStatus
   };
 }
 

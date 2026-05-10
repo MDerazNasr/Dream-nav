@@ -138,9 +138,9 @@ const apiPayloads: Record<string, unknown> = {
   "http://api.test/scene/warehouse_01/asset-status": {
     scene_id: "warehouse_01",
     splat_url: "/scenes/warehouse_01/splat.ply",
-    splat_available: false,
-    viewer_render_mode: "placeholder",
-    missing_assets: ["splat.ply"]
+    splat_available: true,
+    viewer_render_mode: "splat",
+    missing_assets: []
   }
 };
 
@@ -162,7 +162,8 @@ describe("DreamNav API client", () => {
     expect(bundle.metadata.title).toBe("Warehouse Scout");
     expect(bundle.quality.runtime_path).toBe("torch_fp16");
     expect(bundle.cameraPath.poses).toHaveLength(1);
-    expect(bundle.assetStatus.viewer_render_mode).toBe("placeholder");
+    expect(bundle.assetStatus.viewer_render_mode).toBe("splat");
+    expect(bundle.assetStatus.splat_url).toBe("http://api.test/scenes/warehouse_01/splat.ply");
   });
 
   it("throws a typed error when an API request fails", async () => {
