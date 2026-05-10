@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import ApiSettings, default_settings
-from .jobs import JobDataError, JobNotFoundError, JobRepository
+from .jobs import JobArtifactNameError, JobArtifactNotFoundError, JobDataError, JobNotFoundError, JobRepository
 from .repository import SceneDataError, SceneNotFoundError, SceneRepository
 from .routes import map_job_errors, map_scene_errors, router
 from .worker import ProcessingWorker
@@ -39,6 +39,8 @@ def create_app(settings: ApiSettings | None = None) -> FastAPI:
     app.add_exception_handler(SceneNotFoundError, _scene_exception_handler)
     app.add_exception_handler(SceneDataError, _scene_exception_handler)
     app.add_exception_handler(JobNotFoundError, _job_exception_handler)
+    app.add_exception_handler(JobArtifactNotFoundError, _job_exception_handler)
+    app.add_exception_handler(JobArtifactNameError, _job_exception_handler)
     app.add_exception_handler(JobDataError, _job_exception_handler)
 
     if resolved_settings.scenes_root.exists():

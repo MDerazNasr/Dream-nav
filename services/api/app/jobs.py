@@ -24,6 +24,14 @@ class JobDataError(Exception):
     pass
 
 
+class JobArtifactNotFoundError(Exception):
+    pass
+
+
+class JobArtifactNameError(Exception):
+    pass
+
+
 @dataclass(frozen=True)
 class StoredJob:
     job_id: str
@@ -197,6 +205,23 @@ class JobRepository:
         artifact_path.write_text(dumps(payload, indent=2), encoding="utf-8")
         return artifact_path
 
+    def read_artifact(self, job_id: str, artifact_name: str) -> dict[str, object]:
+        self._read_job(job_id)
+        safe_artifact_name = self._safe_artifact_name(artifact_name)
+        artifact_path = self.artifact_root(job_id) / safe_artifact_name
+
+        try:
+            payload = loads(artifact_path.read_text(encoding="utf-8"))
+        except FileNotFoundError as error:
+            raise JobArtifactNotFoundError(artifact_name) from error
+        except JSONDecodeError as error:
+            raise JobDataError(f"Invalid artifact data for {job_id}/{safe_artifact_name}") from error
+
+        if not isinstance(payload, dict):
+            raise JobDataError(f"Invalid artifact data for {job_id}/{safe_artifact_name}")
+
+        return payload
+
     def upload_path(self, job: StoredJob) -> Path:
         return self.uploads_root / job.job_id / job.stored_filename
 
@@ -244,6 +269,17 @@ class JobRepository:
         suffix = Path(filename).suffix.lower() or ".mp4"
         safe_stem = sub(r"[^A-Za-z0-9_.-]+", "_", stem).strip("._") or "walkthrough"
         return f"{safe_stem}{suffix}"
+
+    def _safe_artifact_name(self, artifact_name: str) -> str:
+        artifact_path = Path(artifact_name)
+        if artifact_path.name != artifact_name or artifact_path.suffix != ".json":
+            raise JobArtifactNameError("Artifact name must be a job-local JSON file.")
+
+        safe_name = sub(r"[^A-Za-z0-9_.-]+", "_", artifact_name)
+        if safe_name != artifact_name or artifact_name.startswith("."):
+            raise JobArtifactNameError("Artifact name must be a job-local JSON file.")
+
+        return artifact_name
 
     def _replace_job(self, job: StoredJob, **changes: object) -> StoredJob:
         payload = asdict(job)

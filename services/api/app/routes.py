@@ -2,11 +2,12 @@ from threading import Thread
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 
-from .jobs import JobDataError, JobNotFoundError, JobRepository
+from .jobs import JobArtifactNameError, JobArtifactNotFoundError, JobDataError, JobNotFoundError, JobRepository
 from .repository import SceneDataError, SceneNotFoundError, SceneRepository
 from .schemas import (
     DemoScene,
     HealthResponse,
+    JobArtifact,
     JobStatus,
     QualityReport,
     SceneAssetStatus,
@@ -72,6 +73,12 @@ def job_status(job_id: str, request: Request) -> JobStatus:
     return _job_repository(request).get_status(job_id)
 
 
+@router.get("/jobs/{job_id}/artifacts/{artifact_name:path}", response_model=JobArtifact)
+def job_artifact(job_id: str, artifact_name: str, request: Request) -> JobArtifact:
+    payload = _job_repository(request).read_artifact(job_id, artifact_name)
+    return JobArtifact(job_id=job_id, artifact_name=artifact_name, payload=payload)
+
+
 def _repository(request: Request) -> SceneRepository:
     return request.app.state.scene_repository
 
@@ -93,6 +100,12 @@ def map_scene_errors(error: Exception) -> HTTPException:
 def map_job_errors(error: Exception) -> HTTPException:
     if isinstance(error, JobNotFoundError):
         return HTTPException(status_code=404, detail="Job not found")
+
+    if isinstance(error, JobArtifactNotFoundError):
+        return HTTPException(status_code=404, detail="Job artifact not found")
+
+    if isinstance(error, JobArtifactNameError):
+        return HTTPException(status_code=400, detail="Unsafe artifact name")
 
     if isinstance(error, JobDataError):
         return HTTPException(status_code=500, detail="Job data invalid")

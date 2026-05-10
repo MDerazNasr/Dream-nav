@@ -155,6 +155,59 @@ def test_status_returns_failed_job_state(tmp_path: Path) -> None:
     assert response.json()["failed_artifact"] == "camera_motion_command.json"
 
 
+def test_job_artifact_returns_job_scoped_json(tmp_path: Path) -> None:
+    app = create_app(ApiSettings(repo_root=tmp_path, auto_start_worker=False))
+    client = TestClient(app)
+    upload_response = client.post(
+        "/upload",
+        files={"file": ("walkthrough.mov", b"video-bytes", "video/quicktime")},
+    )
+    job_id = upload_response.json()["job_id"]
+    app.state.job_repository.write_artifact(
+        job_id,
+        "frame_extraction_command.json",
+        {"exit_code": 0, "stdout": "ok"},
+    )
+
+    response = client.get(f"/jobs/{job_id}/artifacts/frame_extraction_command.json")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "job_id": job_id,
+        "artifact_name": "frame_extraction_command.json",
+        "payload": {"exit_code": 0, "stdout": "ok"},
+    }
+
+
+def test_job_artifact_rejects_unsafe_names(tmp_path: Path) -> None:
+    app = create_app(ApiSettings(repo_root=tmp_path, auto_start_worker=False))
+    client = TestClient(app)
+    upload_response = client.post(
+        "/upload",
+        files={"file": ("walkthrough.mov", b"video-bytes", "video/quicktime")},
+    )
+    job_id = upload_response.json()["job_id"]
+
+    response = client.get(f"/jobs/{job_id}/artifacts/nested/secret.json")
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Unsafe artifact name"
+
+
+def test_job_artifact_returns_404_for_missing_artifact(tmp_path: Path) -> None:
+    client = TestClient(create_app(ApiSettings(repo_root=tmp_path, auto_start_worker=False)))
+    upload_response = client.post(
+        "/upload",
+        files={"file": ("walkthrough.mov", b"video-bytes", "video/quicktime")},
+    )
+    job_id = upload_response.json()["job_id"]
+
+    response = client.get(f"/jobs/{job_id}/artifacts/missing.json")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Job artifact not found"
+
+
 def test_missing_job_returns_404() -> None:
     client = TestClient(create_app())
 

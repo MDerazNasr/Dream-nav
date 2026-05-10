@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -47,6 +49,12 @@ class JobStatus(StrictModel):
     error_message: str | None
     failed_stage: str | None
     failed_artifact: str | None
+
+
+class JobArtifact(StrictModel):
+    job_id: str
+    artifact_name: str
+    payload: dict[str, Any]
 
 
 class QualityReport(StrictModel):
