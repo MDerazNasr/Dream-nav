@@ -8,15 +8,16 @@
     "services/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run build -w @dream-nav/shared && npm run build -w @dream-nav/scene-registry",
     "lint": "npm run lint --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "test": "npm run build -w @dream-nav/shared && npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck -w @dream-nav/shared && npm run build -w @dream-nav/shared && npm run typecheck -w @dream-nav/scene-registry"
   },
   "engines": {
     "node": ">=20"
   },
   "devDependencies": {
+    "@types/node": "24.10.2",
     "typescript": "5.9.3",
     "vitest": "4.0.15"
   }

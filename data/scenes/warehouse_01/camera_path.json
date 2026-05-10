@@ -1,0 +1,35 @@
+{
+  "scene_id": "warehouse_01",
+  "coordinate_system": "dreamnav_viewer_v1",
+  "intrinsics": {
+    "width": 1920,
+    "height": 1080,
+    "fx": 1240,
+    "fy": 1240,
+    "cx": 960,
+    "cy": 540
+  },
+  "poses": [
+    {
+      "frame_index": 0,
+      "timestamp_sec": 0,
+      "position": [0, 1.55, 0],
+      "rotation_xyzw": [0, 0, 0, 1],
+      "fov_degrees": 60
+    },
+    {
+      "frame_index": 120,
+      "timestamp_sec": 5.2,
+      "position": [0.4, 1.55, -1.2],
+      "rotation_xyzw": [0, 0.08, 0, 0.997],
+      "fov_degrees": 60
+    },
+    {
+      "frame_index": 260,
+      "timestamp_sec": 11.6,
+      "position": [1.1, 1.55, -2.1],
+      "rotation_xyzw": [0, 0.18, 0, 0.984],
+      "fov_degrees": 60
+    }
+  ]
+}
