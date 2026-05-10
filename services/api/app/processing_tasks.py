@@ -36,6 +36,23 @@ class ProcessingCommand:
     timeout_sec: float = 60
 
 
+@dataclass(frozen=True)
+class FrameInventory:
+    frames: list[Path]
+
+    @property
+    def frame_count(self) -> int:
+        return len(self.frames)
+
+    @property
+    def first_frame(self) -> str | None:
+        return self.frames[0].name if self.frames else None
+
+    @property
+    def last_frame(self) -> str | None:
+        return self.frames[-1].name if self.frames else None
+
+
 class ProcessingTaskRunner(Protocol):
     def __call__(self, context: ProcessingTaskContext) -> ProcessingTaskResult:
         pass
@@ -148,26 +165,34 @@ def estimate_camera_motion(context: ProcessingTaskContext) -> ProcessingTaskResu
 
 def extract_video_frames(context: ProcessingTaskContext) -> ProcessingTaskResult:
     backend = _normalized_frame_backend(context.processing_settings)
+    _validate_frame_settings(context.processing_settings)
     frames_root = _frames_root(context)
     frames_root.mkdir(parents=True, exist_ok=True)
-    frame_count = len(list(frames_root.glob("*.jpg")))
 
-    if backend == "stub" and frame_count == 0:
+    if backend == "stub" and not _frame_inventory(frames_root).frames:
         for frame_index in range(3):
             (frames_root / f"frame_{frame_index:04d}.jpg").write_text(
                 f"stub frame {frame_index}\n",
                 encoding="utf-8",
             )
-        frame_count = 3
+
+    inventory = _frame_inventory(frames_root)
+    _validate_frame_inventory(inventory, context.processing_settings, backend)
+    warnings = _frame_extraction_warnings(context, inventory)
 
     return _result(
         "frame_extraction.json",
         context,
         backend=backend,
         command_mode="stub" if backend == "stub" else "external",
-        frame_count=frame_count,
+        frame_count=inventory.frame_count,
         frame_rate=context.processing_settings.frame_rate,
+        frame_max_count=context.processing_settings.frame_max_count,
+        frame_max_duration_sec=context.processing_settings.frame_max_duration_sec,
+        first_frame=inventory.first_frame,
+        last_frame=inventory.last_frame,
         frames_path=str(frames_root),
+        warnings=warnings,
     )
 
 
@@ -239,6 +264,7 @@ def build_camera_motion_command(context: ProcessingTaskContext) -> ProcessingCom
 
 def build_frame_extraction_command(context: ProcessingTaskContext) -> ProcessingCommand:
     backend = _normalized_frame_backend(context.processing_settings)
+    _validate_frame_settings(context.processing_settings)
     frames_root = _frames_root(context)
     frames_root.mkdir(parents=True, exist_ok=True)
 
@@ -260,8 +286,12 @@ def build_frame_extraction_command(context: ProcessingTaskContext) -> Processing
                 "-y",
                 "-i",
                 str(context.upload_path),
+                "-t",
+                str(context.processing_settings.frame_max_duration_sec),
                 "-vf",
                 f"fps={context.processing_settings.frame_rate}",
+                "-frames:v",
+                str(context.processing_settings.frame_max_count),
                 str(frames_root / "frame_%04d.jpg"),
             ],
             timeout_sec=context.processing_settings.frame_timeout_sec,
@@ -287,6 +317,72 @@ def _normalized_frame_backend(settings: ProcessingSettings) -> str:
 
 def _frames_root(context: ProcessingTaskContext) -> Path:
     return context.artifacts_root / "frames"
+
+
+def _frame_inventory(frames_root: Path) -> FrameInventory:
+    return FrameInventory(sorted(frame for frame in frames_root.glob("*.jpg") if frame.is_file()))
+
+
+def _validate_frame_settings(settings: ProcessingSettings) -> None:
+    if settings.frame_rate <= 0:
+        raise ProcessingTaskFailed("Frame rate must be greater than zero.")
+
+    if settings.frame_max_count < 1:
+        raise ProcessingTaskFailed("Frame max count must be at least one.")
+
+    if settings.frame_max_duration_sec <= 0:
+        raise ProcessingTaskFailed("Frame max duration must be greater than zero.")
+
+
+def _validate_frame_inventory(
+    inventory: FrameInventory,
+    settings: ProcessingSettings,
+    backend: str,
+) -> None:
+    if inventory.frame_count == 0:
+        raise ProcessingTaskFailed("Frame extraction produced no JPG frames.")
+
+    if inventory.frame_count > settings.frame_max_count:
+        raise ProcessingTaskFailed(
+            f"Frame extraction produced {inventory.frame_count} frames, above configured limit {settings.frame_max_count}."
+        )
+
+    if backend == "stub":
+        return
+
+    for frame in inventory.frames:
+        _validate_external_frame(frame)
+
+
+def _validate_external_frame(frame_path: Path) -> None:
+    if frame_path.stat().st_size == 0:
+        raise ProcessingTaskFailed(f"Extracted frame is empty: {frame_path.name}")
+
+    with frame_path.open("rb") as frame:
+        signature = frame.read(2)
+
+    if signature != b"\xff\xd8":
+        raise ProcessingTaskFailed(f"Extracted frame is not a JPEG file: {frame_path.name}")
+
+
+def _frame_extraction_warnings(
+    context: ProcessingTaskContext,
+    inventory: FrameInventory,
+) -> list[str]:
+    warnings = []
+    try:
+        probe = probe_video_file(context.upload_path)
+    except VideoProbeError:
+        return warnings
+
+    max_duration_sec = context.processing_settings.frame_max_duration_sec
+    if probe.duration_sec and probe.duration_sec > max_duration_sec:
+        warnings.append(f"Frame extraction was capped to the first {max_duration_sec:g} seconds.")
+
+    if inventory.frame_count == context.processing_settings.frame_max_count:
+        warnings.append("Frame extraction reached the configured frame limit.")
+
+    return warnings
 
 
 def _resolve_command(configured_command: str | None, default_command: str) -> str | None:

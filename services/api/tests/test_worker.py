@@ -267,7 +267,7 @@ def test_worker_runs_configured_ffmpeg_command(tmp_path: Path) -> None:
         "#!/usr/bin/env python3\n"
         "from pathlib import Path\n"
         "import sys\n"
-        "Path(sys.argv[-1].replace('%04d', '0001')).write_text('frame')\n"
+        "Path(sys.argv[-1].replace('%04d', '0001')).write_bytes(b'\\xff\\xd8\\xff\\xd9')\n"
         "print('fake ffmpeg ' + ' '.join(sys.argv[1:]))\n",
         encoding="utf-8",
     )
@@ -309,9 +309,13 @@ def test_worker_runs_configured_ffmpeg_command(tmp_path: Path) -> None:
     assert frame_command["exit_code"] == 0
     assert frame_command["command"][0] == str(fake_ffmpeg)
     assert "fps=4" in frame_command["command"]
+    assert "-frames:v" in frame_command["command"]
+    assert "-t" in frame_command["command"]
     assert frame_artifact["backend"] == "ffmpeg"
     assert frame_artifact["command_mode"] == "external"
     assert frame_artifact["frame_count"] == 1
+    assert frame_artifact["first_frame"] == "frame_0001.jpg"
+    assert frame_artifact["last_frame"] == "frame_0001.jpg"
 
 
 def test_worker_fails_empty_capture_validation(tmp_path: Path) -> None:
