@@ -38,9 +38,11 @@ class ProcessingWorker:
         if not job:
             return None
 
+        failed_stage = job.stage
         try:
             for task in self.tasks:
                 self.job_repository.update_stage(job.job_id, task.step)
+                failed_stage = task.step.stage
                 context = ProcessingTaskContext(
                     job=job,
                     upload_path=self.job_repository.upload_path(job),
@@ -56,8 +58,15 @@ class ProcessingWorker:
                 sleep(self.step_delay_sec)
 
             self.job_repository.complete_job(job.job_id, self.output_scene_id)
+        except ProcessingTaskFailed as error:
+            self.job_repository.fail_job(
+                job.job_id,
+                str(error),
+                failed_stage=failed_stage,
+                failed_artifact=error.artifact_name,
+            )
         except Exception as error:
-            self.job_repository.fail_job(job.job_id, str(error))
+            self.job_repository.fail_job(job.job_id, str(error), failed_stage=failed_stage)
 
         return job.job_id
 
@@ -72,10 +81,16 @@ class ProcessingWorker:
         self.job_repository.write_artifact(job_id, command.artifact_name, result.to_artifact())
 
         if result.timed_out:
-            raise ProcessingTaskFailed(f"Command timed out: {command.command[0]}")
+            raise ProcessingTaskFailed(
+                f"Command timed out: {command.command[0]}",
+                artifact_name=command.artifact_name,
+            )
 
         if result.exit_code != 0:
-            raise ProcessingTaskFailed(f"Command failed with exit code {result.exit_code}: {command.command[0]}")
+            raise ProcessingTaskFailed(
+                f"Command failed with exit code {result.exit_code}: {command.command[0]}",
+                artifact_name=command.artifact_name,
+            )
 
     def process_available_jobs(self) -> list[str]:
         processed_job_ids = []

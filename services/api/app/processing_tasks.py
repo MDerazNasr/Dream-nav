@@ -12,7 +12,9 @@ from .video_probe import VideoProbeError, probe_video_file
 
 
 class ProcessingTaskFailed(Exception):
-    pass
+    def __init__(self, message: str, artifact_name: str | None = None) -> None:
+        super().__init__(message)
+        self.artifact_name = artifact_name
 
 
 @dataclass(frozen=True)

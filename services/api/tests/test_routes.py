@@ -126,6 +126,8 @@ def test_status_returns_processing_progress(tmp_path: Path) -> None:
     assert response.json()["stage"] == "checking_capture_quality"
     assert response.json()["progress"] == 0
     assert response.json()["output_scene_id"] is None
+    assert response.json()["failed_stage"] is None
+    assert response.json()["failed_artifact"] is None
 
 
 def test_status_returns_failed_job_state(tmp_path: Path) -> None:
@@ -136,7 +138,12 @@ def test_status_returns_failed_job_state(tmp_path: Path) -> None:
         files={"file": ("walkthrough.mov", b"video-bytes", "video/quicktime")},
     )
     job_id = upload_response.json()["job_id"]
-    app.state.job_repository.fail_job(job_id, "Bad poses break splat")
+    app.state.job_repository.fail_job(
+        job_id,
+        "Bad poses break splat",
+        failed_stage="estimating_camera_motion",
+        failed_artifact="camera_motion_command.json",
+    )
 
     response = client.get(f"/status/{job_id}")
 
@@ -144,6 +151,8 @@ def test_status_returns_failed_job_state(tmp_path: Path) -> None:
     assert response.json()["state"] == "failed"
     assert response.json()["stage"] == "failed"
     assert response.json()["error_message"] == "Bad poses break splat"
+    assert response.json()["failed_stage"] == "estimating_camera_motion"
+    assert response.json()["failed_artifact"] == "camera_motion_command.json"
 
 
 def test_missing_job_returns_404() -> None:

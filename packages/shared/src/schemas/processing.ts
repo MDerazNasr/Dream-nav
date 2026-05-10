@@ -32,7 +32,9 @@ export const jobStatusSchema = z.object({
   elapsed_sec: z.number().min(0),
   message: z.string().min(1),
   output_scene_id: z.string().min(1).nullable(),
-  error_message: z.string().min(1).nullable()
+  error_message: z.string().min(1).nullable(),
+  failed_stage: processingStageSchema.exclude(["completed", "failed"]).nullable().default(null),
+  failed_artifact: z.string().min(1).nullable().default(null)
 });
 
 export type JobLifecycleState = z.infer<typeof jobLifecycleStateSchema>;

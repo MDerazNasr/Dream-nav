@@ -33,6 +33,8 @@ def test_worker_completes_queued_job(tmp_path: Path) -> None:
     assert processed_job_id == response.job_id
     assert status.state == "completed"
     assert status.stage == "completed"
+    assert status.failed_stage is None
+    assert status.failed_artifact is None
     assert status.progress == 1
     assert status.output_scene_id == "warehouse_01"
     artifact_path = tmp_path / "data" / "jobs" / response.job_id / "artifacts" / "capture_quality.json"
@@ -135,6 +137,8 @@ def test_worker_fails_job_when_task_fails(tmp_path: Path) -> None:
     assert status.state == "failed"
     assert status.stage == "failed"
     assert status.error_message == "camera motion failed"
+    assert status.failed_stage == "estimating_camera_motion"
+    assert status.failed_artifact is None
 
 
 def test_worker_fails_job_when_task_command_fails(tmp_path: Path) -> None:
@@ -156,6 +160,8 @@ def test_worker_fails_job_when_task_command_fails(tmp_path: Path) -> None:
     assert status.state == "failed"
     assert status.error_message is not None
     assert "exit code 12" in status.error_message
+    assert status.failed_stage == "estimating_camera_motion"
+    assert status.failed_artifact == "bad_command.json"
     assert command_artifact["exit_code"] == 12
 
 
@@ -182,6 +188,8 @@ def test_worker_fails_when_colmap_backend_is_missing(tmp_path: Path) -> None:
 
     assert status.state == "failed"
     assert status.error_message == "Pose backend colmap selected but COLMAP binary was not found."
+    assert status.failed_stage == "estimating_camera_motion"
+    assert status.failed_artifact is None
 
 
 def test_worker_runs_configured_colmap_command(tmp_path: Path) -> None:
@@ -255,6 +263,8 @@ def test_worker_fails_when_ffmpeg_backend_is_missing(tmp_path: Path) -> None:
 
     assert status.state == "failed"
     assert status.error_message == "Frame backend ffmpeg selected but ffmpeg binary was not found."
+    assert status.failed_stage == "extracting_video_frames"
+    assert status.failed_artifact is None
 
 
 def test_worker_runs_configured_ffmpeg_command(tmp_path: Path) -> None:
@@ -334,6 +344,7 @@ def test_worker_fails_empty_capture_validation(tmp_path: Path) -> None:
 
     assert status.state == "failed"
     assert status.error_message == "Uploaded file is empty."
+    assert status.failed_stage == "checking_capture_quality"
 
 
 def test_worker_records_unsupported_extension_warning(tmp_path: Path) -> None:

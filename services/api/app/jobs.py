@@ -40,6 +40,8 @@ class StoredJob:
     estimated_processing_time_sec: int
     output_scene_id: str | None
     error_message: str | None
+    failed_stage: str | None
+    failed_artifact: str | None
 
 
 @dataclass(frozen=True)
@@ -88,6 +90,8 @@ class JobRepository:
             estimated_processing_time_sec=ESTIMATED_PROCESSING_TIME_SEC,
             output_scene_id=None,
             error_message=None,
+            failed_stage=None,
+            failed_artifact=None,
         )
         self._write_job(job)
 
@@ -111,6 +115,8 @@ class JobRepository:
             message=job.message,
             output_scene_id=job.output_scene_id,
             error_message=job.error_message,
+            failed_stage=job.failed_stage,
+            failed_artifact=job.failed_artifact,
         )
 
     def claim_next_queued_job(self) -> StoredJob | None:
@@ -151,12 +157,21 @@ class JobRepository:
             progress=1,
             message="Explorer ready",
             output_scene_id=output_scene_id,
+            error_message=None,
+            failed_stage=None,
+            failed_artifact=None,
             updated_at_sec=self.now_func(),
         )
         self._write_job(completed_job)
         return completed_job
 
-    def fail_job(self, job_id: str, error_message: str) -> StoredJob:
+    def fail_job(
+        self,
+        job_id: str,
+        error_message: str,
+        failed_stage: str | None = None,
+        failed_artifact: str | None = None,
+    ) -> StoredJob:
         job = self._read_job(job_id)
         failed_job = self._replace_job(
             job,
@@ -165,6 +180,8 @@ class JobRepository:
             progress=job.progress,
             message="Processing failed",
             error_message=error_message,
+            failed_stage=failed_stage or job.stage,
+            failed_artifact=failed_artifact,
             updated_at_sec=self.now_func(),
         )
         self._write_job(failed_job)
@@ -244,4 +261,6 @@ class JobRepository:
             "message": payload.get("message", "Queued for processing"),
             "output_scene_id": payload.get("output_scene_id", None),
             "error_message": payload.get("error_message", None),
+            "failed_stage": payload.get("failed_stage", None),
+            "failed_artifact": payload.get("failed_artifact", None),
         }

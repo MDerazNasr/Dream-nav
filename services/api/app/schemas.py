@@ -45,6 +45,8 @@ class JobStatus(StrictModel):
     message: str
     output_scene_id: str | None
     error_message: str | None
+    failed_stage: str | None
+    failed_artifact: str | None
 
 
 class QualityReport(StrictModel):

@@ -73,4 +73,22 @@ describe("processing schemas", () => {
 
     expect(status.output_scene_id).toBe("warehouse_01");
   });
+
+  it("accepts structured failed job details", () => {
+    const status = parseJobStatus({
+      job_id: "scene_abc123",
+      state: "failed",
+      stage: "failed",
+      progress: 0.14,
+      elapsed_sec: 18,
+      message: "Processing failed",
+      output_scene_id: null,
+      error_message: "Frame extraction produced no JPG frames.",
+      failed_stage: "extracting_video_frames",
+      failed_artifact: "frame_extraction_command.json"
+    });
+
+    expect(status.failed_stage).toBe("extracting_video_frames");
+    expect(status.failed_artifact).toBe("frame_extraction_command.json");
+  });
 });
