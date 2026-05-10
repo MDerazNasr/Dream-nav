@@ -1,11 +1,11 @@
 "use client";
 
-import type { JobStatus, ProcessingStage, UploadResponse } from "@dream-nav/shared";
+import type { JobArtifact, JobStatus, ProcessingStage, UploadResponse } from "@dream-nav/shared";
 import { AlertTriangle, CheckCircle2, Film, LoaderCircle, RotateCcw, Upload, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ExplorerShell } from "../explorer/ExplorerShell";
 import type { ViewerSceneBundle } from "../../lib/dreamnav-api";
-import { fetchJobStatus, uploadWalkthrough } from "../../lib/dreamnav-api";
+import { fetchJobArtifact, fetchJobStatus, uploadWalkthrough } from "../../lib/dreamnav-api";
 
 type WorkflowShellProps = {
   sceneBundle: ViewerSceneBundle;
@@ -34,6 +34,9 @@ export function WorkflowShell({ sceneBundle }: WorkflowShellProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadResponse, setUploadResponse] = useState<UploadResponse | null>(null);
   const [jobStatus, setJobStatus] = useState<JobStatus | null>(null);
+  const [jobArtifact, setJobArtifact] = useState<JobArtifact | null>(null);
+  const [artifactError, setArtifactError] = useState<string | null>(null);
+  const [isArtifactLoading, setIsArtifactLoading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -78,6 +81,11 @@ export function WorkflowShell({ sceneBundle }: WorkflowShellProps) {
     };
   }, [uploadResponse, view]);
 
+  useEffect(() => {
+    setJobArtifact(null);
+    setArtifactError(null);
+  }, [jobStatus?.failed_artifact]);
+
   const startUpload = async () => {
     if (!selectedFile) {
       setUploadError("Choose a walkthrough video first");
@@ -90,6 +98,8 @@ export function WorkflowShell({ sceneBundle }: WorkflowShellProps) {
     try {
       const response = await uploadWalkthrough(selectedFile);
       setUploadResponse(response);
+      setJobArtifact(null);
+      setArtifactError(null);
       setView("processing");
     } catch {
       setUploadError("Upload failed");
@@ -102,8 +112,28 @@ export function WorkflowShell({ sceneBundle }: WorkflowShellProps) {
     setView("select");
     setUploadResponse(null);
     setJobStatus(null);
+    setJobArtifact(null);
+    setArtifactError(null);
     setUploadError(null);
     setIsUploading(false);
+  };
+
+  const loadFailedArtifact = async () => {
+    if (!jobStatus?.failed_artifact) {
+      return;
+    }
+
+    setIsArtifactLoading(true);
+    setArtifactError(null);
+
+    try {
+      const artifact = await fetchJobArtifact(jobStatus.job_id, jobStatus.failed_artifact);
+      setJobArtifact(artifact);
+    } catch {
+      setArtifactError("Debug artifact unavailable");
+    } finally {
+      setIsArtifactLoading(false);
+    }
   };
 
   if (view === "explorer") {
@@ -160,7 +190,25 @@ export function WorkflowShell({ sceneBundle }: WorkflowShellProps) {
             <section className="failure-panel" aria-label="Processing failure details">
               {failedStageLabel ? <p>Pipeline stage: {failedStageLabel}</p> : null}
               <strong>{jobStatus.error_message ?? "Processing failed"}</strong>
-              {jobStatus.failed_artifact ? <p>Debug artifact: {jobStatus.failed_artifact}</p> : null}
+              {jobStatus.failed_artifact ? (
+                <>
+                  <p>Debug artifact: {jobStatus.failed_artifact}</p>
+                  <button
+                    className="secondary-action"
+                    disabled={isArtifactLoading}
+                    onClick={loadFailedArtifact}
+                    type="button"
+                  >
+                    {isArtifactLoading ? "Loading artifact" : "View debug artifact"}
+                  </button>
+                </>
+              ) : null}
+              {artifactError ? <p>{artifactError}</p> : null}
+              {jobArtifact ? (
+                <pre aria-label="Debug artifact payload" style={{ overflowWrap: "anywhere", whiteSpace: "pre-wrap" }}>
+                  {JSON.stringify(jobArtifact.payload, null, 2)}
+                </pre>
+              ) : null}
               <p>{failureGuidance.nextStep}</p>
             </section>
           ) : null}

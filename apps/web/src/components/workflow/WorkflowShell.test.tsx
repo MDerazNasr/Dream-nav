@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { WorkflowShell } from "./WorkflowShell";
 import type { ViewerSceneBundle } from "../../lib/dreamnav-api";
-import { fetchJobStatus } from "../../lib/dreamnav-api";
+import { fetchJobArtifact, fetchJobStatus } from "../../lib/dreamnav-api";
 
 vi.mock("../explorer/ExplorerShell", () => ({
   ExplorerShell: () => <div data-testid="explorer-shell" />
@@ -24,6 +24,14 @@ vi.mock("../../lib/dreamnav-api", async (importOriginal) => {
       error_message: null,
       failed_stage: null,
       failed_artifact: null
+    })),
+    fetchJobArtifact: vi.fn(async () => ({
+      job_id: "scene_abc123",
+      artifact_name: "frame_extraction_command.json",
+      payload: {
+        exit_code: 1,
+        stderr: "ffmpeg failed"
+      }
     })),
     uploadWalkthrough: vi.fn(async () => ({
       job_id: "scene_abc123",
@@ -244,5 +252,36 @@ describe("WorkflowShell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Choose another video" }));
 
     expect(screen.getByRole("button", { name: "Start processing" })).not.toBeNull();
+  });
+
+  it("loads debug artifacts from failed jobs", async () => {
+    vi.mocked(fetchJobStatus).mockResolvedValueOnce({
+      job_id: "scene_abc123",
+      state: "failed",
+      stage: "failed",
+      progress: 0.14,
+      elapsed_sec: 18,
+      message: "Processing failed",
+      output_scene_id: null,
+      error_message: "Frame extraction produced no JPG frames.",
+      failed_stage: "extracting_video_frames",
+      failed_artifact: "frame_extraction_command.json"
+    });
+    render(<WorkflowShell sceneBundle={sceneBundle} />);
+
+    fireEvent.change(screen.getByLabelText("Walkthrough video"), {
+      target: { files: [new File(["video"], "walkthrough.mp4", { type: "video/mp4" })] }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Start processing" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "View debug artifact" })).not.toBeNull();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "View debug artifact" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Debug artifact payload").textContent).toContain("ffmpeg failed");
+    });
+    expect(fetchJobArtifact).toHaveBeenCalledWith("scene_abc123", "frame_extraction_command.json");
   });
 });
