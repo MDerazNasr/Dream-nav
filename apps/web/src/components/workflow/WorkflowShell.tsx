@@ -45,8 +45,9 @@ export function WorkflowShell({ sceneBundle }: WorkflowShellProps) {
     () => Math.min(processingStages.length, Math.ceil(activeProgress * processingStages.length)),
     [activeProgress]
   );
-  const failedStageLabel = getStageLabel(jobStatus?.failed_stage);
-  const failureGuidance = getFailureGuidance(jobStatus?.failed_stage, jobStatus?.error_message);
+  const failedStage = jobStatus?.failed_stage ?? null;
+  const failedStageLabel = getStageLabel(failedStage);
+  const failureGuidance = getFailureGuidance(failedStage, jobStatus?.error_message);
 
   useEffect(() => {
     if (!uploadResponse || view !== "processing") {
