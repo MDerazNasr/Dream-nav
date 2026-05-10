@@ -37,6 +37,12 @@ export const jobStatusSchema = z.object({
   failed_artifact: z.string().min(1).nullable().default(null)
 });
 
+export const jobArtifactSchema = z.object({
+  job_id: z.string().min(1),
+  artifact_name: z.string().min(1),
+  payload: z.record(z.string(), z.unknown())
+});
+
 export type JobLifecycleState = z.infer<typeof jobLifecycleStateSchema>;
 
 export type ProcessingStage = z.infer<typeof processingStageSchema>;
@@ -45,10 +51,16 @@ export type UploadResponse = z.infer<typeof uploadResponseSchema>;
 
 export type JobStatus = z.infer<typeof jobStatusSchema>;
 
+export type JobArtifact = z.infer<typeof jobArtifactSchema>;
+
 export function parseUploadResponse(input: unknown): UploadResponse {
   return uploadResponseSchema.parse(input);
 }
 
 export function parseJobStatus(input: unknown): JobStatus {
   return jobStatusSchema.parse(input);
+}
+
+export function parseJobArtifact(input: unknown): JobArtifact {
+  return jobArtifactSchema.parse(input);
 }

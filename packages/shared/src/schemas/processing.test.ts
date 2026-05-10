@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseJobStatus, parseUploadResponse } from "./processing.js";
+import { parseJobArtifact, parseJobStatus, parseUploadResponse } from "./processing.js";
 
 describe("processing schemas", () => {
   it("accepts upload responses with validation warnings", () => {
@@ -90,5 +90,18 @@ describe("processing schemas", () => {
 
     expect(status.failed_stage).toBe("extracting_video_frames");
     expect(status.failed_artifact).toBe("frame_extraction_command.json");
+  });
+
+  it("accepts JSON job artifact payloads", () => {
+    const artifact = parseJobArtifact({
+      job_id: "scene_abc123",
+      artifact_name: "frame_extraction_command.json",
+      payload: {
+        exit_code: 1,
+        stderr: "ffmpeg failed"
+      }
+    });
+
+    expect(artifact.payload.stderr).toBe("ffmpeg failed");
   });
 });

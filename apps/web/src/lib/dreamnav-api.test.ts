@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DreamNavApiError,
+  fetchJobArtifact,
   fetchJobStatus,
   fetchSceneBundle,
   getDreamNavApiBaseUrl,
@@ -237,6 +238,27 @@ describe("DreamNav API client", () => {
     const response = await fetchJobStatus("scene_abc123", "http://api.test");
 
     expect(response.stage).toBe("training_scene_model");
+  });
+
+  it("loads job artifact payloads", async () => {
+    mockFetchFromPayloads({
+      "http://api.test/jobs/scene_abc123/artifacts/frame_extraction_command.json": {
+        job_id: "scene_abc123",
+        artifact_name: "frame_extraction_command.json",
+        payload: {
+          exit_code: 1,
+          stderr: "ffmpeg failed"
+        }
+      }
+    });
+
+    const response = await fetchJobArtifact(
+      "scene_abc123",
+      "frame_extraction_command.json",
+      "http://api.test"
+    );
+
+    expect(response.payload.stderr).toBe("ffmpeg failed");
   });
 });
 
