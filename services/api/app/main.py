@@ -7,6 +7,7 @@ from .config import ApiSettings, default_settings
 from .jobs import JobDataError, JobNotFoundError, JobRepository
 from .repository import SceneDataError, SceneNotFoundError, SceneRepository
 from .routes import map_job_errors, map_scene_errors, router
+from .worker import ProcessingWorker
 
 
 def create_app(settings: ApiSettings | None = None) -> FastAPI:
@@ -24,11 +25,13 @@ def create_app(settings: ApiSettings | None = None) -> FastAPI:
         allow_headers=["*"],
     )
     app.state.settings = resolved_settings
+    app.state.auto_start_worker = resolved_settings.auto_start_worker
     app.state.scene_repository = SceneRepository(resolved_settings.data_root)
     app.state.job_repository = JobRepository(
         resolved_settings.jobs_root,
         resolved_settings.uploads_root,
     )
+    app.state.processing_worker = ProcessingWorker(app.state.job_repository)
     app.include_router(router)
     app.add_exception_handler(SceneNotFoundError, _scene_exception_handler)
     app.add_exception_handler(SceneDataError, _scene_exception_handler)

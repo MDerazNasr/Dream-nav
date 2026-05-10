@@ -1,3 +1,5 @@
+from threading import Thread
+
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 
 from .jobs import JobDataError, JobNotFoundError, JobRepository
@@ -57,7 +59,12 @@ async def upload_walkthrough(
     request: Request,
     file: UploadFile = File(...),
 ) -> UploadResponse:
-    return await _job_repository(request).create_upload_job(file)
+    response = await _job_repository(request).create_upload_job(file)
+
+    if request.app.state.auto_start_worker:
+        Thread(target=request.app.state.processing_worker.process_next_job, daemon=True).start()
+
+    return response
 
 
 @router.get("/status/{job_id}", response_model=JobStatus)

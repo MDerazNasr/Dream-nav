@@ -14,6 +14,8 @@ export const processingStageSchema = z.enum([
   "failed"
 ]);
 
+export const jobLifecycleStateSchema = z.enum(["queued", "running", "completed", "failed"]);
+
 export const uploadResponseSchema = z.object({
   job_id: z.string().min(1),
   validation_status: z.enum(["pass", "warning", "fail"]),
@@ -23,11 +25,16 @@ export const uploadResponseSchema = z.object({
 
 export const jobStatusSchema = z.object({
   job_id: z.string().min(1),
+  state: jobLifecycleStateSchema,
   stage: processingStageSchema,
   progress: z.number().min(0).max(1),
   elapsed_sec: z.number().min(0),
-  message: z.string().min(1)
+  message: z.string().min(1),
+  output_scene_id: z.string().min(1).nullable(),
+  error_message: z.string().min(1).nullable()
 });
+
+export type JobLifecycleState = z.infer<typeof jobLifecycleStateSchema>;
 
 export type ProcessingStage = z.infer<typeof processingStageSchema>;
 

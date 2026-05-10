@@ -5,6 +5,7 @@ from pathlib import Path
 @dataclass(frozen=True)
 class ApiSettings:
     repo_root: Path
+    auto_start_worker: bool = True
 
     @property
     def data_root(self) -> Path:

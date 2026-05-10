@@ -38,10 +38,13 @@ class UploadResponse(StrictModel):
 
 class JobStatus(StrictModel):
     job_id: str
+    state: str
     stage: str
     progress: float = Field(ge=0, le=1)
     elapsed_sec: int = Field(ge=0)
     message: str
+    output_scene_id: str | None
+    error_message: str | None
 
 
 class QualityReport(StrictModel):

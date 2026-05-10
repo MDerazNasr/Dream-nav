@@ -80,7 +80,7 @@ def test_static_scene_metadata_is_served() -> None:
 
 
 def test_upload_creates_processing_job(tmp_path: Path) -> None:
-    client = TestClient(create_app(ApiSettings(repo_root=tmp_path)))
+    client = TestClient(create_app(ApiSettings(repo_root=tmp_path, auto_start_worker=False)))
 
     response = client.post(
         "/upload",
@@ -96,7 +96,7 @@ def test_upload_creates_processing_job(tmp_path: Path) -> None:
 
 
 def test_upload_warns_for_unsupported_video_extension(tmp_path: Path) -> None:
-    client = TestClient(create_app(ApiSettings(repo_root=tmp_path)))
+    client = TestClient(create_app(ApiSettings(repo_root=tmp_path, auto_start_worker=False)))
 
     response = client.post(
         "/upload",
@@ -111,7 +111,7 @@ def test_upload_warns_for_unsupported_video_extension(tmp_path: Path) -> None:
 
 
 def test_status_returns_processing_progress(tmp_path: Path) -> None:
-    client = TestClient(create_app(ApiSettings(repo_root=tmp_path)))
+    client = TestClient(create_app(ApiSettings(repo_root=tmp_path, auto_start_worker=False)))
     upload_response = client.post(
         "/upload",
         files={"file": ("walkthrough.mov", b"video-bytes", "video/quicktime")},
@@ -122,8 +122,28 @@ def test_status_returns_processing_progress(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     assert response.json()["job_id"] == job_id
+    assert response.json()["state"] == "queued"
     assert response.json()["stage"] == "checking_capture_quality"
-    assert response.json()["progress"] == 0.08
+    assert response.json()["progress"] == 0
+    assert response.json()["output_scene_id"] is None
+
+
+def test_status_returns_failed_job_state(tmp_path: Path) -> None:
+    app = create_app(ApiSettings(repo_root=tmp_path, auto_start_worker=False))
+    client = TestClient(app)
+    upload_response = client.post(
+        "/upload",
+        files={"file": ("walkthrough.mov", b"video-bytes", "video/quicktime")},
+    )
+    job_id = upload_response.json()["job_id"]
+    app.state.job_repository.fail_job(job_id, "Bad poses break splat")
+
+    response = client.get(f"/status/{job_id}")
+
+    assert response.status_code == 200
+    assert response.json()["state"] == "failed"
+    assert response.json()["stage"] == "failed"
+    assert response.json()["error_message"] == "Bad poses break splat"
 
 
 def test_missing_job_returns_404() -> None:

@@ -5,6 +5,7 @@ from json import JSONDecodeError, dumps, loads
 from pathlib import Path
 from re import sub
 from secrets import token_hex
+from shutil import copyfileobj
 from time import time
 
 from fastapi import UploadFile
@@ -29,9 +30,16 @@ class StoredJob:
     original_filename: str
     stored_filename: str
     created_at_sec: float
+    updated_at_sec: float
+    state: str
+    stage: str
+    progress: float
+    message: str
     validation_status: str
     warnings: list[str]
     estimated_processing_time_sec: int
+    output_scene_id: str | None
+    error_message: str | None
 
 
 @dataclass(frozen=True)
@@ -77,19 +85,27 @@ class JobRepository:
 
         stored_filename = self._safe_filename(upload.filename or "walkthrough.mp4")
         stored_path = job_root / stored_filename
-        content = await upload.read()
-        stored_path.write_bytes(content)
+        with stored_path.open("wb") as output_file:
+            copyfileobj(upload.file, output_file)
 
-        warnings = self._validation_warnings(stored_filename, len(content))
+        warnings = self._validation_warnings(stored_filename, stored_path.stat().st_size)
         validation_status = "warning" if warnings else "pass"
+        created_at_sec = self.now_func()
         job = StoredJob(
             job_id=job_id,
             original_filename=upload.filename or stored_filename,
             stored_filename=stored_filename,
-            created_at_sec=self.now_func(),
+            created_at_sec=created_at_sec,
+            updated_at_sec=created_at_sec,
+            state="queued",
+            stage="checking_capture_quality",
+            progress=0,
+            message="Queued for processing",
             validation_status=validation_status,
             warnings=warnings,
             estimated_processing_time_sec=ESTIMATED_PROCESSING_TIME_SEC,
+            output_scene_id=None,
+            error_message=None,
         )
         self._write_job(job)
 
@@ -103,21 +119,74 @@ class JobRepository:
     def get_status(self, job_id: str) -> JobStatus:
         job = self._read_job(job_id)
         elapsed_sec = max(0, int(self.now_func() - job.created_at_sec))
-        elapsed_ratio = min(elapsed_sec / job.estimated_processing_time_sec, 1)
-
-        step = PROCESSING_STEPS[-1]
-        for candidate in PROCESSING_STEPS:
-            if elapsed_ratio <= candidate.progress:
-                step = candidate
-                break
 
         return JobStatus(
             job_id=job.job_id,
-            stage=step.stage,
-            progress=max(step.progress, round(elapsed_ratio, 2)),
+            state=job.state,
+            stage=job.stage,
+            progress=job.progress,
             elapsed_sec=elapsed_sec,
-            message=step.message,
+            message=job.message,
+            output_scene_id=job.output_scene_id,
+            error_message=job.error_message,
         )
+
+    def claim_next_queued_job(self) -> StoredJob | None:
+        self.jobs_root.mkdir(parents=True, exist_ok=True)
+        for path in sorted(self.jobs_root.glob("scene_*.json")):
+            job = self._read_job(path.stem)
+            if job.state == "queued":
+                running_job = self._replace_job(
+                    job,
+                    state="running",
+                    updated_at_sec=self.now_func(),
+                    message="Checking capture quality",
+                )
+                self._write_job(running_job)
+                return running_job
+
+        return None
+
+    def update_stage(self, job_id: str, step: ProcessingStep) -> StoredJob:
+        job = self._read_job(job_id)
+        updated_job = self._replace_job(
+            job,
+            state="running",
+            stage=step.stage,
+            progress=step.progress,
+            message=step.message,
+            updated_at_sec=self.now_func(),
+        )
+        self._write_job(updated_job)
+        return updated_job
+
+    def complete_job(self, job_id: str, output_scene_id: str) -> StoredJob:
+        job = self._read_job(job_id)
+        completed_job = self._replace_job(
+            job,
+            state="completed",
+            stage="completed",
+            progress=1,
+            message="Explorer ready",
+            output_scene_id=output_scene_id,
+            updated_at_sec=self.now_func(),
+        )
+        self._write_job(completed_job)
+        return completed_job
+
+    def fail_job(self, job_id: str, error_message: str) -> StoredJob:
+        job = self._read_job(job_id)
+        failed_job = self._replace_job(
+            job,
+            state="failed",
+            stage="failed",
+            progress=job.progress,
+            message="Processing failed",
+            error_message=error_message,
+            updated_at_sec=self.now_func(),
+        )
+        self._write_job(failed_job)
+        return failed_job
 
     def _new_job_id(self) -> str:
         self.jobs_root.mkdir(parents=True, exist_ok=True)
@@ -160,3 +229,8 @@ class JobRepository:
         suffix = Path(filename).suffix.lower() or ".mp4"
         safe_stem = sub(r"[^A-Za-z0-9_.-]+", "_", stem).strip("._") or "walkthrough"
         return f"{safe_stem}{suffix}"
+
+    def _replace_job(self, job: StoredJob, **changes: object) -> StoredJob:
+        payload = asdict(job)
+        payload.update(changes)
+        return StoredJob(**payload)

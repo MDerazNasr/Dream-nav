@@ -38,9 +38,11 @@ export {
 } from "./schemas/completion-manifest.js";
 export {
   type JobStatus,
+  type JobLifecycleState,
   type ProcessingStage,
   type UploadResponse,
   jobStatusSchema,
+  jobLifecycleStateSchema,
   parseJobStatus,
   parseUploadResponse,
   processingStageSchema,
