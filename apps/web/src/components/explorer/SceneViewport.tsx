@@ -64,11 +64,13 @@ export function SceneViewport({
       renderer.setSize(width, height);
     };
 
-    const clock = new THREE.Clock();
     let animationFrame = 0;
+    let previousFrameTime = performance.now();
 
     const render = () => {
-      const delta = clock.getDelta();
+      const currentFrameTime = performance.now();
+      const delta = (currentFrameTime - previousFrameTime) / 1000;
+      previousFrameTime = currentFrameTime;
       moveCamera(camera, pressedKeys, delta);
       renderer.render(scene, camera);
       animationFrame = window.requestAnimationFrame(render);
