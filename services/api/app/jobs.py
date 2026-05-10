@@ -207,6 +207,9 @@ class JobRepository:
     def _read_job(self, job_id: str) -> StoredJob:
         try:
             payload = loads((self.jobs_root / f"{job_id}.json").read_text(encoding="utf-8"))
+            if not isinstance(payload, dict):
+                raise TypeError("Job payload must be an object")
+            payload = self._with_current_defaults(payload)
             return StoredJob(**payload)
         except FileNotFoundError as error:
             raise JobNotFoundError(job_id) from error
@@ -234,3 +237,16 @@ class JobRepository:
         payload = asdict(job)
         payload.update(changes)
         return StoredJob(**payload)
+
+    def _with_current_defaults(self, payload: dict[str, object]) -> dict[str, object]:
+        created_at_sec = float(payload.get("created_at_sec", self.now_func()))
+        return {
+            **payload,
+            "updated_at_sec": payload.get("updated_at_sec", created_at_sec),
+            "state": payload.get("state", "queued"),
+            "stage": payload.get("stage", "checking_capture_quality"),
+            "progress": payload.get("progress", 0),
+            "message": payload.get("message", "Queued for processing"),
+            "output_scene_id": payload.get("output_scene_id", None),
+            "error_message": payload.get("error_message", None),
+        }
