@@ -7,6 +7,7 @@ from shutil import which
 import sys
 from typing import Protocol
 
+from .colmap_pipeline import build_colmap_pipeline_commands
 from .colmap_pose_parser import ColmapPoseParseError, parse_colmap_text_model
 from .config import ProcessingSettings
 from .jobs import ProcessingStep, StoredJob
@@ -64,7 +65,7 @@ class ProcessingTaskRunner(Protocol):
 
 
 class ProcessingCommandBuilder(Protocol):
-    def __call__(self, context: ProcessingTaskContext) -> ProcessingCommand:
+    def __call__(self, context: ProcessingTaskContext) -> ProcessingCommand | list[ProcessingCommand]:
         pass
 
 
@@ -264,18 +265,18 @@ def build_camera_motion_command(context: ProcessingTaskContext) -> ProcessingCom
         if not colmap_command:
             raise ProcessingTaskFailed("Pose backend colmap selected but COLMAP binary was not found.")
 
-        return ProcessingCommand(
-            artifact_name="camera_motion_command.json",
-            command=[
+        return [
+            ProcessingCommand(
+                artifact_name=command.artifact_name,
+                command=command.command,
+                timeout_sec=context.processing_settings.pose_timeout_sec,
+            )
+            for command in build_colmap_pipeline_commands(
                 colmap_command,
-                "feature_extractor",
-                "--database_path",
-                str(context.artifacts_root / "colmap.db"),
-                "--image_path",
-                str(_frames_root(context)),
-            ],
-            timeout_sec=context.processing_settings.pose_timeout_sec,
-        )
+                context.artifacts_root,
+                _frames_root(context),
+            )
+        ]
 
     if backend == "droid_slam":
         raise ProcessingTaskFailed("Pose backend droid_slam is configured but not implemented yet.")

@@ -51,7 +51,8 @@ class ProcessingWorker:
                 )
 
                 if task.command_builder:
-                    self._run_task_command(job.job_id, task.command_builder(context))
+                    for command in _task_commands(task.command_builder(context)):
+                        self._run_task_command(job.job_id, command)
 
                 result = task.run(context)
                 self.job_repository.write_artifact(job.job_id, result.artifact_name, result.payload)
@@ -102,3 +103,10 @@ class ProcessingWorker:
                 return processed_job_ids
 
             processed_job_ids.append(job_id)
+
+
+def _task_commands(command_or_commands: ProcessingCommand | list[ProcessingCommand]) -> list[ProcessingCommand]:
+    if isinstance(command_or_commands, list):
+        return command_or_commands
+
+    return [command_or_commands]

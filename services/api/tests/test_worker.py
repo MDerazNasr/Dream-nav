@@ -239,7 +239,31 @@ def test_worker_runs_configured_colmap_command(tmp_path: Path) -> None:
     worker.process_next_job()
     status = repo.get_status(response.job_id)
     command_path = (
-        tmp_path / "data" / "jobs" / response.job_id / "artifacts" / "camera_motion_command.json"
+        tmp_path
+        / "data"
+        / "jobs"
+        / response.job_id
+        / "artifacts"
+        / "colmap_feature_extractor_command.json"
+    )
+    matcher_command_path = (
+        tmp_path
+        / "data"
+        / "jobs"
+        / response.job_id
+        / "artifacts"
+        / "colmap_exhaustive_matcher_command.json"
+    )
+    mapper_command_path = (
+        tmp_path / "data" / "jobs" / response.job_id / "artifacts" / "colmap_mapper_command.json"
+    )
+    converter_command_path = (
+        tmp_path
+        / "data"
+        / "jobs"
+        / response.job_id
+        / "artifacts"
+        / "colmap_model_converter_command.json"
     )
     command_artifact = loads(command_path.read_text(encoding="utf-8"))
     camera_motion = loads(
@@ -257,6 +281,9 @@ def test_worker_runs_configured_colmap_command(tmp_path: Path) -> None:
     assert command_artifact["exit_code"] == 0
     assert command_artifact["command"][0] == str(fake_colmap)
     assert "feature_extractor" in command_artifact["stdout"]
+    assert matcher_command_path.is_file()
+    assert mapper_command_path.is_file()
+    assert converter_command_path.is_file()
     assert camera_motion["backend"] == "colmap"
     assert camera_motion["command_mode"] == "external"
     assert camera_motion["camera_path"] == "camera_path.json"
