@@ -1,1 +1,41 @@
 export { SCENE_SCHEMA_VERSION } from "./constants.js";
+export {
+  type DemoScene,
+  type SceneAssets,
+  demoSceneSchema,
+  demoScenesResponseSchema,
+  parseDemoScenesResponse,
+  parseSceneAssets,
+  sceneAssetsSchema
+} from "./schemas/api-contracts.js";
+export {
+  type LensMode,
+  type QualityGate,
+  assetPathSchema,
+  lensModeSchema,
+  nonNegativeNumberSchema,
+  qualityGateSchema,
+  ratioSchema,
+  sceneIdSchema,
+  urlPathSchema
+} from "./schemas/common.js";
+export {
+  type JobStatus,
+  type ProcessingStage,
+  type UploadResponse,
+  jobStatusSchema,
+  parseJobStatus,
+  parseUploadResponse,
+  processingStageSchema,
+  uploadResponseSchema
+} from "./schemas/processing.js";
+export {
+  type QualityReport,
+  parseQualityReport,
+  qualityReportSchema
+} from "./schemas/quality-report.js";
+export {
+  type SceneMetadata,
+  parseSceneMetadata,
+  sceneMetadataSchema
+} from "./schemas/scene-metadata.js";
