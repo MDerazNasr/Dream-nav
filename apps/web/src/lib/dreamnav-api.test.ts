@@ -224,10 +224,13 @@ describe("DreamNav API client", () => {
     mockFetchFromPayloads({
       "http://api.test/status/scene_abc123": {
         job_id: "scene_abc123",
+        state: "running",
         stage: "training_scene_model",
         progress: 0.62,
         elapsed_sec: 148,
-        message: "Training geometrically consistent scene-specific completion model"
+        message: "Training geometrically consistent scene-specific completion model",
+        output_scene_id: null,
+        error_message: null
       }
     });
 

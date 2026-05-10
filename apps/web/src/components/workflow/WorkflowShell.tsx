@@ -33,8 +33,10 @@ export function WorkflowShell({ sceneBundle }: WorkflowShellProps) {
 
   const activeProgress = jobStatus?.progress ?? 0;
   const percent = Math.round(activeProgress * 100);
+  const jobCompleted = jobStatus?.state === "completed";
+  const jobFailed = jobStatus?.state === "failed";
   const completedStageCount = useMemo(
-    () => Math.min(processingStages.length, Math.max(1, Math.ceil(activeProgress * processingStages.length))),
+    () => Math.min(processingStages.length, Math.ceil(activeProgress * processingStages.length)),
     [activeProgress]
   );
 
@@ -123,12 +125,20 @@ export function WorkflowShell({ sceneBundle }: WorkflowShellProps) {
           </ol>
 
           {uploadError ? <p className="workflow-error">{uploadError}</p> : null}
+          {jobFailed ? (
+            <p className="workflow-error">{jobStatus.error_message ?? "Processing failed"}</p>
+          ) : null}
 
           <div className="workflow-actions">
             <button className="secondary-action" onClick={() => setView("select")} type="button">
               Back
             </button>
-            <button className="primary-action" onClick={() => setView("explorer")} type="button">
+            <button
+              className="primary-action"
+              disabled={!jobCompleted}
+              onClick={() => setView("explorer")}
+              type="button"
+            >
               Open explorer
             </button>
           </div>

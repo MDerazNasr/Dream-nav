@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { WorkflowShell } from "./WorkflowShell";
 import type { ViewerSceneBundle } from "../../lib/dreamnav-api";
+import { fetchJobStatus } from "../../lib/dreamnav-api";
 
 vi.mock("../explorer/ExplorerShell", () => ({
   ExplorerShell: () => <div data-testid="explorer-shell" />
@@ -14,10 +15,13 @@ vi.mock("../../lib/dreamnav-api", async (importOriginal) => {
     ...actual,
     fetchJobStatus: vi.fn(async () => ({
       job_id: "scene_abc123",
+      state: "running",
       stage: "training_scene_model",
       progress: 0.72,
       elapsed_sec: 148,
-      message: "Training geometrically consistent scene-specific completion model"
+      message: "Training geometrically consistent scene-specific completion model",
+      output_scene_id: null,
+      error_message: null
     })),
     uploadWalkthrough: vi.fn(async () => ({
       job_id: "scene_abc123",
@@ -175,6 +179,31 @@ describe("WorkflowShell", () => {
     });
     await waitFor(() => {
       expect(screen.getByText("Training geometrically consistent scene-specific completion model")).not.toBeNull();
+    });
+    expect(screen.getByRole("button", { name: "Open explorer" }).hasAttribute("disabled")).toBe(true);
+  });
+
+  it("enables explorer when the worker completes the job", async () => {
+    vi.mocked(fetchJobStatus).mockResolvedValueOnce({
+      job_id: "scene_abc123",
+      state: "completed",
+      stage: "completed",
+      progress: 1,
+      elapsed_sec: 240,
+      message: "Explorer ready",
+      output_scene_id: "warehouse_01",
+      error_message: null
+    });
+    render(<WorkflowShell sceneBundle={sceneBundle} />);
+    const input = screen.getByLabelText("Walkthrough video");
+
+    fireEvent.change(input, {
+      target: { files: [new File(["video"], "walkthrough.mp4", { type: "video/mp4" })] }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Start processing" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Open explorer" }).hasAttribute("disabled")).toBe(false);
     });
   });
 });
