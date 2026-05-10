@@ -1,0 +1,157 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Protocol
+
+from .jobs import ProcessingStep, StoredJob
+
+
+class ProcessingTaskFailed(Exception):
+    pass
+
+
+@dataclass(frozen=True)
+class ProcessingTaskContext:
+    job: StoredJob
+    upload_path: Path
+    artifacts_root: Path
+
+
+@dataclass(frozen=True)
+class ProcessingTaskResult:
+    artifact_name: str
+    payload: dict[str, object]
+
+
+class ProcessingTaskRunner(Protocol):
+    def __call__(self, context: ProcessingTaskContext) -> ProcessingTaskResult:
+        pass
+
+
+@dataclass(frozen=True)
+class ProcessingTask:
+    step: ProcessingStep
+    artifact_name: str
+    run: ProcessingTaskRunner
+
+
+def default_processing_tasks() -> list[ProcessingTask]:
+    return [
+        ProcessingTask(
+            ProcessingStep("checking_capture_quality", 0.08, "Checking capture quality"),
+            "capture_quality.json",
+            validate_capture_quality,
+        ),
+        ProcessingTask(
+            ProcessingStep("estimating_camera_motion", 0.2, "Estimating camera motion"),
+            "camera_motion.json",
+            estimate_camera_motion,
+        ),
+        ProcessingTask(
+            ProcessingStep("building_gaussian_scene", 0.36, "Building Gaussian scene"),
+            "gaussian_scene.json",
+            build_gaussian_scene,
+        ),
+        ProcessingTask(
+            ProcessingStep("computing_visibility_support", 0.48, "Computing visibility support"),
+            "visibility_support.json",
+            compute_visibility_support,
+        ),
+        ProcessingTask(
+            ProcessingStep("rendering_training_views", 0.58, "Rendering training views from the splat"),
+            "training_views.json",
+            render_training_views,
+        ),
+        ProcessingTask(
+            ProcessingStep(
+                "training_scene_model",
+                0.72,
+                "Training geometrically consistent scene-specific completion model",
+            ),
+            "scene_model.json",
+            train_scene_model,
+        ),
+        ProcessingTask(
+            ProcessingStep("evaluating_heldout_viewpoints", 0.82, "Evaluating held-out viewpoints"),
+            "heldout_evaluation.json",
+            evaluate_heldout_viewpoints,
+        ),
+        ProcessingTask(
+            ProcessingStep("applying_quality_gate", 0.9, "Applying held-out PSNR quality gate"),
+            "quality_gate.json",
+            apply_quality_gate,
+        ),
+        ProcessingTask(
+            ProcessingStep("preparing_explorer", 0.97, "Preparing explorer"),
+            "explorer_bundle.json",
+            prepare_explorer,
+        ),
+    ]
+
+
+def validate_capture_quality(context: ProcessingTaskContext) -> ProcessingTaskResult:
+    file_size_bytes = context.upload_path.stat().st_size
+
+    if file_size_bytes == 0:
+        raise ProcessingTaskFailed("Uploaded file is empty.")
+
+    return _result(
+        "capture_quality.json",
+        context,
+        capture_score=0.84,
+        file_size_bytes=file_size_bytes,
+        validation_status=context.job.validation_status,
+    )
+
+
+def estimate_camera_motion(context: ProcessingTaskContext) -> ProcessingTaskResult:
+    return _result("camera_motion.json", context, backend="COLMAP", pose_count=3)
+
+
+def build_gaussian_scene(context: ProcessingTaskContext) -> ProcessingTaskResult:
+    return _result("gaussian_scene.json", context, splat_file="splat.ply", gaussian_count=6)
+
+
+def compute_visibility_support(context: ProcessingTaskContext) -> ProcessingTaskResult:
+    return _result("visibility_support.json", context, observed_threshold=3, method="voxel_visibility_v1")
+
+
+def render_training_views(context: ProcessingTaskContext) -> ProcessingTaskResult:
+    return _result("training_views.json", context, train_views=520, heldout_views=80)
+
+
+def train_scene_model(context: ProcessingTaskContext) -> ProcessingTaskResult:
+    return _result(
+        "scene_model.json",
+        context,
+        architecture="pose_conditioned_encoder_decoder",
+        training_time_sec=184,
+    )
+
+
+def evaluate_heldout_viewpoints(context: ProcessingTaskContext) -> ProcessingTaskResult:
+    return _result("heldout_evaluation.json", context, heldout_psnr_median=21.4)
+
+
+def apply_quality_gate(context: ProcessingTaskContext) -> ProcessingTaskResult:
+    return _result("quality_gate.json", context, quality_gate="warning")
+
+
+def prepare_explorer(context: ProcessingTaskContext) -> ProcessingTaskResult:
+    return _result("explorer_bundle.json", context, output_scene_id="warehouse_01")
+
+
+def _result(
+    artifact_name: str,
+    context: ProcessingTaskContext,
+    **payload: object,
+) -> ProcessingTaskResult:
+    return ProcessingTaskResult(
+        artifact_name=artifact_name,
+        payload={
+            "job_id": context.job.job_id,
+            "source_video": context.job.stored_filename,
+            **payload,
+        },
+    )

@@ -49,24 +49,6 @@ class ProcessingStep:
     message: str
 
 
-PROCESSING_STEPS = [
-    ProcessingStep("checking_capture_quality", 0.08, "Checking capture quality"),
-    ProcessingStep("estimating_camera_motion", 0.2, "Estimating camera motion"),
-    ProcessingStep("building_gaussian_scene", 0.36, "Building Gaussian scene"),
-    ProcessingStep("computing_visibility_support", 0.48, "Computing visibility support"),
-    ProcessingStep("rendering_training_views", 0.58, "Rendering training views from the splat"),
-    ProcessingStep(
-        "training_scene_model",
-        0.72,
-        "Training geometrically consistent scene-specific completion model",
-    ),
-    ProcessingStep("evaluating_heldout_viewpoints", 0.82, "Evaluating held-out viewpoints"),
-    ProcessingStep("applying_quality_gate", 0.9, "Applying held-out PSNR quality gate"),
-    ProcessingStep("preparing_explorer", 0.97, "Preparing explorer"),
-    ProcessingStep("completed", 1, "Explorer ready"),
-]
-
-
 class JobRepository:
     def __init__(
         self,
@@ -187,6 +169,19 @@ class JobRepository:
         )
         self._write_job(failed_job)
         return failed_job
+
+    def artifact_root(self, job_id: str) -> Path:
+        return self.jobs_root / job_id / "artifacts"
+
+    def write_artifact(self, job_id: str, artifact_name: str, payload: object) -> Path:
+        artifact_root = self.artifact_root(job_id)
+        artifact_root.mkdir(parents=True, exist_ok=True)
+        artifact_path = artifact_root / artifact_name
+        artifact_path.write_text(dumps(payload, indent=2), encoding="utf-8")
+        return artifact_path
+
+    def upload_path(self, job: StoredJob) -> Path:
+        return self.uploads_root / job.job_id / job.stored_filename
 
     def _new_job_id(self) -> str:
         self.jobs_root.mkdir(parents=True, exist_ok=True)
