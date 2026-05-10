@@ -33,3 +33,14 @@ class ProcessingWorker:
             self.job_repository.fail_job(job.job_id, str(error))
 
         return job.job_id
+
+    def process_available_jobs(self) -> list[str]:
+        processed_job_ids = []
+
+        while True:
+            job_id = self.process_next_job()
+
+            if not job_id:
+                return processed_job_ids
+
+            processed_job_ids.append(job_id)

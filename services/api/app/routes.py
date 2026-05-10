@@ -62,7 +62,7 @@ async def upload_walkthrough(
     response = await _job_repository(request).create_upload_job(file)
 
     if request.app.state.auto_start_worker:
-        Thread(target=request.app.state.processing_worker.process_next_job, daemon=True).start()
+        Thread(target=request.app.state.processing_worker.process_available_jobs, daemon=True).start()
 
     return response
 

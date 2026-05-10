@@ -53,3 +53,24 @@ def test_worker_reads_legacy_elapsed_time_job(tmp_path: Path) -> None:
 
     assert processed_job_id == "scene_legacy"
     assert status.state == "completed"
+
+
+def test_worker_drains_all_queued_jobs(tmp_path: Path) -> None:
+    repo = JobRepository(
+        jobs_root=tmp_path / "data" / "jobs",
+        uploads_root=tmp_path / "data" / "uploads",
+    )
+    first = anyio.run(
+        repo.create_upload_job,
+        UploadFile(filename="first.mp4", file=BytesIO(b"first-video")),
+    )
+    second = anyio.run(
+        repo.create_upload_job,
+        UploadFile(filename="second.mp4", file=BytesIO(b"second-video")),
+    )
+    worker = ProcessingWorker(repo, step_delay_sec=0)
+
+    processed_job_ids = worker.process_available_jobs()
+
+    assert set(processed_job_ids) == {first.job_id, second.job_id}
+    assert repo.get_status(second.job_id).state == "completed"
