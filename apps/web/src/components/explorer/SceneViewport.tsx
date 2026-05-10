@@ -38,7 +38,7 @@ export function SceneViewport({
       startPose?.position[2] ?? 3
     );
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.domElement.dataset.testid = "scene-canvas";
     mount.appendChild(renderer.domElement);

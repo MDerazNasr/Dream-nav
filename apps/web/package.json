@@ -7,7 +7,8 @@
     "build": "next build",
     "dev": "next dev",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "verify:viewer": "node scripts/verify-viewer.mjs"
   },
   "dependencies": {
     "@dream-nav/scene-registry": "0.1.0",
@@ -19,6 +20,7 @@
     "three": "0.184.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.59.1",
     "@testing-library/react": "16.3.2",
     "@types/react": "19.2.8",
     "@types/react-dom": "19.2.3",
