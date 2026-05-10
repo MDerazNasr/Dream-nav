@@ -1,8 +1,10 @@
-import { loadSceneBundle } from "@dream-nav/scene-registry";
 import { ExplorerShell } from "../components/explorer/ExplorerShell";
+import { fetchSceneBundle } from "../lib/dreamnav-api";
+
+export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const sceneBundle = await loadSceneBundle("warehouse_01");
+  const sceneBundle = await fetchSceneBundle("warehouse_01");
 
   return <ExplorerShell sceneBundle={sceneBundle} />;
 }
