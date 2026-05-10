@@ -29,6 +29,21 @@ describe("processing schemas", () => {
     expect(status.state).toBe("running");
   });
 
+  it("accepts the frame extraction stage", () => {
+    const status = parseJobStatus({
+      job_id: "scene_abc123",
+      state: "running",
+      stage: "extracting_video_frames",
+      progress: 0.14,
+      elapsed_sec: 22,
+      message: "Extracting video frames",
+      output_scene_id: null,
+      error_message: null
+    });
+
+    expect(status.stage).toBe("extracting_video_frames");
+  });
+
   it("rejects progress values above completion", () => {
     expect(() =>
       parseJobStatus({

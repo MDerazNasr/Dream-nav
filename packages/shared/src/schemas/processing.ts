@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const processingStageSchema = z.enum([
   "checking_capture_quality",
+  "extracting_video_frames",
   "estimating_camera_motion",
   "building_gaussian_scene",
   "computing_visibility_support",

@@ -5,6 +5,10 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class ProcessingSettings:
+    frame_backend: str = "stub"
+    frame_command: str | None = None
+    frame_timeout_sec: float = 30
+    frame_rate: float = 2
     pose_backend: str = "stub"
     pose_command: str | None = None
     pose_timeout_sec: float = 30
@@ -37,6 +41,10 @@ def default_settings() -> ApiSettings:
     return ApiSettings(
         repo_root=Path(__file__).resolve().parents[3],
         processing=ProcessingSettings(
+            frame_backend=environ.get("DREAMNAV_FRAME_BACKEND", "stub"),
+            frame_command=environ.get("DREAMNAV_FRAME_COMMAND"),
+            frame_timeout_sec=float(environ.get("DREAMNAV_FRAME_TIMEOUT_SEC", "30")),
+            frame_rate=float(environ.get("DREAMNAV_FRAME_RATE", "2")),
             pose_backend=environ.get("DREAMNAV_POSE_BACKEND", "stub"),
             pose_command=environ.get("DREAMNAV_POSE_COMMAND"),
             pose_timeout_sec=float(environ.get("DREAMNAV_POSE_TIMEOUT_SEC", "30")),
