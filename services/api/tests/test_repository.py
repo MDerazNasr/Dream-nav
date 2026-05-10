@@ -20,3 +20,12 @@ def test_repository_rejects_unknown_scene() -> None:
 
     with pytest.raises(SceneNotFoundError):
         repo.get_quality_report("missing_scene")
+
+
+def test_repository_reports_missing_splat_asset() -> None:
+    repo = SceneRepository(Path("data"))
+
+    status = repo.get_asset_status("warehouse_01")
+
+    assert status.splat_available is False
+    assert status.viewer_render_mode == "placeholder"

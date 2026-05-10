@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request
 
-from .schemas import DemoScene, HealthResponse, QualityReport, SceneAssets
+from .schemas import DemoScene, HealthResponse, QualityReport, SceneAssetStatus, SceneAssets
 from .repository import SceneDataError, SceneNotFoundError, SceneRepository
 
 router = APIRouter()
@@ -36,6 +36,11 @@ def scene_assets(scene_id: str, request: Request) -> SceneAssets:
 @router.get("/quality/{scene_id}", response_model=QualityReport)
 def quality(scene_id: str, request: Request) -> QualityReport:
     return _repository(request).get_quality_report(scene_id)
+
+
+@router.get("/scene/{scene_id}/asset-status", response_model=SceneAssetStatus)
+def scene_asset_status(scene_id: str, request: Request) -> SceneAssetStatus:
+    return _repository(request).get_asset_status(scene_id)
 
 
 def _repository(request: Request) -> SceneRepository:

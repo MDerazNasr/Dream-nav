@@ -26,6 +26,7 @@ Primary routes:
 GET /health
 GET /demo-scenes
 GET /scene/{scene_id}
+GET /scene/{scene_id}/asset-status
 GET /quality/{scene_id}
 GET /scenes/{scene_id}/{asset}
 ```

@@ -4,7 +4,7 @@ from typing import TypeVar
 
 from pydantic import BaseModel, ValidationError
 
-from .schemas import DemoScene, QualityReport, SceneMetadata
+from .schemas import DemoScene, QualityReport, SceneAssetStatus, SceneMetadata
 
 ModelType = TypeVar("ModelType", bound=BaseModel)
 
@@ -35,6 +35,20 @@ class SceneRepository:
     def get_quality_report(self, scene_id: str) -> QualityReport:
         self._assert_registered_scene(scene_id)
         return self._read_model(self._scene_root(scene_id) / "quality.json", QualityReport)
+
+    def get_asset_status(self, scene_id: str) -> SceneAssetStatus:
+        metadata = self.get_scene_metadata(scene_id)
+        splat_path = self._scene_root(scene_id) / metadata.splat_file
+        splat_available = splat_path.is_file()
+        missing_assets = [] if splat_available else [metadata.splat_file]
+
+        return SceneAssetStatus(
+            scene_id=scene_id,
+            splat_url=f"/scenes/{scene_id}/{metadata.splat_file}",
+            splat_available=splat_available,
+            viewer_render_mode="splat" if splat_available else "placeholder",
+            missing_assets=missing_assets,
+        )
 
     def scene_exists(self, scene_id: str) -> bool:
         return any(scene.scene_id == scene_id for scene in self.list_demo_scenes())

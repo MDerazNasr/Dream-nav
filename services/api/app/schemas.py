@@ -21,6 +21,14 @@ class SceneAssets(StrictModel):
     quality_report_url: str
 
 
+class SceneAssetStatus(StrictModel):
+    scene_id: str
+    splat_url: str
+    splat_available: bool
+    viewer_render_mode: str
+    missing_assets: list[str]
+
+
 class QualityReport(StrictModel):
     scene_id: str
     pose_backend: str

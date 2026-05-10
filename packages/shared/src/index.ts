@@ -9,6 +9,13 @@ export {
   sceneAssetsSchema
 } from "./schemas/api-contracts.js";
 export {
+  type SceneAssetStatus,
+  type ViewerRenderMode,
+  parseSceneAssetStatus,
+  sceneAssetStatusSchema,
+  viewerRenderModeSchema
+} from "./schemas/asset-status.js";
+export {
   type LensMode,
   type QualityGate,
   assetPathSchema,
