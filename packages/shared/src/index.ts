@@ -20,6 +20,16 @@ export {
   urlPathSchema
 } from "./schemas/common.js";
 export {
+  type CameraPath,
+  cameraPathSchema,
+  parseCameraPath
+} from "./schemas/camera-path.js";
+export {
+  type CompletionManifest,
+  completionManifestSchema,
+  parseCompletionManifest
+} from "./schemas/completion-manifest.js";
+export {
   type JobStatus,
   type ProcessingStage,
   type UploadResponse,
@@ -39,3 +49,10 @@ export {
   parseSceneMetadata,
   sceneMetadataSchema
 } from "./schemas/scene-metadata.js";
+export {
+  type VisibilityManifest,
+  type VisibilityZone,
+  parseVisibilityManifest,
+  visibilityManifestSchema,
+  visibilityZoneSchema
+} from "./schemas/visibility-manifest.js";
