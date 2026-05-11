@@ -71,3 +71,8 @@ export {
   visibilityManifestSchema,
   visibilityZoneSchema
 } from "./schemas/visibility-manifest.js";
+export {
+  type ZoneArtifact,
+  parseZoneArtifact,
+  zoneArtifactSchema
+} from "./schemas/zone-artifact.js";
