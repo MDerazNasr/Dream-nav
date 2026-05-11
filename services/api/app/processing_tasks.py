@@ -11,6 +11,7 @@ from .processing_models import (
     ProcessingTaskFailed,
     ProcessingTaskResult,
 )
+from .pseudo_views import PseudoViewRenderError, render_pseudo_views
 from .splat_assets import SplatAssetError, ensure_job_splat_asset
 from .viewer_assets import ViewerAssetBuildError, build_job_viewer_assets
 
@@ -120,7 +121,16 @@ def compute_visibility_support(context: ProcessingTaskContext) -> ProcessingTask
 
 
 def render_training_views(context: ProcessingTaskContext) -> ProcessingTaskResult:
-    return _result("training_views.json", context, train_views=520, heldout_views=80)
+    try:
+        payload = render_pseudo_views(
+            context.job.job_id,
+            context.job.stored_filename,
+            context.artifacts_root,
+        )
+    except PseudoViewRenderError as error:
+        raise ProcessingTaskFailed(str(error)) from error
+
+    return ProcessingTaskResult("training_views.json", payload)
 
 
 def train_scene_model(context: ProcessingTaskContext) -> ProcessingTaskResult:
