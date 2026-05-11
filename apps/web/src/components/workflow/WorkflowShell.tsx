@@ -326,23 +326,21 @@ function toProcessedViewerBundle(
   baseBundle: ViewerSceneBundle,
   jobSceneBundle: Awaited<ReturnType<typeof fetchJobSceneBundle>>
 ): ViewerSceneBundle {
-  const frameCount = jobSceneBundle.camera_path.poses.length;
-
   return {
     ...baseBundle,
-    cameraPath: jobSceneBundle.camera_path,
-    metadata: {
-      ...baseBundle.metadata,
+    demoScene: {
       scene_id: jobSceneBundle.output_scene_id,
-      title: "Processed walkthrough",
-      frame_count: frameCount,
-      camera_path: jobSceneBundle.camera_path_artifact
+      title: jobSceneBundle.metadata.title,
+      thumbnail_url: baseBundle.demoScene.thumbnail_url,
+      description: "Processed walkthrough from your upload"
     },
-    quality: {
-      ...baseBundle.quality,
-      scene_id: jobSceneBundle.output_scene_id,
-      frame_count: frameCount
-    }
+    assets: jobSceneBundle.assets,
+    metadata: jobSceneBundle.metadata,
+    quality: jobSceneBundle.quality,
+    cameraPath: jobSceneBundle.camera_path,
+    visibility: jobSceneBundle.visibility,
+    completion: jobSceneBundle.completion,
+    assetStatus: jobSceneBundle.asset_status
   };
 }
 

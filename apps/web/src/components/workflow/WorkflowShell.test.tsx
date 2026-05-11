@@ -33,6 +33,124 @@ const processedCameraPath = vi.hoisted(() => ({
   ]
 }));
 
+const processedJobSceneBundle = vi.hoisted(() => ({
+  job_id: "scene_abc123",
+  output_scene_id: "scene_abc123",
+  assets: {
+    scene_id: "scene_abc123",
+    splat_url: "/jobs/scene_abc123/viewer-assets/splat.ply",
+    metadata_url: "/jobs/scene_abc123/viewer-assets/metadata.json",
+    visibility_manifest_url: "/jobs/scene_abc123/viewer-assets/visibility_manifest.json",
+    completion_manifest_url: "/jobs/scene_abc123/viewer-assets/completion_manifest.json",
+    quality_report_url: "/jobs/scene_abc123/viewer-assets/quality.json"
+  },
+  metadata: {
+    scene_id: "scene_abc123",
+    title: "Processed walkthrough",
+    input_video: "walkthrough.mp4",
+    duration_sec: 0,
+    frame_count: 2,
+    pose_backend: "stub",
+    camera_path: "camera_path.json",
+    splat_file: "splat.ply",
+    visibility: {
+      observed_threshold: 3,
+      partial_threshold: [1, 2],
+      observed_ratio: 0.62,
+      partial_ratio: 0.22,
+      completion_candidate_ratio: 0.11
+    },
+    scene_model: {
+      enabled: true,
+      architecture: "pose_conditioned_encoder_decoder",
+      train_views: 520,
+      heldout_views: 80,
+      training_time_sec: 184,
+      loss: "L_rgb + lambda_geo * L_geo",
+      heldout_psnr_median: 21.4,
+      quality_gate: "warning",
+      lpips: null
+    },
+    optimization: {
+      fp32_latency_ms_p50: null,
+      fp16_latency_ms_p50: null,
+      compiled_latency_ms_p50: null,
+      tensorrt_latency_ms_p50: null,
+      cached_output_latency_ms_p50: null
+    },
+    zones: {
+      observed: "observed_zone.json",
+      partial: "partial_zone.json",
+      completion: "completion_zone.json",
+      unknown: "unknown_zone.json"
+    },
+    quality: {
+      capture_score: 0.92,
+      sharpness_score: 0.79,
+      parallax_score: 0.82,
+      texture_score: 0.8,
+      splat_fps: 0,
+      processing_time_sec: 0
+    },
+    product_tools: {
+      lens_modes: ["24mm", "35mm", "50mm", "85mm"],
+      camera_markers_enabled: true,
+      notes_enabled: false
+    }
+  },
+  quality: {
+    scene_id: "scene_abc123",
+    pose_backend: "stub",
+    frame_count: 2,
+    visibility_threshold_observed: 3,
+    splat_fps: 0,
+    scene_model_training_sec: 184,
+    heldout_psnr_median: 21.4,
+    quality_gate: "warning",
+    completion_latency_ms_p50: null,
+    completion_latency_ms_p95: null,
+    runtime_path: "placeholder",
+    cached_completion: false
+  },
+  camera_path_artifact: "camera_path.json",
+  camera_path: processedCameraPath,
+  visibility: {
+    scene_id: "scene_abc123",
+    method: "voxel_visibility_v1",
+    observed_threshold: 3,
+    partial_threshold: [1, 2],
+    observed_ratio: 0.62,
+    partial_ratio: 0.22,
+    completion_candidate_ratio: 0.11,
+    unknown_ratio: 0.05,
+    cells: [
+      {
+        cell_id: "cell_observed_001",
+        center: [0, 1, -0.5],
+        size_meters: 0.5,
+        visibility_count: 5,
+        zone: "observed"
+      }
+    ]
+  },
+  completion: {
+    scene_id: "scene_abc123",
+    model_enabled: true,
+    architecture: "pose_conditioned_encoder_decoder",
+    quality_gate: "warning",
+    heldout_psnr_median: 21.4,
+    cache_strategy: "none",
+    cached_predictions: []
+  },
+  asset_status: {
+    scene_id: "scene_abc123",
+    splat_url: "http://api.test/jobs/scene_abc123/viewer-assets/splat.ply",
+    splat_available: false,
+    viewer_render_mode: "placeholder",
+    missing_assets: ["splat.ply"]
+  }
+}));
+
 vi.mock("../explorer/ExplorerShell", () => ({
   ExplorerShell: ({ sceneBundle }: { sceneBundle: ViewerSceneBundle }) => (
     <div data-testid="explorer-shell">{sceneBundle.cameraPath.poses.length} poses</div>
@@ -64,12 +182,7 @@ vi.mock("../../lib/dreamnav-api", async (importOriginal) => {
         stderr: "ffmpeg failed"
       }
     })),
-    fetchJobSceneBundle: vi.fn(async () => ({
-      job_id: "scene_abc123",
-      output_scene_id: "warehouse_01",
-      camera_path_artifact: "camera_path.json",
-      camera_path: processedCameraPath
-    })),
+    fetchJobSceneBundle: vi.fn(async () => processedJobSceneBundle),
     uploadWalkthrough: vi.fn(async () => ({
       job_id: "scene_abc123",
       validation_status: "pass",
