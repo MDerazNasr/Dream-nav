@@ -26,6 +26,7 @@ def build_job_viewer_assets(
     quality_gate = _read_json(artifacts_root / "quality_gate.json")
 
     frame_count = _int_value(frame_extraction, "frame_count")
+    splat_file = _string_value(gaussian_scene, "splat_file", "splat.ply")
     quality_gate_status = _string_value(quality_gate, "quality_gate", "warning")
     heldout_psnr = _optional_number(heldout_evaluation, "heldout_psnr_median")
     visibility = _build_visibility_manifest(job_id, camera_path, visibility_support)
@@ -38,11 +39,12 @@ def build_job_viewer_assets(
         scene_model,
         heldout_psnr,
         quality_gate_status,
-        artifacts_root / _string_value(gaussian_scene, "splat_file", "splat.ply"),
+        artifacts_root / splat_file,
     )
     metadata = _build_metadata(
         job_id,
         source_video,
+        splat_file,
         frame_count,
         capture_quality,
         camera_motion,
@@ -70,6 +72,7 @@ def build_job_viewer_assets(
             "camera_path.json",
             "visibility_manifest.json",
             "completion_manifest.json",
+            splat_file,
         ],
         "missing_assets": missing_assets,
         "viewer_render_mode": "placeholder" if missing_assets else "splat",
@@ -79,6 +82,7 @@ def build_job_viewer_assets(
 def _build_metadata(
     scene_id: str,
     source_video: str,
+    splat_file: str,
     frame_count: int,
     capture_quality: dict[str, Any],
     camera_motion: dict[str, Any],
@@ -97,7 +101,7 @@ def _build_metadata(
         "frame_count": frame_count,
         "pose_backend": _string_value(camera_motion, "backend", "unknown"),
         "camera_path": "camera_path.json",
-        "splat_file": "splat.ply",
+        "splat_file": splat_file,
         "visibility": {
             "observed_threshold": visibility["observed_threshold"],
             "partial_threshold": visibility["partial_threshold"],

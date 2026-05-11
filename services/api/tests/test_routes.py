@@ -202,7 +202,7 @@ def test_completed_job_scene_bundle_returns_viewer_assets(tmp_path: Path) -> Non
     assert payload["camera_path"]["scene_id"] == job_id
     assert payload["visibility"]["scene_id"] == job_id
     assert payload["completion"]["scene_id"] == job_id
-    assert payload["asset_status"]["viewer_render_mode"] == "placeholder"
+    assert payload["asset_status"]["viewer_render_mode"] == "splat"
 
 
 def test_job_viewer_asset_serves_raw_json(tmp_path: Path) -> None:
@@ -216,9 +216,12 @@ def test_job_viewer_asset_serves_raw_json(tmp_path: Path) -> None:
     _write_viewer_assets(app.state.job_repository, job_id)
 
     response = client.get(f"/jobs/{job_id}/viewer-assets/metadata.json")
+    splat_response = client.get(f"/jobs/{job_id}/viewer-assets/splat.ply")
 
     assert response.status_code == 200
     assert response.json()["scene_id"] == job_id
+    assert splat_response.status_code == 200
+    assert splat_response.content.startswith(b"ply\n")
 
 
 def test_job_viewer_asset_rejects_unlisted_names(tmp_path: Path) -> None:
@@ -414,3 +417,6 @@ def _write_viewer_assets(job_repository, job_id: str) -> None:
         "completion_manifest.json": completion,
     }.items():
         job_repository.write_artifact(job_id, artifact_name, payload)
+
+    splat_path = job_repository.artifact_root(job_id) / "splat.ply"
+    splat_path.write_bytes(b"ply\nformat ascii 1.0\nend_header\n")
