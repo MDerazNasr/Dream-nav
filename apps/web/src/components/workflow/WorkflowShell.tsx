@@ -5,7 +5,13 @@ import { AlertTriangle, CheckCircle2, Film, LoaderCircle, RotateCcw, Upload, XCi
 import { useEffect, useMemo, useState } from "react";
 import { ExplorerShell } from "../explorer/ExplorerShell";
 import type { ViewerSceneBundle } from "../../lib/dreamnav-api";
-import { fetchJobArtifact, fetchJobSceneBundle, fetchJobStatus, uploadWalkthrough } from "../../lib/dreamnav-api";
+import {
+  fetchJobArtifact,
+  fetchJobSceneBundle,
+  fetchJobStatus,
+  resolveBrowserAssetDirectoryUrl,
+  uploadWalkthrough
+} from "../../lib/dreamnav-api";
 
 type WorkflowShellProps = {
   sceneBundle: ViewerSceneBundle;
@@ -340,6 +346,7 @@ function toProcessedViewerBundle(
     cameraPath: jobSceneBundle.camera_path,
     visibility: jobSceneBundle.visibility,
     completion: jobSceneBundle.completion,
+    completionAssetBaseUrl: resolveBrowserAssetDirectoryUrl(jobSceneBundle.assets.completion_manifest_url),
     assetStatus: jobSceneBundle.asset_status,
     zoneArtifacts: jobSceneBundle.zoneArtifacts
   };

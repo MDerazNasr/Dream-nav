@@ -2,7 +2,7 @@
 
 import type { LensMode } from "@dream-nav/shared";
 import { BookmarkPlus, Gauge, Layers, RotateCcw, Trash2, Video } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ViewerSceneBundle } from "../../lib/dreamnav-api";
 import {
   type CameraBookmark,
@@ -10,6 +10,11 @@ import {
   loadCameraBookmarks,
   saveCameraBookmarks
 } from "./camera-bookmarks";
+import {
+  formatCompletionCacheStatus,
+  selectNearestCachedCompletion
+} from "./completion-preview";
+import { CompletionPreview } from "./CompletionPreview";
 import { ConfidenceLegend } from "./ConfidenceLegend";
 import { LensSelector } from "./LensSelector";
 import { MetricsPanel } from "./MetricsPanel";
@@ -37,6 +42,17 @@ export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
   const handleCameraPoseChange = useCallback((pose: ViewerCameraPose) => {
     setCurrentPose(pose);
   }, []);
+  const cachedCompletionMatch = useMemo(
+    () =>
+      selectNearestCachedCompletion(
+        sceneBundle.completion,
+        sceneBundle.cameraPath,
+        currentPose,
+        sceneBundle.completionAssetBaseUrl
+      ),
+    [currentPose, sceneBundle.cameraPath, sceneBundle.completion, sceneBundle.completionAssetBaseUrl]
+  );
+  const completionCacheStatus = formatCompletionCacheStatus(sceneBundle.completion, cachedCompletionMatch);
 
   useEffect(() => {
     setBookmarksLoaded(false);
@@ -130,7 +146,13 @@ export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
           />
         </section>
 
-        <MetricsPanel cameraPose={currentPose} quality={sceneBundle.quality} />
+        <MetricsPanel
+          cameraPose={currentPose}
+          completionCacheStatus={completionCacheStatus}
+          quality={sceneBundle.quality}
+        />
+
+        <CompletionPreview completion={sceneBundle.completion} match={cachedCompletionMatch} />
 
         <ConfidenceLegend
           qualityGate={sceneBundle.quality.quality_gate}

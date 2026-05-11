@@ -9,8 +9,8 @@
     {
       "prediction_id": "pred_001",
       "camera_pose_index": 1,
-      "rgb_asset": "completion/pred_001.png",
-      "confidence_mask_asset": "completion/pred_001_mask.png",
+      "rgb_asset": "completion/pred_001.svg",
+      "confidence_mask_asset": "completion/pred_001_mask.svg",
       "latency_ms_p50": 12
     }
   ]

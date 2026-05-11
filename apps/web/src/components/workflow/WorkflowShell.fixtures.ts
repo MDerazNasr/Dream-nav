@@ -198,8 +198,18 @@ export const sceneBundle = {
   completion: {
     ...processedJobSceneBundle.completion,
     scene_id: "warehouse_01",
-    cache_strategy: "planned_path"
+    cache_strategy: "planned_path",
+    cached_predictions: [
+      {
+        prediction_id: "pred_001",
+        camera_pose_index: 0,
+        rgb_asset: "completion/pred_001.svg",
+        confidence_mask_asset: "completion/pred_001_mask.svg",
+        latency_ms_p50: 12
+      }
+    ]
   },
+  completionAssetBaseUrl: "/dreamnav-assets/scenes/warehouse_01/",
   assetStatus: {
     scene_id: "warehouse_01",
     splat_url: "http://api.test/scenes/warehouse_01/splat.ply",

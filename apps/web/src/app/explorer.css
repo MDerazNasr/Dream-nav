@@ -61,6 +61,8 @@
   right: 18px;
   display: grid;
   gap: 10px;
+  max-height: calc(100vh - 112px);
+  overflow: auto;
   width: min(310px, calc(100vw - 36px));
 }
 
@@ -253,6 +255,42 @@
 .bookmark-delete {
   width: 36px;
   min-height: 36px;
+}
+
+.completion-preview {
+  display: grid;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.completion-preview img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 1px solid rgba(245, 247, 244, 0.14);
+  border-radius: 8px;
+  object-fit: cover;
+  background: #111412;
+}
+
+.completion-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #b8c6bd;
+  font-size: 11px;
+}
+
+.completion-empty {
+  margin: 0 12px 12px;
+  min-height: 54px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(245, 247, 244, 0.12);
+  border-radius: 8px;
+  color: #b8c6bd;
+  font-size: 12px;
 }
 
 .badge {

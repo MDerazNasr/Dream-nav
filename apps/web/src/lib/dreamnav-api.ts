@@ -20,6 +20,7 @@ import { buildZoneArtifactsFromVisibility, type ConfidenceZoneArtifacts } from "
 
 export type ViewerSceneBundle = SceneBundle & {
   assetStatus: SceneAssetStatus;
+  completionAssetBaseUrl: string;
   zoneArtifacts: ConfidenceZoneArtifacts;
 };
 
@@ -88,9 +89,15 @@ export async function fetchSceneBundle(
     cameraPath,
     visibility,
     completion,
+    completionAssetBaseUrl: resolveBrowserAssetDirectoryUrl(assets.completion_manifest_url),
     assetStatus: resolvedAssetStatus,
     zoneArtifacts: buildZoneArtifactsFromVisibility(sceneId, visibility)
   };
+}
+
+export function resolveBrowserAssetDirectoryUrl(manifestUrl: string): string {
+  const assetDirectory = new URL(".", new URL(manifestUrl, "http://dreamnav.local")).pathname;
+  return `/dreamnav-assets${assetDirectory}`;
 }
 
 export async function uploadWalkthrough(

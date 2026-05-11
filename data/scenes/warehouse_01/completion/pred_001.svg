@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" role="img">
+  <defs>
+    <linearGradient id="wall" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#6e786f"/>
+      <stop offset="1" stop-color="#2e3733"/>
+    </linearGradient>
+    <linearGradient id="floor" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#202623"/>
+      <stop offset="0.54" stop-color="#465047"/>
+      <stop offset="1" stop-color="#151917"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="180" fill="#121512"/>
+  <polygon points="0,0 320,0 250,74 69,76" fill="url(#wall)"/>
+  <polygon points="0,180 69,76 250,74 320,180" fill="url(#floor)"/>
+  <polygon points="0,0 69,76 0,180" fill="#252c28"/>
+  <polygon points="320,0 250,74 320,180" fill="#1a211e"/>
+  <rect x="132" y="28" width="56" height="50" fill="#18201d" opacity="0.82"/>
+  <rect x="146" y="39" width="29" height="39" fill="#8ea49b" opacity="0.36"/>
+  <path d="M75 124c40-13 91-17 167-5" fill="none" stroke="#77d7c8" stroke-width="3" opacity="0.7"/>
+  <circle cx="226" cy="119" r="16" fill="#4a8ee8" opacity="0.4"/>
+  <circle cx="226" cy="119" r="5" fill="#dfe7df"/>
+</svg>

@@ -169,6 +169,13 @@ const sceneBundle: ViewerSceneBundle = {
         position: [0, 1.55, 0],
         rotation_xyzw: [0, 0, 0, 1],
         fov_degrees: 60
+      },
+      {
+        frame_index: 24,
+        timestamp_sec: 0.8,
+        position: [1, 1.55, -2],
+        rotation_xyzw: [0, 0.06, 0, 0.9982],
+        fov_degrees: 60
       }
     ]
   },
@@ -180,8 +187,17 @@ const sceneBundle: ViewerSceneBundle = {
     quality_gate: "warning",
     heldout_psnr_median: 21.4,
     cache_strategy: "planned_path",
-    cached_predictions: []
+    cached_predictions: [
+      {
+        prediction_id: "pred_001",
+        camera_pose_index: 1,
+        rgb_asset: "completion/pred_001.svg",
+        confidence_mask_asset: "completion/pred_001_mask.svg",
+        latency_ms_p50: 12
+      }
+    ]
   },
+  completionAssetBaseUrl: "/dreamnav-assets/scenes/warehouse_01/",
   assetStatus: {
     scene_id: "warehouse_01",
     splat_url: "/scenes/warehouse_01/splat.ply",
@@ -206,10 +222,16 @@ describe("ExplorerShell", () => {
     expect(screen.getByText("torch_fp16")).not.toBeNull();
     expect(screen.getByLabelText("Confidence zones")).not.toBeNull();
     expect(screen.getByText("Observed")).not.toBeNull();
-    expect(screen.getByText("Completion")).not.toBeNull();
+    expect(screen.getAllByText("Completion").length).toBeGreaterThan(0);
     expect(screen.getByLabelText("Render mode").textContent).toContain("Placeholder");
     expect(screen.getByLabelText("Current camera position")).not.toBeNull();
     expect(screen.getByText("0.0, 0.0")).not.toBeNull();
+    expect(screen.getByLabelText("Completion preview")).not.toBeNull();
+    expect(screen.getByAltText("Cached completion prediction").getAttribute("src")).toBe(
+      "/dreamnav-assets/scenes/warehouse_01/completion/pred_001.svg"
+    );
+    expect(screen.getAllByText(/pred_001/).length).toBeGreaterThan(0);
+    expect(screen.getByText("12 ms")).not.toBeNull();
   });
 
   it("toggles the confidence overlay button state", () => {
@@ -244,6 +266,7 @@ describe("ExplorerShell", () => {
 
     expect(screen.getByText("1.2, -2.4")).not.toBeNull();
     expect(screen.getByText("73 deg")).not.toBeNull();
+    expect(screen.getByText(/0.4 m/)).not.toBeNull();
   });
 
   it("resets the camera view", () => {

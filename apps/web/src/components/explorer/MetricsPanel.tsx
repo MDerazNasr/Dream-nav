@@ -5,10 +5,11 @@ import type { ViewerCameraPose } from "./viewer-camera";
 
 type MetricsPanelProps = {
   cameraPose: ViewerCameraPose;
+  completionCacheStatus: string;
   quality: QualityReport;
 };
 
-export function MetricsPanel({ cameraPose, quality }: MetricsPanelProps) {
+export function MetricsPanel({ cameraPose, completionCacheStatus, quality }: MetricsPanelProps) {
   const metrics = [
     ["Splat FPS", quality.splat_fps.toFixed(0)],
     ["PSNR", formatNullableMetric(quality.heldout_psnr_median, " dB")],
@@ -16,6 +17,7 @@ export function MetricsPanel({ cameraPose, quality }: MetricsPanelProps) {
     ["Runtime", quality.runtime_path],
     ["Pose", formatPose(cameraPose)],
     ["FOV", `${cameraPose.fovDegrees} deg`],
+    ["Cache", completionCacheStatus],
     ["P50", formatNullableMetric(quality.completion_latency_ms_p50, " ms")],
     ["P95", formatNullableMetric(quality.completion_latency_ms_p95, " ms")]
   ];
