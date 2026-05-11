@@ -53,6 +53,16 @@ export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
     [currentPose, sceneBundle.cameraPath, sceneBundle.completion, sceneBundle.completionAssetBaseUrl]
   );
   const completionCacheStatus = formatCompletionCacheStatus(sceneBundle.completion, cachedCompletionMatch);
+  const completionProjection = useMemo(
+    () =>
+      cachedCompletionMatch
+        ? {
+            cameraPoseIndex: cachedCompletionMatch.prediction.camera_pose_index,
+            url: cachedCompletionMatch.rgbUrl
+          }
+        : null,
+    [cachedCompletionMatch?.prediction.camera_pose_index, cachedCompletionMatch?.rgbUrl]
+  );
 
   useEffect(() => {
     setBookmarksLoaded(false);
@@ -99,7 +109,7 @@ export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
     <main className="explorer">
       <SceneViewport
         cameraPath={sceneBundle.cameraPath}
-        completionProjectionUrl={cachedCompletionMatch?.rgbUrl ?? null}
+        completionProjection={completionProjection}
         lensMode={selectedLens}
         onCameraPoseChange={handleCameraPoseChange}
         overlayEnabled={overlayEnabled}

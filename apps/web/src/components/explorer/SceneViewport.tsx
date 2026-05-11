@@ -6,11 +6,12 @@ import * as THREE from "three";
 import { confidenceZoneColors, type ConfidenceZoneArtifacts, zoneCells } from "../../lib/confidence-zones";
 import { getLensFov } from "../../lib/lens";
 import { loadSplatScene } from "../../lib/splat-loader";
+import { createCompletionProjection, type CompletionProjectionTarget } from "./completion-projection";
 import type { ViewerCameraPose } from "./viewer-camera";
 
 type SceneViewportProps = {
   cameraPath: CameraPath;
-  completionProjectionUrl: string | null;
+  completionProjection: CompletionProjectionTarget | null;
   lensMode: LensMode;
   overlayEnabled: boolean;
   onCameraPoseChange: (pose: ViewerCameraPose) => void;
@@ -33,7 +34,7 @@ type ViewportRuntime = {
 
 export function SceneViewport({
   cameraPath,
-  completionProjectionUrl,
+  completionProjection,
   lensMode,
   overlayEnabled,
   onCameraPoseChange,
@@ -45,22 +46,22 @@ export function SceneViewport({
   zoneArtifacts
 }: SceneViewportProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
-  const completionProjectionUrlRef = useRef(completionProjectionUrl);
+  const completionProjectionRef = useRef(completionProjection);
   const lensModeRef = useRef(lensMode);
   const runtimeRef = useRef<ViewportRuntime | null>(null);
 
   useEffect(() => {
-    completionProjectionUrlRef.current = completionProjectionUrl;
+    completionProjectionRef.current = completionProjection;
     const runtime = runtimeRef.current;
     if (!runtime) {
       return;
     }
 
-    replaceCompletionProjection(runtime, completionProjectionUrl, zoneArtifacts);
+    replaceCompletionProjection(runtime, completionProjection, cameraPath, zoneArtifacts);
     return () => {
       removeCompletionProjection(runtime);
     };
-  }, [completionProjectionUrl, zoneArtifacts]);
+  }, [cameraPath, completionProjection, zoneArtifacts]);
 
   useEffect(() => {
     lensModeRef.current = lensMode;
@@ -117,7 +118,7 @@ export function SceneViewport({
       scene,
       startPosition
     };
-    replaceCompletionProjection(runtimeRef.current, completionProjectionUrlRef.current, zoneArtifacts);
+    replaceCompletionProjection(runtimeRef.current, completionProjectionRef.current, cameraPath, zoneArtifacts);
     poseReporter.emit(true);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
@@ -246,7 +247,8 @@ export function SceneViewport({
   return (
     <div
       className="viewport"
-      data-completion-projection={completionProjectionUrl ? "active" : "inactive"}
+      data-completion-projection={completionProjection ? "active" : "inactive"}
+      data-completion-projection-pose={completionProjection?.cameraPoseIndex ?? "none"}
       data-testid="scene-viewport"
       ref={mountRef}
     />
@@ -255,16 +257,17 @@ export function SceneViewport({
 
 function replaceCompletionProjection(
   runtime: ViewportRuntime,
-  completionProjectionUrl: string | null,
+  completionProjection: CompletionProjectionTarget | null,
+  cameraPath: CameraPath,
   zoneArtifacts: ConfidenceZoneArtifacts
 ): void {
   removeCompletionProjection(runtime);
 
-  if (!completionProjectionUrl) {
+  if (!completionProjection) {
     return;
   }
 
-  const projection = createCompletionProjection(completionProjectionUrl, zoneArtifacts);
+  const projection = createCompletionProjection(completionProjection, cameraPath, zoneArtifacts);
   runtime.scene.add(projection);
   runtime.completionProjection = projection;
 }
@@ -317,45 +320,6 @@ function createVisibilityObjects(
     cube.position.set(cell.center[0], cell.center[1], cell.center[2]);
     return cube;
   });
-}
-
-function createCompletionProjection(
-  completionProjectionUrl: string,
-  zoneArtifacts: ConfidenceZoneArtifacts
-): THREE.Mesh {
-  const material = new THREE.MeshBasicMaterial({
-    color: "#77d7c8",
-    opacity: 0.88,
-    side: THREE.DoubleSide,
-    transparent: true
-  });
-  const projection = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.9), material);
-  const anchor = completionProjectionAnchor(zoneArtifacts);
-  projection.name = "cached-completion-projection";
-  projection.position.set(anchor.x, anchor.y, anchor.z);
-  projection.rotation.y = Math.PI;
-
-  new THREE.TextureLoader().load(completionProjectionUrl, (texture) => {
-    texture.colorSpace = THREE.SRGBColorSpace;
-    material.map = texture;
-    material.color.set("#ffffff");
-    material.needsUpdate = true;
-  });
-
-  return projection;
-}
-
-function completionProjectionAnchor(zoneArtifacts: ConfidenceZoneArtifacts): THREE.Vector3 {
-  const completionCell = zoneArtifacts.completion.cells[0];
-  if (completionCell) {
-    return new THREE.Vector3(
-      completionCell.center[0],
-      Math.max(1.1, completionCell.center[1]),
-      completionCell.center[2]
-    );
-  }
-
-  return new THREE.Vector3(0, 1.4, -1.8);
 }
 
 function disposeObjectResources(object: THREE.Object3D): void {
