@@ -81,11 +81,13 @@ def test_worker_completes_queued_job(tmp_path: Path) -> None:
     explorer_bundle = _read_job_artifact(tmp_path, response.job_id, "explorer_bundle.json")
     assert metadata["scene_id"] == response.job_id
     assert metadata["frame_count"] == 3
-    assert quality["runtime_path"] == "placeholder"
+    splat_path = tmp_path / "data" / "jobs" / response.job_id / "artifacts" / "splat.ply"
+    assert splat_path.read_bytes().startswith(b"ply\nformat binary_little_endian 1.0")
+    assert quality["runtime_path"] == "torch_fp16"
     assert visibility["scene_id"] == response.job_id
     assert completion["cache_strategy"] == "none"
     assert explorer_bundle["output_scene_id"] == response.job_id
-    assert explorer_bundle["viewer_render_mode"] == "placeholder"
+    assert explorer_bundle["viewer_render_mode"] == "splat"
 
 
 def test_worker_reads_legacy_elapsed_time_job(tmp_path: Path) -> None:

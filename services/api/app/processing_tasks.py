@@ -12,6 +12,7 @@ from .colmap_pose_parser import ColmapPoseParseError, parse_colmap_text_model
 from .config import ProcessingSettings
 from .jobs import ProcessingStep, StoredJob
 from .pose_normalization import PoseNormalizationError, normalize_camera_path, stub_raw_poses_from_frames
+from .splat_assets import SplatAssetError, ensure_job_splat_asset
 from .viewer_assets import ViewerAssetBuildError, build_job_viewer_assets
 from .video_probe import VideoProbeError, probe_video_file
 
@@ -220,7 +221,19 @@ def extract_video_frames(context: ProcessingTaskContext) -> ProcessingTaskResult
 
 
 def build_gaussian_scene(context: ProcessingTaskContext) -> ProcessingTaskResult:
-    return _result("gaussian_scene.json", context, splat_file="splat.ply", gaussian_count=6)
+    try:
+        splat_asset = ensure_job_splat_asset(context.artifacts_root)
+    except SplatAssetError as error:
+        raise ProcessingTaskFailed(str(error)) from error
+
+    return _result(
+        "gaussian_scene.json",
+        context,
+        splat_file=splat_asset.file_name,
+        gaussian_count=splat_asset.gaussian_count,
+        splat_source=splat_asset.source,
+        splat_file_size_bytes=splat_asset.file_size_bytes,
+    )
 
 
 def compute_visibility_support(context: ProcessingTaskContext) -> ProcessingTaskResult:
