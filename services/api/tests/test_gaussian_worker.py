@@ -16,9 +16,13 @@ def test_worker_runs_configured_gaussian_command(tmp_path: Path) -> None:
     fake_gaussian.write_text(
         "#!/usr/bin/env python3\n"
         "from pathlib import Path\n"
+        "from struct import pack\n"
         "import sys\n"
         "output = Path(sys.argv[sys.argv.index('--output-splat') + 1])\n"
-        "output.write_bytes(b'ply\\nformat ascii 1.0\\nelement vertex 4\\nend_header\\n')\n"
+        "properties = ['x', 'y', 'z', 'f_dc_0', 'f_dc_1', 'f_dc_2', 'opacity', 'scale_0', 'scale_1', 'scale_2', 'rot_0', 'rot_1', 'rot_2', 'rot_3']\n"
+        "header = '\\n'.join(['ply', 'format binary_little_endian 1.0', 'element vertex 4', *(f'property float {name}' for name in properties), 'end_header\\n'])\n"
+        "rows = b''.join(pack('<14f', index * 0.2, 1.2, -index * 0.3, 1, 0, 0, 4, -1, -1, -1, 0, 0, 0, 1) for index in range(4))\n"
+        "output.write_bytes(header.encode('utf-8') + rows)\n"
         "print('fake gaussian ' + ' '.join(sys.argv[1:]))\n",
         encoding="utf-8",
     )

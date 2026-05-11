@@ -85,6 +85,9 @@ def test_worker_completes_queued_job(tmp_path: Path) -> None:
     assert splat_path.read_bytes().startswith(b"ply\nformat binary_little_endian 1.0")
     assert quality["runtime_path"] == "torch_fp16"
     assert visibility["scene_id"] == response.job_id
+    assert len(visibility["cells"]) >= 6
+    assert visibility["cells"][0]["cell_id"] == "cell_000"
+    assert {cell["zone"] for cell in visibility["cells"]} >= {"observed", "completion"}
     assert completion["cache_strategy"] == "none"
     assert explorer_bundle["output_scene_id"] == response.job_id
     assert explorer_bundle["viewer_render_mode"] == "splat"

@@ -4,6 +4,8 @@ from json import JSONDecodeError, dumps, loads
 from pathlib import Path
 from typing import Any
 
+from .visibility_assets import VisibilityBuildError, build_visibility_manifest
+
 
 class ViewerAssetBuildError(Exception):
     pass
@@ -29,7 +31,15 @@ def build_job_viewer_assets(
     splat_file = _string_value(gaussian_scene, "splat_file", "splat.ply")
     quality_gate_status = _string_value(quality_gate, "quality_gate", "warning")
     heldout_psnr = _optional_number(heldout_evaluation, "heldout_psnr_median")
-    visibility = _build_visibility_manifest(job_id, camera_path, visibility_support)
+    try:
+        visibility = build_visibility_manifest(
+            job_id,
+            camera_path,
+            artifacts_root / splat_file,
+            visibility_support,
+        )
+    except VisibilityBuildError as error:
+        raise ViewerAssetBuildError(str(error)) from error
     completion = _build_completion_manifest(job_id, scene_model, heldout_psnr, quality_gate_status)
     quality = _build_quality_report(
         job_id,
@@ -175,33 +185,6 @@ def _build_quality_report(
     }
 
 
-def _build_visibility_manifest(
-    scene_id: str,
-    camera_path: dict[str, Any],
-    visibility_support: dict[str, Any],
-) -> dict[str, object]:
-    poses = camera_path.get("poses") if isinstance(camera_path.get("poses"), list) else []
-    first_position = _pose_position(poses, 0, [0, 1, 0])
-    middle_position = _pose_position(poses, len(poses) // 2, [0.8, 1, -1.4])
-    last_position = _pose_position(poses, len(poses) - 1, [1.4, 1, -2.4])
-    observed_threshold = _int_value(visibility_support, "observed_threshold", default=3)
-    return {
-        "scene_id": scene_id,
-        "method": _string_value(visibility_support, "method", "voxel_visibility_v1"),
-        "observed_threshold": observed_threshold,
-        "partial_threshold": [1, max(1, observed_threshold - 1)],
-        "observed_ratio": 0.62,
-        "partial_ratio": 0.22,
-        "completion_candidate_ratio": 0.11,
-        "unknown_ratio": 0.05,
-        "cells": [
-            _visibility_cell("cell_observed_001", first_position, observed_threshold + 2, "observed"),
-            _visibility_cell("cell_partial_001", middle_position, 1, "partial"),
-            _visibility_cell("cell_completion_001", [last_position[0] + 0.7, last_position[1], last_position[2] - 0.7], 0, "completion"),
-        ],
-    }
-
-
 def _build_completion_manifest(
     scene_id: str,
     scene_model: dict[str, Any],
@@ -217,27 +200,6 @@ def _build_completion_manifest(
         "cache_strategy": "none",
         "cached_predictions": [],
     }
-
-
-def _visibility_cell(cell_id: str, center: list[float], visibility_count: int, zone: str) -> dict[str, object]:
-    return {
-        "cell_id": cell_id,
-        "center": center,
-        "size_meters": 0.5,
-        "visibility_count": visibility_count,
-        "zone": zone,
-    }
-
-
-def _pose_position(poses: list[object], index: int, fallback: list[float]) -> list[float]:
-    if index < 0 or index >= len(poses) or not isinstance(poses[index], dict):
-        return fallback
-
-    position = poses[index].get("position")
-    if not isinstance(position, list) or len(position) != 3:
-        return fallback
-
-    return [float(position[0]), float(position[1]), float(position[2])]
 
 
 def _missing_viewer_assets(artifacts_root: Path) -> list[str]:

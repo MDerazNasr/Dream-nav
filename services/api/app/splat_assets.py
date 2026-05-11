@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from json import JSONDecodeError, loads
 from math import log
 from pathlib import Path
-from struct import pack
+from struct import pack, unpack
 from typing import Any
 
 
@@ -18,6 +18,13 @@ class SplatAssetSummary:
     gaussian_count: int
     source: str
     file_size_bytes: int
+
+
+@dataclass(frozen=True)
+class SplatPoint:
+    x: float
+    y: float
+    z: float
 
 
 def ensure_job_splat_asset(artifacts_root: Path, allow_stub: bool = True) -> SplatAssetSummary:
@@ -141,3 +148,52 @@ def _read_vertex_count(path: Path) -> int:
             return int(parts[2])
 
     raise SplatAssetError("Splat PLY missing vertex count.")
+
+
+def read_splat_points(path: Path, max_points: int = 512) -> list[SplatPoint]:
+    payload = path.read_bytes()
+    header, _, body = payload.partition(b"end_header\n")
+    header_text = header.decode("utf-8", errors="replace")
+    vertex_count = _vertex_count_from_header(header_text)
+    properties = _properties_from_header(header_text)
+
+    if "format binary_little_endian 1.0" not in header_text:
+        raise SplatAssetError("Only binary little-endian splat PLY files are supported for visibility.")
+
+    if len(properties) < 3 or properties[:3] != ["x", "y", "z"]:
+        raise SplatAssetError("Splat PLY must start with x, y, z float properties.")
+
+    row_size = len(properties) * 4
+    point_count = min(vertex_count, max_points)
+    points = []
+    for index in range(point_count):
+        offset = index * row_size
+        if offset + 12 > len(body):
+            break
+
+        x, y, z = unpack("<3f", body[offset : offset + 12])
+        points.append(SplatPoint(x=x, y=y, z=z))
+
+    if not points:
+        raise SplatAssetError("Splat PLY did not contain readable points.")
+
+    return points
+
+
+def _vertex_count_from_header(header: str) -> int:
+    for line in header.splitlines():
+        parts = line.split()
+        if len(parts) == 3 and parts[:2] == ["element", "vertex"]:
+            return int(parts[2])
+
+    raise SplatAssetError("Splat PLY missing vertex count.")
+
+
+def _properties_from_header(header: str) -> list[str]:
+    properties = []
+    for line in header.splitlines():
+        parts = line.split()
+        if len(parts) == 3 and parts[:2] == ["property", "float"]:
+            properties.append(parts[2])
+
+    return properties
