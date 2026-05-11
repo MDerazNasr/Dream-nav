@@ -179,6 +179,63 @@ def test_job_artifact_returns_job_scoped_json(tmp_path: Path) -> None:
     }
 
 
+def test_completed_job_scene_bundle_returns_camera_path(tmp_path: Path) -> None:
+    app = create_app(ApiSettings(repo_root=tmp_path, auto_start_worker=False))
+    client = TestClient(app)
+    upload_response = client.post(
+        "/upload",
+        files={"file": ("walkthrough.mov", b"video-bytes", "video/quicktime")},
+    )
+    job_id = upload_response.json()["job_id"]
+    camera_path = {
+        "scene_id": "warehouse_01",
+        "coordinate_system": "dreamnav_viewer_v1",
+        "intrinsics": {
+            "width": 1280,
+            "height": 720,
+            "fx": 910,
+            "fy": 910,
+            "cx": 640,
+            "cy": 360,
+        },
+        "poses": [
+            {
+                "frame_index": 0,
+                "timestamp_sec": 0,
+                "position": [0, 1.55, 0],
+                "rotation_xyzw": [0, 0, 0, 1],
+                "fov_degrees": 60,
+            }
+        ],
+    }
+    app.state.job_repository.write_artifact(job_id, "camera_path.json", camera_path)
+    app.state.job_repository.complete_job(job_id, "warehouse_01")
+
+    response = client.get(f"/jobs/{job_id}/scene-bundle")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "job_id": job_id,
+        "output_scene_id": "warehouse_01",
+        "camera_path_artifact": "camera_path.json",
+        "camera_path": camera_path,
+    }
+
+
+def test_job_scene_bundle_waits_for_completed_job(tmp_path: Path) -> None:
+    client = TestClient(create_app(ApiSettings(repo_root=tmp_path, auto_start_worker=False)))
+    upload_response = client.post(
+        "/upload",
+        files={"file": ("walkthrough.mov", b"video-bytes", "video/quicktime")},
+    )
+    job_id = upload_response.json()["job_id"]
+
+    response = client.get(f"/jobs/{job_id}/scene-bundle")
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Job explorer bundle is not ready"
+
+
 def test_job_artifact_rejects_unsafe_names(tmp_path: Path) -> None:
     app = create_app(ApiSettings(repo_root=tmp_path, auto_start_worker=False))
     client = TestClient(app)

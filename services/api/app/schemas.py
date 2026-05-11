@@ -57,6 +57,13 @@ class JobArtifact(StrictModel):
     payload: dict[str, Any]
 
 
+class JobSceneBundle(StrictModel):
+    job_id: str
+    output_scene_id: str
+    camera_path_artifact: str
+    camera_path: dict[str, Any]
+
+
 class QualityReport(StrictModel):
     scene_id: str
     pose_backend: str

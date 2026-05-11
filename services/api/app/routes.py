@@ -8,6 +8,7 @@ from .schemas import (
     DemoScene,
     HealthResponse,
     JobArtifact,
+    JobSceneBundle,
     JobStatus,
     QualityReport,
     SceneAssetStatus,
@@ -77,6 +78,25 @@ def job_status(job_id: str, request: Request) -> JobStatus:
 def job_artifact(job_id: str, artifact_name: str, request: Request) -> JobArtifact:
     payload = _job_repository(request).read_artifact(job_id, artifact_name)
     return JobArtifact(job_id=job_id, artifact_name=artifact_name, payload=payload)
+
+
+@router.get("/jobs/{job_id}/scene-bundle", response_model=JobSceneBundle)
+def job_scene_bundle(job_id: str, request: Request) -> JobSceneBundle:
+    job_repository = _job_repository(request)
+    status = job_repository.get_status(job_id)
+
+    if status.state != "completed" or status.output_scene_id is None:
+        raise HTTPException(status_code=409, detail="Job explorer bundle is not ready")
+
+    camera_path_artifact = "camera_path.json"
+    camera_path = job_repository.read_artifact(job_id, camera_path_artifact)
+
+    return JobSceneBundle(
+        job_id=job_id,
+        output_scene_id=status.output_scene_id,
+        camera_path_artifact=camera_path_artifact,
+        camera_path=camera_path,
+    )
 
 
 def _repository(request: Request) -> SceneRepository:

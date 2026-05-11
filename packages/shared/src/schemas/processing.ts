@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { cameraPathSchema } from "./camera-path.js";
 
 export const processingStageSchema = z.enum([
   "checking_capture_quality",
@@ -43,6 +44,13 @@ export const jobArtifactSchema = z.object({
   payload: z.record(z.string(), z.unknown())
 });
 
+export const jobSceneBundleSchema = z.object({
+  job_id: z.string().min(1),
+  output_scene_id: z.string().min(1),
+  camera_path_artifact: z.string().min(1),
+  camera_path: cameraPathSchema
+});
+
 export type JobLifecycleState = z.infer<typeof jobLifecycleStateSchema>;
 
 export type ProcessingStage = z.infer<typeof processingStageSchema>;
@@ -52,6 +60,8 @@ export type UploadResponse = z.infer<typeof uploadResponseSchema>;
 export type JobStatus = z.infer<typeof jobStatusSchema>;
 
 export type JobArtifact = z.infer<typeof jobArtifactSchema>;
+
+export type JobSceneBundle = z.infer<typeof jobSceneBundleSchema>;
 
 export function parseUploadResponse(input: unknown): UploadResponse {
   return uploadResponseSchema.parse(input);
@@ -63,4 +73,8 @@ export function parseJobStatus(input: unknown): JobStatus {
 
 export function parseJobArtifact(input: unknown): JobArtifact {
   return jobArtifactSchema.parse(input);
+}
+
+export function parseJobSceneBundle(input: unknown): JobSceneBundle {
+  return jobSceneBundleSchema.parse(input);
 }
