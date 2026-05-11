@@ -223,7 +223,7 @@ describe("ExplorerShell", () => {
     expect(screen.getByRole("heading", { name: "Warehouse Scout" })).not.toBeNull();
     expect(screen.getByRole("button", { name: "24mm" })).not.toBeNull();
     expect(screen.getByLabelText("Camera path")).not.toBeNull();
-    expect(screen.getByText("torch_fp16")).not.toBeNull();
+    expect(screen.getAllByText("torch_fp16").length).toBeGreaterThan(0);
     expect(screen.getByLabelText("Confidence zones")).not.toBeNull();
     expect(screen.getByText("Observed")).not.toBeNull();
     expect(screen.getAllByText("Completion").length).toBeGreaterThan(0);
@@ -234,6 +234,12 @@ describe("ExplorerShell", () => {
     expect(screen.getByAltText("Cached completion prediction").getAttribute("src")).toBe(
       "/dreamnav-assets/scenes/warehouse_01/completion/pred_001.svg"
     );
+    expect(screen.getByLabelText("Baseline comparison")).not.toBeNull();
+    expect(screen.getByAltText("Model completion comparison").getAttribute("src")).toBe(
+      "/dreamnav-assets/scenes/warehouse_01/completion/pred_001.svg"
+    );
+    expect(screen.getByText("Nearest view")).not.toBeNull();
+    expect(screen.getByText("Frame 0")).not.toBeNull();
     expect(screen.getByTestId("scene-viewport").textContent).toContain(
       "projection:/dreamnav-assets/scenes/warehouse_01/completion/pred_001.svg"
     );
@@ -242,7 +248,7 @@ describe("ExplorerShell", () => {
       "mask:/dreamnav-assets/scenes/warehouse_01/completion/pred_001_mask.svg"
     );
     expect(screen.getAllByText(/pred_001/).length).toBeGreaterThan(0);
-    expect(screen.getByText("12 ms")).not.toBeNull();
+    expect(screen.getAllByText("12 ms").length).toBeGreaterThan(0);
   });
 
   it("toggles the confidence overlay button state", () => {

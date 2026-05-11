@@ -293,6 +293,86 @@
   font-size: 12px;
 }
 
+.baseline-comparison {
+  display: grid;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.baseline-method {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid rgba(245, 247, 244, 0.12);
+  border-radius: 8px;
+  background: rgba(245, 247, 244, 0.05);
+}
+
+.baseline-method-header,
+.baseline-stats,
+.baseline-stats div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.baseline-method-header,
+.baseline-stats {
+  justify-content: space-between;
+}
+
+.baseline-method-header strong {
+  color: #f5f7f4;
+  font-size: 12px;
+}
+
+.baseline-method-header span,
+.baseline-stats {
+  color: #b8c6bd;
+  font-size: 11px;
+}
+
+.baseline-method img,
+.baseline-placeholder {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 1px solid rgba(245, 247, 244, 0.14);
+  border-radius: 8px;
+  background: #111412;
+}
+
+.baseline-method img {
+  display: block;
+  object-fit: cover;
+}
+
+.baseline-placeholder {
+  display: grid;
+  place-items: center;
+  color: #dfe7df;
+  background: #18211f;
+}
+
+.baseline-placeholder strong,
+.baseline-placeholder span {
+  display: block;
+  text-align: center;
+}
+
+.baseline-stats {
+  margin: 0;
+}
+
+.baseline-stats dt,
+.baseline-stats dd {
+  margin: 0;
+}
+
+.baseline-stats dd {
+  color: #f5f7f4;
+}
+
 .badge {
   display: inline-flex;
   align-items: center;

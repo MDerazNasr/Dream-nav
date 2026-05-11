@@ -10,6 +10,7 @@ import {
   loadCameraBookmarks,
   saveCameraBookmarks
 } from "./camera-bookmarks";
+import { BaselineComparison } from "./BaselineComparison";
 import {
   formatCompletionCacheStatus,
   selectNearestCachedCompletion
@@ -165,6 +166,12 @@ export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
         />
 
         <CompletionPreview completion={sceneBundle.completion} match={cachedCompletionMatch} />
+
+        <BaselineComparison
+          cameraPath={sceneBundle.cameraPath}
+          match={cachedCompletionMatch}
+          quality={sceneBundle.quality}
+        />
 
         <ConfidenceLegend
           qualityGate={sceneBundle.quality.quality_gate}
