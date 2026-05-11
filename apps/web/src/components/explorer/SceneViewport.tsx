@@ -1,8 +1,9 @@
 "use client";
 
-import type { CameraPath, LensMode, ViewerRenderMode, VisibilityManifest } from "@dream-nav/shared";
+import type { CameraPath, LensMode, ViewerRenderMode } from "@dream-nav/shared";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
+import { confidenceZoneColors, type ConfidenceZoneArtifacts, zoneCells } from "../../lib/confidence-zones";
 import { getLensFov } from "../../lib/lens";
 import { loadSplatScene } from "../../lib/splat-loader";
 
@@ -12,7 +13,7 @@ type SceneViewportProps = {
   overlayEnabled: boolean;
   renderMode: ViewerRenderMode;
   splatUrl: string;
-  visibility: VisibilityManifest;
+  zoneArtifacts: ConfidenceZoneArtifacts;
 };
 
 export function SceneViewport({
@@ -21,7 +22,7 @@ export function SceneViewport({
   overlayEnabled,
   renderMode,
   splatUrl,
-  visibility
+  zoneArtifacts
 }: SceneViewportProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
 
@@ -48,7 +49,7 @@ export function SceneViewport({
     renderer.domElement.dataset.testid = "scene-canvas";
     mount.appendChild(renderer.domElement);
 
-    const objects = createSceneObjects(visibility, overlayEnabled, renderMode);
+    const objects = createSceneObjects(zoneArtifacts, overlayEnabled, renderMode);
     objects.forEach((object) => scene.add(object));
     const fallbackObjects: THREE.Object3D[] = [];
     let disposeSplatViewer: (() => Promise<void>) | null = null;
@@ -69,7 +70,9 @@ export function SceneViewport({
             return;
           }
 
-          fallbackObjects.push(...createVisibilityObjects(visibility, overlayEnabled));
+          if (!overlayEnabled) {
+            fallbackObjects.push(...createVisibilityObjects(zoneArtifacts, true));
+          }
           fallbackObjects.forEach((object) => scene.add(object));
         });
     }
@@ -119,13 +122,13 @@ export function SceneViewport({
       renderer.dispose();
       mount.replaceChildren();
     };
-  }, [cameraPath, lensMode, overlayEnabled, renderMode, splatUrl, visibility]);
+  }, [cameraPath, lensMode, overlayEnabled, renderMode, splatUrl, zoneArtifacts]);
 
   return <div className="viewport" data-testid="scene-viewport" ref={mountRef} />;
 }
 
 function createSceneObjects(
-  visibility: VisibilityManifest,
+  zoneArtifacts: ConfidenceZoneArtifacts,
   overlayEnabled: boolean,
   renderMode: ViewerRenderMode
 ): THREE.Object3D[] {
@@ -140,20 +143,21 @@ function createSceneObjects(
   floor.rotation.x = -Math.PI / 2;
   objects.push(floor);
 
-  if (renderMode === "placeholder") {
-    objects.push(...createVisibilityObjects(visibility, overlayEnabled));
+  if (renderMode === "placeholder" || overlayEnabled) {
+    objects.push(...createVisibilityObjects(zoneArtifacts, overlayEnabled));
   }
 
   return objects;
 }
 
 function createVisibilityObjects(
-  visibility: VisibilityManifest,
+  zoneArtifacts: ConfidenceZoneArtifacts,
   overlayEnabled: boolean
 ): THREE.Object3D[] {
-  return visibility.cells.map((cell) => {
+  // Limit overlay meshes because the splat renderer already owns the dense scene.
+  return zoneCells(zoneArtifacts).slice(0, 128).map((cell) => {
     const material = new THREE.MeshStandardMaterial({
-      color: overlayEnabled ? zoneColor(cell.zone) : "#8d948c",
+      color: overlayEnabled ? confidenceZoneColors[cell.zone] : "#8d948c",
       opacity: overlayEnabled && cell.zone !== "observed" ? 0.72 : 1,
       transparent: overlayEnabled && cell.zone !== "observed"
     });
@@ -193,20 +197,4 @@ function moveCamera(
   if (pressedKeys.has("d")) {
     camera.position.x += speed;
   }
-}
-
-function zoneColor(zone: string): string {
-  if (zone === "observed") {
-    return "#dfe7df";
-  }
-
-  if (zone === "partial") {
-    return "#77d7c8";
-  }
-
-  if (zone === "completion") {
-    return "#4a8ee8";
-  }
-
-  return "#d88b4a";
 }

@@ -4,6 +4,7 @@ import type { LensMode } from "@dream-nav/shared";
 import { BookmarkPlus, Gauge, Layers, Video } from "lucide-react";
 import { useState } from "react";
 import type { ViewerSceneBundle } from "../../lib/dreamnav-api";
+import { ConfidenceLegend } from "./ConfidenceLegend";
 import { LensSelector } from "./LensSelector";
 import { MetricsPanel } from "./MetricsPanel";
 import { Minimap } from "./Minimap";
@@ -26,7 +27,7 @@ export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
         overlayEnabled={overlayEnabled}
         renderMode={sceneBundle.assetStatus.viewer_render_mode}
         splatUrl={sceneBundle.assetStatus.splat_url}
-        visibility={sceneBundle.visibility}
+        zoneArtifacts={sceneBundle.zoneArtifacts}
       />
 
       <header className="top-bar">
@@ -45,7 +46,7 @@ export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
         <div className="panel-header">
           <h2 className="panel-title">Path</h2>
         </div>
-        <Minimap cameraPath={sceneBundle.cameraPath} visibility={sceneBundle.visibility} />
+        <Minimap cameraPath={sceneBundle.cameraPath} zoneArtifacts={sceneBundle.zoneArtifacts} />
       </aside>
 
       <aside className="right-panel">
@@ -61,6 +62,12 @@ export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
         </section>
 
         <MetricsPanel quality={sceneBundle.quality} />
+
+        <ConfidenceLegend
+          qualityGate={sceneBundle.quality.quality_gate}
+          visibility={sceneBundle.visibility}
+          zoneArtifacts={sceneBundle.zoneArtifacts}
+        />
       </aside>
 
       <div className="bottom-bar">

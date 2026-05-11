@@ -2,10 +2,38 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ExplorerShell } from "./ExplorerShell";
 import type { ViewerSceneBundle } from "../../lib/dreamnav-api";
+import { buildZoneArtifactsFromVisibility } from "../../lib/confidence-zones";
 
 vi.mock("./SceneViewport", () => ({
   SceneViewport: () => <div data-testid="scene-viewport" />
 }));
+
+const sceneVisibility: ViewerSceneBundle["visibility"] = {
+  scene_id: "warehouse_01",
+  method: "voxel_visibility_v1",
+  observed_threshold: 3,
+  partial_threshold: [1, 2],
+  observed_ratio: 0.5,
+  partial_ratio: 0.25,
+  completion_candidate_ratio: 0.25,
+  unknown_ratio: 0,
+  cells: [
+    {
+      cell_id: "cell_observed_001",
+      center: [0, 1, -0.5],
+      size_meters: 0.5,
+      visibility_count: 5,
+      zone: "observed"
+    },
+    {
+      cell_id: "cell_completion_001",
+      center: [1, 1, -1],
+      size_meters: 0.5,
+      visibility_count: 0,
+      zone: "completion"
+    }
+  ]
+};
 
 const sceneBundle: ViewerSceneBundle = {
   demoScene: {
@@ -111,25 +139,7 @@ const sceneBundle: ViewerSceneBundle = {
       }
     ]
   },
-  visibility: {
-    scene_id: "warehouse_01",
-    method: "voxel_visibility_v1",
-    observed_threshold: 3,
-    partial_threshold: [1, 2],
-    observed_ratio: 0.62,
-    partial_ratio: 0.22,
-    completion_candidate_ratio: 0.11,
-    unknown_ratio: 0.05,
-    cells: [
-      {
-        cell_id: "cell_observed_001",
-        center: [0, 1, -0.5],
-        size_meters: 0.5,
-        visibility_count: 5,
-        zone: "observed"
-      }
-    ]
-  },
+  visibility: sceneVisibility,
   completion: {
     scene_id: "warehouse_01",
     model_enabled: true,
@@ -145,7 +155,8 @@ const sceneBundle: ViewerSceneBundle = {
     splat_available: false,
     viewer_render_mode: "placeholder",
     missing_assets: ["splat.ply"]
-  }
+  },
+  zoneArtifacts: buildZoneArtifactsFromVisibility("warehouse_01", sceneVisibility)
 };
 
 describe("ExplorerShell", () => {
@@ -156,6 +167,9 @@ describe("ExplorerShell", () => {
     expect(screen.getByRole("button", { name: "24mm" })).not.toBeNull();
     expect(screen.getByLabelText("Camera path")).not.toBeNull();
     expect(screen.getByText("torch_fp16")).not.toBeNull();
+    expect(screen.getByLabelText("Confidence zones")).not.toBeNull();
+    expect(screen.getByText("Observed")).not.toBeNull();
+    expect(screen.getByText("Completion")).not.toBeNull();
     expect(screen.getByLabelText("Render mode").textContent).toContain("Placeholder");
   });
 

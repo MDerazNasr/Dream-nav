@@ -1,26 +1,27 @@
 "use client";
 
-import type { CameraPath, VisibilityManifest } from "@dream-nav/shared";
+import type { CameraPath } from "@dream-nav/shared";
+import { confidenceZoneColors, type ConfidenceZoneArtifacts, zoneCells } from "../../lib/confidence-zones";
 
 type MinimapProps = {
   cameraPath: CameraPath;
-  visibility: VisibilityManifest;
+  zoneArtifacts: ConfidenceZoneArtifacts;
 };
 
-export function Minimap({ cameraPath, visibility }: MinimapProps) {
+export function Minimap({ cameraPath, zoneArtifacts }: MinimapProps) {
   const points = cameraPath.poses.map((pose) => projectPoint(pose.position[0], pose.position[2]));
   const polylinePoints = points.map((point) => `${point.x},${point.y}`).join(" ");
 
   return (
     <div className="minimap">
       <svg aria-label="Camera path" role="img" viewBox="0 0 120 120">
-        {visibility.cells.map((cell) => {
+        {zoneCells(zoneArtifacts).map((cell) => {
           const point = projectPoint(cell.center[0], cell.center[2]);
           return (
             <circle
               cx={point.x}
               cy={point.y}
-              fill={zoneColor(cell.zone)}
+              fill={confidenceZoneColors[cell.zone]}
               key={cell.cell_id}
               opacity="0.68"
               r="7"
@@ -47,20 +48,4 @@ function projectPoint(x: number, z: number): { x: number; y: number } {
     x: 60 + x * 20,
     y: 60 + z * 20
   };
-}
-
-function zoneColor(zone: string): string {
-  if (zone === "observed") {
-    return "#dfe7df";
-  }
-
-  if (zone === "partial") {
-    return "#77d7c8";
-  }
-
-  if (zone === "completion") {
-    return "#4a8ee8";
-  }
-
-  return "#d88b4a";
 }

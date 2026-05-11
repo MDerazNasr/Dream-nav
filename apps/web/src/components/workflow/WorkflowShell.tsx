@@ -340,7 +340,8 @@ function toProcessedViewerBundle(
     cameraPath: jobSceneBundle.camera_path,
     visibility: jobSceneBundle.visibility,
     completion: jobSceneBundle.completion,
-    assetStatus: jobSceneBundle.asset_status
+    assetStatus: jobSceneBundle.asset_status,
+    zoneArtifacts: jobSceneBundle.zoneArtifacts
   };
 }
 
