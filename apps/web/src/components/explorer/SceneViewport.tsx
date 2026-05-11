@@ -1,7 +1,7 @@
 "use client";
 
 import type { CameraPath, LensMode, ViewerRenderMode } from "@dream-nav/shared";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 import * as THREE from "three";
 import { confidenceZoneColors, type ConfidenceZoneArtifacts, zoneCells } from "../../lib/confidence-zones";
 import { getLensFov } from "../../lib/lens";
@@ -14,9 +14,18 @@ type SceneViewportProps = {
   overlayEnabled: boolean;
   onCameraPoseChange: (pose: ViewerCameraPose) => void;
   renderMode: ViewerRenderMode;
+  restorePose: ViewerCameraPose | null;
+  restoreSignal: number;
   resetSignal: number;
   splatUrl: string;
   zoneArtifacts: ConfidenceZoneArtifacts;
+};
+
+type ViewportRuntime = {
+  camera: THREE.PerspectiveCamera;
+  poseReporter: { emit: (force: boolean) => void };
+  rotationState: { pitch: number; yaw: number };
+  startPosition: THREE.Vector3;
 };
 
 export function SceneViewport({
@@ -25,11 +34,47 @@ export function SceneViewport({
   overlayEnabled,
   onCameraPoseChange,
   renderMode,
+  restorePose,
+  restoreSignal,
   resetSignal,
   splatUrl,
   zoneArtifacts
 }: SceneViewportProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
+  const lensModeRef = useRef(lensMode);
+  const runtimeRef = useRef<ViewportRuntime | null>(null);
+
+  useEffect(() => {
+    lensModeRef.current = lensMode;
+    const runtime = runtimeRef.current;
+    if (!runtime) {
+      return;
+    }
+
+    runtime.camera.fov = getLensFov(lensMode);
+    runtime.camera.updateProjectionMatrix();
+    runtime.poseReporter.emit(true);
+  }, [lensMode]);
+
+  useEffect(() => {
+    const runtime = runtimeRef.current;
+    if (!runtime) {
+      return;
+    }
+
+    resetCamera(runtime.camera, runtime.startPosition, runtime.rotationState);
+    runtime.poseReporter.emit(true);
+  }, [resetSignal]);
+
+  useEffect(() => {
+    const runtime = runtimeRef.current;
+    if (!runtime || !restorePose) {
+      return;
+    }
+
+    applyCameraPose(runtime.camera, restorePose, runtime.rotationState);
+    runtime.poseReporter.emit(true);
+  }, [restorePose, restoreSignal]);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -45,7 +90,13 @@ export function SceneViewport({
     const startPosition = startCameraPosition(cameraPath);
     const rotationState = { pitch: 0, yaw: 0 };
     resetCamera(camera, startPosition, rotationState);
-    const poseReporter = createCameraPoseReporter(camera, rotationState, lensMode, onCameraPoseChange);
+    const poseReporter = createCameraPoseReporter(camera, rotationState, lensModeRef, onCameraPoseChange);
+    runtimeRef.current = {
+      camera,
+      poseReporter,
+      rotationState,
+      startPosition
+    };
     poseReporter.emit(true);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
@@ -165,9 +216,10 @@ export function SceneViewport({
       void disposeSplatViewer?.();
       [...objects, ...fallbackObjects].forEach(disposeObjectResources);
       renderer.dispose();
+      runtimeRef.current = null;
       mount.replaceChildren();
     };
-  }, [cameraPath, lensMode, onCameraPoseChange, overlayEnabled, renderMode, resetSignal, splatUrl, zoneArtifacts]);
+  }, [cameraPath, onCameraPoseChange, overlayEnabled, renderMode, splatUrl, zoneArtifacts]);
 
   return <div className="viewport" data-testid="scene-viewport" ref={mountRef} />;
 }
@@ -270,7 +322,7 @@ function rotateCamera(
 function createCameraPoseReporter(
   camera: THREE.PerspectiveCamera,
   rotationState: { pitch: number; yaw: number },
-  lensMode: LensMode,
+  lensModeRef: RefObject<LensMode>,
   onCameraPoseChange: (pose: ViewerCameraPose) => void
 ): { emit: (force: boolean) => void } {
   let lastEmitTime = 0;
@@ -283,6 +335,7 @@ function createCameraPoseReporter(
       }
 
       lastEmitTime = now;
+      const lensMode = lensModeRef.current;
       onCameraPoseChange({
         fovDegrees: getLensFov(lensMode),
         lensMode,
@@ -304,6 +357,19 @@ function resetCamera(
   camera.position.copy(startPosition);
   camera.rotation.order = "YXZ";
   camera.rotation.set(0, 0, 0);
+}
+
+function applyCameraPose(
+  camera: THREE.PerspectiveCamera,
+  pose: ViewerCameraPose,
+  rotationState: { pitch: number; yaw: number }
+): void {
+  rotationState.pitch = pose.pitch;
+  rotationState.yaw = pose.yaw;
+  camera.position.set(pose.position[0], pose.position[1], pose.position[2]);
+  camera.rotation.order = "YXZ";
+  camera.rotation.y = pose.yaw;
+  camera.rotation.x = pose.pitch;
 }
 
 function startCameraPosition(cameraPath: CameraPath): THREE.Vector3 {

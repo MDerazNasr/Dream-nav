@@ -1,13 +1,16 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ExplorerShell } from "./ExplorerShell";
 import type { ViewerSceneBundle } from "../../lib/dreamnav-api";
 import { buildZoneArtifactsFromVisibility } from "../../lib/confidence-zones";
+import { cameraBookmarkStorageKey } from "./camera-bookmarks";
 
 vi.mock("./SceneViewport", () => ({
   SceneViewport: ({
     onCameraPoseChange,
-    resetSignal
+    resetSignal,
+    restorePose,
+    restoreSignal
   }: {
     onCameraPoseChange: (pose: {
       fovDegrees: number;
@@ -17,6 +20,8 @@ vi.mock("./SceneViewport", () => ({
       yaw: number;
     }) => void;
     resetSignal: number;
+    restorePose: { position: [number, number, number] } | null;
+    restoreSignal: number;
   }) => (
     <button
       data-testid="scene-viewport"
@@ -31,7 +36,7 @@ vi.mock("./SceneViewport", () => ({
       }
       type="button"
     >
-      {resetSignal}
+      reset:{resetSignal};restore:{restoreSignal};x:{restorePose?.position[0] ?? "none"}
     </button>
   )
 }));
@@ -188,6 +193,10 @@ const sceneBundle: ViewerSceneBundle = {
 };
 
 describe("ExplorerShell", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
   it("renders scene title, lens controls, minimap, and metrics", () => {
     render(<ExplorerShell sceneBundle={sceneBundle} />);
 
@@ -214,7 +223,7 @@ describe("ExplorerShell", () => {
     expect(toggle.getAttribute("data-active")).toBe("false");
   });
 
-  it("tracks saved camera markers", () => {
+  it("tracks saved camera markers", async () => {
     render(<ExplorerShell sceneBundle={sceneBundle} />);
 
     fireEvent.click(screen.getByTestId("scene-viewport"));
@@ -222,6 +231,10 @@ describe("ExplorerShell", () => {
 
     expect(screen.getByLabelText("Saved markers").textContent).toContain("1");
     expect(screen.getByLabelText("Saved camera marker")).not.toBeNull();
+    expect(screen.getByRole("button", { name: /^Shot 1/ })).not.toBeNull();
+    await waitFor(() => {
+      expect(window.localStorage.getItem(cameraBookmarkStorageKey("warehouse_01"))).toContain("Shot 1");
+    });
   });
 
   it("updates the live camera pose from the viewport", () => {
@@ -238,6 +251,48 @@ describe("ExplorerShell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Reset camera view" }));
 
-    expect(screen.getByTestId("scene-viewport").textContent).toBe("1");
+    expect(screen.getByTestId("scene-viewport").textContent).toContain("reset:1");
+  });
+
+  it("restores and deletes camera bookmarks", () => {
+    render(<ExplorerShell sceneBundle={sceneBundle} />);
+
+    fireEvent.click(screen.getByTestId("scene-viewport"));
+    fireEvent.click(screen.getByRole("button", { name: "Save camera marker" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Shot 1/ }));
+
+    expect(screen.getByTestId("scene-viewport").textContent).toContain("restore:1");
+    expect(screen.getByTestId("scene-viewport").textContent).toContain("x:1.2");
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Shot 1" }));
+
+    expect(screen.getByLabelText("Saved markers").textContent).toContain("0");
+  });
+
+  it("loads persisted camera bookmarks", async () => {
+    window.localStorage.setItem(
+      cameraBookmarkStorageKey("warehouse_01"),
+      JSON.stringify([
+        {
+          createdAt: "2026-05-11T10:00:00.000Z",
+          id: "bookmark-1",
+          label: "Shot 1",
+          pose: {
+            fovDegrees: 73,
+            lensMode: "24mm",
+            pitch: 0.1,
+            position: [2, 1.55, -3],
+            yaw: 0.4
+          }
+        }
+      ])
+    );
+
+    render(<ExplorerShell sceneBundle={sceneBundle} />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /^Shot 1/ })).not.toBeNull();
+    });
+    expect(screen.getByLabelText("Saved markers").textContent).toContain("1");
   });
 });

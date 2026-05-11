@@ -205,6 +205,56 @@
   line-height: 1.35;
 }
 
+.bookmark-list {
+  display: grid;
+  max-height: 168px;
+  overflow: auto;
+  padding: 0 10px 10px;
+  gap: 6px;
+}
+
+.bookmark-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 6px;
+}
+
+.bookmark-restore {
+  display: grid;
+  min-width: 0;
+  min-height: 38px;
+  padding: 6px 9px;
+  border: 1px solid rgba(245, 247, 244, 0.12);
+  border-radius: 8px;
+  background: rgba(245, 247, 244, 0.06);
+  color: #f5f7f4;
+  cursor: pointer;
+  text-align: left;
+}
+
+.bookmark-restore strong,
+.bookmark-restore span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bookmark-restore strong {
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.bookmark-restore span {
+  color: #b8c6bd;
+  font-size: 11px;
+}
+
+.bookmark-delete {
+  width: 36px;
+  min-height: 36px;
+}
+
 .badge {
   display: inline-flex;
   align-items: center;

@@ -1,9 +1,15 @@
 "use client";
 
 import type { LensMode } from "@dream-nav/shared";
-import { BookmarkPlus, Gauge, Layers, RotateCcw, Video } from "lucide-react";
-import { useCallback, useState } from "react";
+import { BookmarkPlus, Gauge, Layers, RotateCcw, Trash2, Video } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import type { ViewerSceneBundle } from "../../lib/dreamnav-api";
+import {
+  type CameraBookmark,
+  getCameraBookmarkStorage,
+  loadCameraBookmarks,
+  saveCameraBookmarks
+} from "./camera-bookmarks";
 import { ConfidenceLegend } from "./ConfidenceLegend";
 import { LensSelector } from "./LensSelector";
 import { MetricsPanel } from "./MetricsPanel";
@@ -16,16 +22,62 @@ type ExplorerShellProps = {
 };
 
 export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
+  const sceneId = sceneBundle.metadata.scene_id;
   const [overlayEnabled, setOverlayEnabled] = useState(true);
   const [selectedLens, setSelectedLens] = useState<LensMode>("35mm");
   const [currentPose, setCurrentPose] = useState<ViewerCameraPose>(() =>
     initialViewerCameraPose(sceneBundle.cameraPath, "35mm")
   );
-  const [cameraMarkers, setCameraMarkers] = useState<ViewerCameraPose[]>([]);
+  const [cameraBookmarks, setCameraBookmarks] = useState<CameraBookmark[]>([]);
+  const [bookmarksSceneId, setBookmarksSceneId] = useState(sceneId);
+  const [bookmarksLoaded, setBookmarksLoaded] = useState(false);
+  const [restoreSignal, setRestoreSignal] = useState(0);
+  const [restorePose, setRestorePose] = useState<ViewerCameraPose | null>(null);
   const [resetSignal, setResetSignal] = useState(0);
   const handleCameraPoseChange = useCallback((pose: ViewerCameraPose) => {
     setCurrentPose(pose);
   }, []);
+
+  useEffect(() => {
+    setBookmarksLoaded(false);
+    setCameraBookmarks(loadCameraBookmarks(sceneId, getCameraBookmarkStorage()));
+    setBookmarksSceneId(sceneId);
+    setBookmarksLoaded(true);
+  }, [sceneId]);
+
+  useEffect(() => {
+    if (bookmarksLoaded && bookmarksSceneId === sceneId) {
+      saveCameraBookmarks(sceneId, getCameraBookmarkStorage(), cameraBookmarks);
+    }
+  }, [bookmarksLoaded, bookmarksSceneId, cameraBookmarks, sceneId]);
+
+  const saveCurrentBookmark = () => {
+    setCameraBookmarks((bookmarks) => [
+      ...bookmarks,
+      {
+        createdAt: new Date().toISOString(),
+        id: createBookmarkId(),
+        label: `Shot ${bookmarks.length + 1}`,
+        pose: currentPose
+      }
+    ]);
+  };
+
+  const restoreBookmark = (bookmark: CameraBookmark) => {
+    setSelectedLens(bookmark.pose.lensMode);
+    setCurrentPose(bookmark.pose);
+    setRestorePose(bookmark.pose);
+    setRestoreSignal((current) => current + 1);
+  };
+
+  const deleteBookmark = (bookmarkId: string) => {
+    setCameraBookmarks((bookmarks) => bookmarks.filter((bookmark) => bookmark.id !== bookmarkId));
+  };
+
+  const resetCameraView = () => {
+    setRestorePose(null);
+    setResetSignal((current) => current + 1);
+  };
 
   return (
     <main className="explorer">
@@ -35,6 +87,8 @@ export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
         onCameraPoseChange={handleCameraPoseChange}
         overlayEnabled={overlayEnabled}
         renderMode={sceneBundle.assetStatus.viewer_render_mode}
+        restorePose={restorePose}
+        restoreSignal={restoreSignal}
         resetSignal={resetSignal}
         splatUrl={sceneBundle.assetStatus.splat_url}
         zoneArtifacts={sceneBundle.zoneArtifacts}
@@ -57,7 +111,7 @@ export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
           <h2 className="panel-title">Path</h2>
         </div>
         <Minimap
-          cameraMarkers={cameraMarkers}
+          cameraMarkers={cameraBookmarks.map((bookmark) => bookmark.pose)}
           cameraPath={sceneBundle.cameraPath}
           currentPose={currentPose}
           zoneArtifacts={sceneBundle.zoneArtifacts}
@@ -83,6 +137,40 @@ export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
           visibility={sceneBundle.visibility}
           zoneArtifacts={sceneBundle.zoneArtifacts}
         />
+
+        <section className="panel" aria-label="Camera bookmarks">
+          <div className="panel-header">
+            <h2 className="panel-title">Bookmarks</h2>
+            <span className="badge" aria-label="Camera bookmark count">
+              {cameraBookmarks.length}
+            </span>
+          </div>
+          <div className="bookmark-list">
+            {cameraBookmarks.map((bookmark) => (
+              <div className="bookmark-row" key={bookmark.id}>
+                <button
+                  className="bookmark-restore"
+                  onClick={() => restoreBookmark(bookmark)}
+                  type="button"
+                >
+                  <strong>{bookmark.label}</strong>
+                  <span>
+                    {bookmark.pose.lensMode} · {formatBookmarkPose(bookmark.pose)}
+                  </span>
+                </button>
+                <button
+                  aria-label={`Delete ${bookmark.label}`}
+                  className="icon-button bookmark-delete"
+                  onClick={() => deleteBookmark(bookmark.id)}
+                  title={`Delete ${bookmark.label}`}
+                  type="button"
+                >
+                  <Trash2 size={16} aria-hidden="true" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
       </aside>
 
       <div className="bottom-bar">
@@ -102,7 +190,7 @@ export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
         <button
           aria-label="Reset camera view"
           className="icon-button"
-          onClick={() => setResetSignal((current) => current + 1)}
+          onClick={resetCameraView}
           title="Reset camera view"
           type="button"
         >
@@ -111,16 +199,24 @@ export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
         <button
           aria-label="Save camera marker"
           className="icon-button"
-          onClick={() => setCameraMarkers((markers) => [...markers, currentPose])}
+          onClick={saveCurrentBookmark}
           title="Save camera marker"
           type="button"
         >
           <BookmarkPlus size={18} aria-hidden="true" />
         </button>
         <span className="badge" aria-label="Saved markers">
-          <Gauge size={15} aria-hidden="true" /> {cameraMarkers.length}
+          <Gauge size={15} aria-hidden="true" /> {cameraBookmarks.length}
         </span>
       </div>
     </main>
   );
+}
+
+function formatBookmarkPose(pose: ViewerCameraPose): string {
+  return `${pose.position[0].toFixed(1)}, ${pose.position[2].toFixed(1)}`;
+}
+
+function createBookmarkId(): string {
+  return globalThis.crypto?.randomUUID?.() ?? `bookmark-${Date.now()}`;
 }
