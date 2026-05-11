@@ -205,6 +205,8 @@ export const sceneBundle = {
         camera_pose_index: 0,
         rgb_asset: "completion/pred_001.svg",
         confidence_mask_asset: "completion/pred_001_mask.svg",
+        nearest_view_asset: "completion/baseline_nearest_001.svg",
+        nearest_view_camera_pose_index: null,
         latency_ms_p50: 12
       }
     ]

@@ -2,6 +2,7 @@ import type { CameraPath, CompletionManifest } from "@dream-nav/shared";
 import type { ViewerCameraPose } from "./viewer-camera";
 
 export type CachedCompletionMatch = {
+  baselineUrl: string | null;
   distanceMeters: number;
   maskUrl: string | null;
   prediction: CompletionManifest["cached_predictions"][number];
@@ -26,6 +27,9 @@ export function selectNearestCachedCompletion(
       }
 
       return {
+        baselineUrl: prediction.nearest_view_asset
+          ? resolvePredictionAssetUrl(assetBaseUrl, prediction.nearest_view_asset)
+          : null,
         distanceMeters: positionDistance(currentPose.position, pose.position),
         maskUrl: prediction.confidence_mask_asset
           ? resolvePredictionAssetUrl(assetBaseUrl, prediction.confidence_mask_asset)

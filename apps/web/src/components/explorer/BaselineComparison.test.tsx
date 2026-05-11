@@ -56,6 +56,7 @@ const quality: QualityReport = {
 };
 
 const match: CachedCompletionMatch = {
+  baselineUrl: "/dreamnav-assets/scenes/warehouse_01/completion/baseline_nearest_001.svg",
   distanceMeters: 0.4,
   maskUrl: "/dreamnav-assets/scenes/warehouse_01/completion/pred_001_mask.svg",
   prediction: {
@@ -63,6 +64,8 @@ const match: CachedCompletionMatch = {
     camera_pose_index: 1,
     rgb_asset: "completion/pred_001.svg",
     confidence_mask_asset: "completion/pred_001_mask.svg",
+    nearest_view_asset: "completion/baseline_nearest_001.svg",
+    nearest_view_camera_pose_index: 0,
     latency_ms_p50: 12
   },
   rgbUrl: "/dreamnav-assets/scenes/warehouse_01/completion/pred_001.svg"
@@ -77,17 +80,19 @@ describe("BaselineComparison", () => {
     });
   });
 
-  it("renders model prediction beside nearest-view baseline metadata", () => {
+  it("renders model prediction beside nearest-view baseline image", () => {
     render(<BaselineComparison cameraPath={cameraPath} match={match} quality={quality} />);
 
     expect(screen.getByLabelText("Baseline comparison")).not.toBeNull();
     expect(screen.getByAltText("Model completion comparison").getAttribute("src")).toBe(
       "/dreamnav-assets/scenes/warehouse_01/completion/pred_001.svg"
     );
+    expect(screen.getByAltText("Nearest-view baseline comparison").getAttribute("src")).toBe(
+      "/dreamnav-assets/scenes/warehouse_01/completion/baseline_nearest_001.svg"
+    );
     expect(screen.getByText("DreamNav")).not.toBeNull();
     expect(screen.getByText("21.4 dB")).not.toBeNull();
     expect(screen.getByText("Nearest view")).not.toBeNull();
-    expect(screen.getByText("Frame 0")).not.toBeNull();
     expect(screen.getByText("Pose 1")).not.toBeNull();
   });
 });

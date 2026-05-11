@@ -197,6 +197,8 @@ const sceneBundle: ViewerSceneBundle = {
         camera_pose_index: 1,
         rgb_asset: "completion/pred_001.svg",
         confidence_mask_asset: "completion/pred_001_mask.svg",
+        nearest_view_asset: "completion/baseline_nearest_001.svg",
+        nearest_view_camera_pose_index: 0,
         latency_ms_p50: 12
       }
     ]
@@ -238,8 +240,10 @@ describe("ExplorerShell", () => {
     expect(screen.getByAltText("Model completion comparison").getAttribute("src")).toBe(
       "/dreamnav-assets/scenes/warehouse_01/completion/pred_001.svg"
     );
+    expect(screen.getByAltText("Nearest-view baseline comparison").getAttribute("src")).toBe(
+      "/dreamnav-assets/scenes/warehouse_01/completion/baseline_nearest_001.svg"
+    );
     expect(screen.getByText("Nearest view")).not.toBeNull();
-    expect(screen.getByText("Frame 0")).not.toBeNull();
     expect(screen.getByTestId("scene-viewport").textContent).toContain(
       "projection:/dreamnav-assets/scenes/warehouse_01/completion/pred_001.svg"
     );

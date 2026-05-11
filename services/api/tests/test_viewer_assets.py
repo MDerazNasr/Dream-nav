@@ -16,12 +16,16 @@ def test_viewer_assets_write_cached_completion_outputs(tmp_path: Path) -> None:
     assert completion["cache_strategy"] == "planned_path"
     assert completion["cached_predictions"][0]["rgb_asset"] == "completion/pred_001.svg"
     assert completion["cached_predictions"][0]["confidence_mask_asset"] == "completion/pred_001_mask.svg"
+    assert completion["cached_predictions"][0]["nearest_view_asset"] == "completion/baseline_nearest_001.svg"
+    assert completion["cached_predictions"][0]["nearest_view_camera_pose_index"] == 0
     assert quality["cached_completion"] is True
     assert quality["completion_latency_ms_p50"] == 12
     assert metadata["optimization"]["cached_output_latency_ms_p50"] == 12
     assert (tmp_path / "completion" / "pred_001.svg").is_file()
     assert (tmp_path / "completion" / "pred_001_mask.svg").is_file()
+    assert (tmp_path / "completion" / "baseline_nearest_001.svg").is_file()
     assert "completion/pred_001.svg" in summary["viewer_assets"]
+    assert "completion/baseline_nearest_001.svg" in summary["viewer_assets"]
 
 
 def test_viewer_assets_disable_cached_completion_on_failed_quality_gate(tmp_path: Path) -> None:

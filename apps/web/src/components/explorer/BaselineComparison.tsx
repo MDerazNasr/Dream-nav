@@ -16,9 +16,7 @@ export type NearestReferenceView = {
 };
 
 export function BaselineComparison({ cameraPath, match, quality }: BaselineComparisonProps) {
-  const referenceView = match
-    ? selectNearestReferenceView(cameraPath, match.prediction.camera_pose_index)
-    : null;
+  const referenceView = match ? referenceViewForMatch(cameraPath, match) : null;
 
   return (
     <section className="panel" aria-label="Baseline comparison">
@@ -53,10 +51,14 @@ export function BaselineComparison({ cameraPath, match, quality }: BaselineCompa
               <strong>Nearest view</strong>
               <span>{referenceView.distanceMeters.toFixed(1)} m</span>
             </div>
-            <div className="baseline-placeholder" aria-label="Nearest-view baseline placeholder">
-              <strong>Frame {referenceView.frameIndex}</strong>
-              <span>Pose {referenceView.cameraPoseIndex}</span>
-            </div>
+            {match.baselineUrl ? (
+              <img alt="Nearest-view baseline comparison" src={match.baselineUrl} />
+            ) : (
+              <div className="baseline-placeholder" aria-label="Nearest-view baseline placeholder">
+                <strong>Frame {referenceView.frameIndex}</strong>
+                <span>Pose {referenceView.cameraPoseIndex}</span>
+              </div>
+            )}
             <dl className="baseline-stats">
               <div>
                 <dt>Method</dt>
@@ -78,6 +80,15 @@ export function BaselineComparison({ cameraPath, match, quality }: BaselineCompa
   );
 }
 
+function referenceViewForMatch(cameraPath: CameraPath, match: CachedCompletionMatch): NearestReferenceView | null {
+  const manifestPoseIndex = match.prediction.nearest_view_camera_pose_index;
+  if (manifestPoseIndex !== null) {
+    return referenceViewAtPose(cameraPath, match.prediction.camera_pose_index, manifestPoseIndex);
+  }
+
+  return selectNearestReferenceView(cameraPath, match.prediction.camera_pose_index);
+}
+
 export function selectNearestReferenceView(
   cameraPath: CameraPath,
   targetPoseIndex: number
@@ -95,6 +106,24 @@ export function selectNearestReferenceView(
     }))
     .filter((candidate) => candidate.cameraPoseIndex !== targetPoseIndex)
     .sort((a, b) => a.distanceMeters - b.distanceMeters)[0] ?? null;
+}
+
+function referenceViewAtPose(
+  cameraPath: CameraPath,
+  targetPoseIndex: number,
+  cameraPoseIndex: number
+): NearestReferenceView | null {
+  const targetPose = cameraPath.poses[targetPoseIndex] ?? cameraPath.poses[0];
+  const referencePose = cameraPath.poses[cameraPoseIndex];
+  if (!targetPose || !referencePose || cameraPoseIndex === targetPoseIndex) {
+    return selectNearestReferenceView(cameraPath, targetPoseIndex);
+  }
+
+  return {
+    cameraPoseIndex,
+    distanceMeters: positionDistance(targetPose.position, referencePose.position),
+    frameIndex: referencePose.frame_index
+  };
 }
 
 function formatLatency(latencyMs: number | null): string {

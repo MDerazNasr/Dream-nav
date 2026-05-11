@@ -11,6 +11,8 @@ const cachedPredictionSchema = z.object({
   camera_pose_index: z.number().int().min(0),
   rgb_asset: assetPathSchema,
   confidence_mask_asset: assetPathSchema.nullable(),
+  nearest_view_asset: assetPathSchema.nullable(),
+  nearest_view_camera_pose_index: z.number().int().min(0).nullable(),
   latency_ms_p50: nonNegativeNumberSchema.nullable()
 });
 

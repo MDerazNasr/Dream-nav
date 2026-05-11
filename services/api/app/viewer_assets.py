@@ -8,6 +8,7 @@ from .visibility_assets import VisibilityBuildError, build_visibility_manifest
 from .zone_assets import ZONE_FILE_NAMES, ZoneAssetBuildError, build_zone_artifacts
 
 CACHED_COMPLETION_LATENCY_MS = 12
+CACHED_COMPLETION_BASELINE_ASSET = "completion/baseline_nearest_001.svg"
 CACHED_COMPLETION_RGB_ASSET = "completion/pred_001.svg"
 CACHED_COMPLETION_MASK_ASSET = "completion/pred_001_mask.svg"
 
@@ -103,7 +104,15 @@ def build_job_viewer_assets(
             "visibility_manifest.json",
             "completion_manifest.json",
             *ZONE_FILE_NAMES,
-            *([CACHED_COMPLETION_RGB_ASSET, CACHED_COMPLETION_MASK_ASSET] if cached_prediction else []),
+            *(
+                [
+                    CACHED_COMPLETION_RGB_ASSET,
+                    CACHED_COMPLETION_MASK_ASSET,
+                    CACHED_COMPLETION_BASELINE_ASSET,
+                ]
+                if cached_prediction
+                else []
+            ),
             splat_file,
         ],
         "missing_assets": missing_assets,
@@ -236,13 +245,17 @@ def _build_cached_completion_prediction(
         return None
 
     target_pose_index = _cached_prediction_pose_index(camera_path)
+    nearest_pose_index = _nearest_reference_pose_index(camera_path, target_pose_index)
     _write_text(artifacts_root / CACHED_COMPLETION_RGB_ASSET, _cached_completion_svg())
     _write_text(artifacts_root / CACHED_COMPLETION_MASK_ASSET, _cached_completion_mask_svg())
+    _write_text(artifacts_root / CACHED_COMPLETION_BASELINE_ASSET, _nearest_view_baseline_svg(nearest_pose_index))
     return {
         "prediction_id": "pred_001",
         "camera_pose_index": target_pose_index,
         "rgb_asset": CACHED_COMPLETION_RGB_ASSET,
         "confidence_mask_asset": CACHED_COMPLETION_MASK_ASSET,
+        "nearest_view_asset": CACHED_COMPLETION_BASELINE_ASSET,
+        "nearest_view_camera_pose_index": nearest_pose_index,
         "latency_ms_p50": CACHED_COMPLETION_LATENCY_MS,
     }
 
@@ -253,6 +266,33 @@ def _cached_prediction_pose_index(camera_path: dict[str, Any]) -> int:
         return 0
 
     return min(1, len(poses) - 1)
+
+
+def _nearest_reference_pose_index(camera_path: dict[str, Any], target_pose_index: int) -> int | None:
+    poses = camera_path.get("poses")
+    if not isinstance(poses, list) or len(poses) < 2:
+        return None
+
+    target_pose = poses[target_pose_index] if target_pose_index < len(poses) else poses[0]
+    if not isinstance(target_pose, dict):
+        return None
+
+    target_position = _position_value(target_pose.get("position"))
+    if target_position is None:
+        return None
+
+    candidates: list[tuple[float, int]] = []
+    for pose_index, pose in enumerate(poses):
+        if pose_index == target_pose_index or not isinstance(pose, dict):
+            continue
+
+        position = _position_value(pose.get("position"))
+        if position is None:
+            continue
+
+        candidates.append((_distance(target_position, position), pose_index))
+
+    return min(candidates)[1] if candidates else None
 
 
 def _missing_viewer_assets(artifacts_root: Path) -> list[str]:
@@ -321,6 +361,22 @@ def _cached_completion_mask_svg() -> str:
 """
 
 
+def _nearest_view_baseline_svg(nearest_pose_index: int | None) -> str:
+    pose_label = "none" if nearest_pose_index is None else str(nearest_pose_index)
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" role="img">
+  <rect width="320" height="180" fill="#111412"/>
+  <polygon points="0,0 320,0 263,80 58,77" fill="#38443d"/>
+  <polygon points="0,180 58,77 263,80 320,180" fill="#202923"/>
+  <polygon points="0,0 58,77 0,180" fill="#1b211e"/>
+  <polygon points="320,0 263,80 320,180" fill="#171d1a"/>
+  <path d="M70 125c43-8 88-12 171-4" fill="none" stroke="#b8c6bd" stroke-width="3" opacity="0.55"/>
+  <rect x="112" y="38" width="64" height="44" fill="#56645c" opacity="0.42"/>
+  <rect x="205" y="105" width="35" height="28" fill="#77857d" opacity="0.48"/>
+  <text x="18" y="162" fill="#dfe7df" font-family="Arial, sans-serif" font-size="14">nearest view pose {pose_label}</text>
+</svg>
+"""
+
+
 def _int_value(payload: dict[str, Any], key: str, default: int = 0) -> int:
     value = payload.get(key, default)
     return int(value) if isinstance(value, int | float) else default
@@ -339,3 +395,17 @@ def _optional_number(payload: dict[str, Any], key: str) -> float | None:
 def _string_value(payload: dict[str, Any], key: str, default: str) -> str:
     value = payload.get(key, default)
     return value if isinstance(value, str) and value else default
+
+
+def _position_value(value: object) -> tuple[float, float, float] | None:
+    if not isinstance(value, list | tuple) or len(value) != 3:
+        return None
+
+    if not all(isinstance(component, int | float) for component in value):
+        return None
+
+    return (float(value[0]), float(value[1]), float(value[2]))
+
+
+def _distance(a: tuple[float, float, float], b: tuple[float, float, float]) -> float:
+    return ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2) ** 0.5

@@ -16,6 +16,8 @@ describe("completion manifest schema", () => {
           camera_pose_index: 1,
           rgb_asset: "completion/pred_001.png",
           confidence_mask_asset: "completion/pred_001_mask.png",
+          nearest_view_asset: "completion/baseline_nearest_001.png",
+          nearest_view_camera_pose_index: 0,
           latency_ms_p50: 12
         }
       ]
