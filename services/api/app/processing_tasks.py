@@ -10,6 +10,7 @@ from typing import Protocol
 from .colmap_pipeline import build_colmap_pipeline_commands
 from .colmap_pose_parser import ColmapPoseParseError, parse_colmap_text_model
 from .config import ProcessingSettings
+from .gaussian_reconstruction import GaussianReconstructionConfigError, build_gaussian_reconstruction_command, normalized_gaussian_backend
 from .jobs import ProcessingStep, StoredJob
 from .pose_normalization import PoseNormalizationError, normalize_camera_path, stub_raw_poses_from_frames
 from .splat_assets import SplatAssetError, ensure_job_splat_asset
@@ -47,7 +48,6 @@ class ProcessingCommand:
 @dataclass(frozen=True)
 class FrameInventory:
     frames: list[Path]
-
     @property
     def frame_count(self) -> int:
         return len(self.frames)
@@ -221,14 +221,20 @@ def extract_video_frames(context: ProcessingTaskContext) -> ProcessingTaskResult
 
 
 def build_gaussian_scene(context: ProcessingTaskContext) -> ProcessingTaskResult:
+    backend = normalized_gaussian_backend(context.processing_settings)
     try:
-        splat_asset = ensure_job_splat_asset(context.artifacts_root)
+        splat_asset = ensure_job_splat_asset(
+            context.artifacts_root,
+            allow_stub=backend == "stub",
+        )
     except SplatAssetError as error:
         raise ProcessingTaskFailed(str(error)) from error
 
     return _result(
         "gaussian_scene.json",
         context,
+        backend=backend,
+        command_mode="stub" if backend == "stub" else "external",
         splat_file=splat_asset.file_name,
         gaussian_count=splat_asset.gaussian_count,
         splat_source=splat_asset.source,
@@ -346,9 +352,18 @@ def build_frame_extraction_command(context: ProcessingTaskContext) -> Processing
 
 
 def build_gaussian_scene_command(context: ProcessingTaskContext) -> ProcessingCommand:
-    return _placeholder_command(
-        "gaussian_scene_command.json",
-        f"gaussian_backend=3DGS artifacts={context.artifacts_root}",
+    try:
+        command = build_gaussian_reconstruction_command(
+            context.processing_settings,
+            context.artifacts_root,
+        )
+    except GaussianReconstructionConfigError as error:
+        raise ProcessingTaskFailed(str(error)) from error
+
+    return ProcessingCommand(
+        artifact_name=command.artifact_name,
+        command=command.command,
+        timeout_sec=command.timeout_sec,
     )
 
 

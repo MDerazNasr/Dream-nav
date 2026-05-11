@@ -20,10 +20,13 @@ class SplatAssetSummary:
     file_size_bytes: int
 
 
-def ensure_job_splat_asset(artifacts_root: Path) -> SplatAssetSummary:
+def ensure_job_splat_asset(artifacts_root: Path, allow_stub: bool = True) -> SplatAssetSummary:
     splat_path = artifacts_root / "splat.ply"
     if splat_path.is_file() and splat_path.stat().st_size > 0:
         return _summary(splat_path, "existing")
+
+    if not allow_stub:
+        raise SplatAssetError("Gaussian reconstruction did not produce splat.ply.")
 
     camera_path = _read_camera_path(artifacts_root / "camera_path.json")
     splats = _splats_from_camera_path(camera_path)
