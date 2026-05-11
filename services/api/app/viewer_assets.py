@@ -4,6 +4,7 @@ from json import JSONDecodeError, dumps, loads
 from pathlib import Path
 from typing import Any
 
+from .baseline_assets import build_nearest_view_baseline_svg
 from .visibility_assets import VisibilityBuildError, build_visibility_manifest
 from .zone_assets import ZONE_FILE_NAMES, ZoneAssetBuildError, build_zone_artifacts
 
@@ -248,7 +249,10 @@ def _build_cached_completion_prediction(
     nearest_pose_index = _nearest_reference_pose_index(camera_path, target_pose_index)
     _write_text(artifacts_root / CACHED_COMPLETION_RGB_ASSET, _cached_completion_svg())
     _write_text(artifacts_root / CACHED_COMPLETION_MASK_ASSET, _cached_completion_mask_svg())
-    _write_text(artifacts_root / CACHED_COMPLETION_BASELINE_ASSET, _nearest_view_baseline_svg(nearest_pose_index))
+    _write_text(
+        artifacts_root / CACHED_COMPLETION_BASELINE_ASSET,
+        build_nearest_view_baseline_svg(artifacts_root, camera_path, nearest_pose_index),
+    )
     return {
         "prediction_id": "pred_001",
         "camera_pose_index": target_pose_index,
@@ -357,22 +361,6 @@ def _cached_completion_mask_svg() -> str:
   <rect x="0" y="0" width="320" height="180" fill="#77d7c8" opacity="0.18"/>
   <circle cx="225" cy="119" r="44" fill="#4a8ee8" opacity="0.82"/>
   <path d="M74 124c41-13 92-17 169-5" fill="none" stroke="#f0c95a" stroke-width="9" opacity="0.72"/>
-</svg>
-"""
-
-
-def _nearest_view_baseline_svg(nearest_pose_index: int | None) -> str:
-    pose_label = "none" if nearest_pose_index is None else str(nearest_pose_index)
-    return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" role="img">
-  <rect width="320" height="180" fill="#111412"/>
-  <polygon points="0,0 320,0 263,80 58,77" fill="#38443d"/>
-  <polygon points="0,180 58,77 263,80 320,180" fill="#202923"/>
-  <polygon points="0,0 58,77 0,180" fill="#1b211e"/>
-  <polygon points="320,0 263,80 320,180" fill="#171d1a"/>
-  <path d="M70 125c43-8 88-12 171-4" fill="none" stroke="#b8c6bd" stroke-width="3" opacity="0.55"/>
-  <rect x="112" y="38" width="64" height="44" fill="#56645c" opacity="0.42"/>
-  <rect x="205" y="105" width="35" height="28" fill="#77857d" opacity="0.48"/>
-  <text x="18" y="162" fill="#dfe7df" font-family="Arial, sans-serif" font-size="14">nearest view pose {pose_label}</text>
 </svg>
 """
 

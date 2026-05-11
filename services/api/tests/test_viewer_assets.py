@@ -24,6 +24,9 @@ def test_viewer_assets_write_cached_completion_outputs(tmp_path: Path) -> None:
     assert (tmp_path / "completion" / "pred_001.svg").is_file()
     assert (tmp_path / "completion" / "pred_001_mask.svg").is_file()
     assert (tmp_path / "completion" / "baseline_nearest_001.svg").is_file()
+    assert "pseudo-view pose 0" in (tmp_path / "completion" / "baseline_nearest_001.svg").read_text(
+        encoding="utf-8"
+    )
     assert "completion/pred_001.svg" in summary["viewer_assets"]
     assert "completion/baseline_nearest_001.svg" in summary["viewer_assets"]
 
@@ -47,6 +50,7 @@ def test_viewer_assets_disable_cached_completion_on_failed_quality_gate(tmp_path
 def _write_viewer_inputs(artifacts_root: Path, quality_gate: str) -> None:
     (artifacts_root / "camera_path.json").write_text(dumps(_camera_path()), encoding="utf-8")
     ensure_job_splat_asset(artifacts_root)
+    _write_pseudo_views(artifacts_root)
     payloads = {
         "capture_quality.json": {"duration_sec": 4.2, "warnings": []},
         "frame_extraction.json": {"frame_count": 3},
@@ -63,6 +67,30 @@ def _write_viewer_inputs(artifacts_root: Path, quality_gate: str) -> None:
     }
     for file_name, payload in payloads.items():
         (artifacts_root / file_name).write_text(dumps(payload), encoding="utf-8")
+
+
+def _write_pseudo_views(artifacts_root: Path) -> None:
+    rgb_root = artifacts_root / "pseudo_views" / "rgb"
+    rgb_root.mkdir(parents=True)
+    (rgb_root / "train_pose0000_offset00.ppm").write_text(
+        "P3\n2 1\n255\n10 20 30 40 50 60\n",
+        encoding="ascii",
+    )
+    (artifacts_root / "pseudo_views.json").write_text(
+        dumps(
+            {
+                "views": [
+                    {
+                        "view_id": "train_pose0000_offset00",
+                        "split": "train",
+                        "source_pose_index": 0,
+                        "rgb_path": "pseudo_views/rgb/train_pose0000_offset00.ppm",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 def _camera_path() -> dict[str, object]:
