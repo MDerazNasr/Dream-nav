@@ -78,6 +78,9 @@ def test_worker_completes_queued_job(tmp_path: Path) -> None:
     quality = _read_job_artifact(tmp_path, response.job_id, "quality.json")
     visibility = _read_job_artifact(tmp_path, response.job_id, "visibility_manifest.json")
     completion = _read_job_artifact(tmp_path, response.job_id, "completion_manifest.json")
+    observed_zone = _read_job_artifact(tmp_path, response.job_id, "observed_zone.json")
+    completion_zone = _read_job_artifact(tmp_path, response.job_id, "completion_zone.json")
+    unknown_zone = _read_job_artifact(tmp_path, response.job_id, "unknown_zone.json")
     explorer_bundle = _read_job_artifact(tmp_path, response.job_id, "explorer_bundle.json")
     assert metadata["scene_id"] == response.job_id
     assert metadata["frame_count"] == 3
@@ -88,9 +91,14 @@ def test_worker_completes_queued_job(tmp_path: Path) -> None:
     assert len(visibility["cells"]) >= 6
     assert visibility["cells"][0]["cell_id"] == "cell_000"
     assert {cell["zone"] for cell in visibility["cells"]} >= {"observed", "completion"}
+    assert observed_zone["zone"] == "observed"
+    assert observed_zone["cell_count"] > 0
+    assert completion_zone["zone"] == "completion"
+    assert unknown_zone["cells"] == []
     assert completion["cache_strategy"] == "none"
     assert explorer_bundle["output_scene_id"] == response.job_id
     assert explorer_bundle["viewer_render_mode"] == "splat"
+    assert "observed_zone.json" in explorer_bundle["viewer_assets"]
 
 
 def test_worker_reads_legacy_elapsed_time_job(tmp_path: Path) -> None:

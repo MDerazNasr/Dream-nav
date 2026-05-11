@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from .visibility_assets import VisibilityBuildError, build_visibility_manifest
+from .zone_assets import ZONE_FILE_NAMES, ZoneAssetBuildError, build_zone_artifacts
 
 
 class ViewerAssetBuildError(Exception):
@@ -40,6 +41,10 @@ def build_job_viewer_assets(
         )
     except VisibilityBuildError as error:
         raise ViewerAssetBuildError(str(error)) from error
+    try:
+        zone_artifacts = build_zone_artifacts(job_id, visibility)
+    except ZoneAssetBuildError as error:
+        raise ViewerAssetBuildError(str(error)) from error
     completion = _build_completion_manifest(job_id, scene_model, heldout_psnr, quality_gate_status)
     quality = _build_quality_report(
         job_id,
@@ -70,6 +75,8 @@ def build_job_viewer_assets(
     _write_json(artifacts_root / "quality.json", quality)
     _write_json(artifacts_root / "visibility_manifest.json", visibility)
     _write_json(artifacts_root / "completion_manifest.json", completion)
+    for file_name, zone_artifact in zone_artifacts.items():
+        _write_json(artifacts_root / file_name, zone_artifact)
 
     missing_assets = _missing_viewer_assets(artifacts_root)
     return {
@@ -82,6 +89,7 @@ def build_job_viewer_assets(
             "camera_path.json",
             "visibility_manifest.json",
             "completion_manifest.json",
+            *ZONE_FILE_NAMES,
             splat_file,
         ],
         "missing_assets": missing_assets,

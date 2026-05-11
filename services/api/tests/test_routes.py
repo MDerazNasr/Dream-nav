@@ -224,6 +224,23 @@ def test_job_viewer_asset_serves_raw_json(tmp_path: Path) -> None:
     assert splat_response.content.startswith(b"ply\n")
 
 
+def test_job_viewer_asset_serves_zone_json(tmp_path: Path) -> None:
+    app = create_app(ApiSettings(repo_root=tmp_path, auto_start_worker=False))
+    client = TestClient(app)
+    upload_response = client.post(
+        "/upload",
+        files={"file": ("walkthrough.mov", b"video-bytes", "video/quicktime")},
+    )
+    job_id = upload_response.json()["job_id"]
+    _write_viewer_assets(app.state.job_repository, job_id)
+
+    response = client.get(f"/jobs/{job_id}/viewer-assets/observed_zone.json")
+
+    assert response.status_code == 200
+    assert response.json()["scene_id"] == job_id
+    assert response.json()["zone"] == "observed"
+
+
 def test_job_viewer_asset_rejects_unlisted_names(tmp_path: Path) -> None:
     client = TestClient(create_app(ApiSettings(repo_root=tmp_path, auto_start_worker=False)))
     upload_response = client.post(
@@ -415,6 +432,15 @@ def _write_viewer_assets(job_repository, job_id: str) -> None:
         "quality.json": quality,
         "visibility_manifest.json": visibility,
         "completion_manifest.json": completion,
+        "observed_zone.json": {
+            "scene_id": job_id,
+            "zone": "observed",
+            "source_manifest": "visibility_manifest.json",
+            "cell_count": 1,
+            "coverage_ratio": 1,
+            "bounds": {"min": [0, 1, -0.5], "max": [0, 1, -0.5]},
+            "cells": visibility["cells"],
+        },
     }.items():
         job_repository.write_artifact(job_id, artifact_name, payload)
 

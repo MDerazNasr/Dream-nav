@@ -22,9 +22,13 @@ router = APIRouter()
 VIEWER_ASSET_NAMES = {
     "camera_path.json",
     "completion_manifest.json",
+    "completion_zone.json",
     "metadata.json",
+    "observed_zone.json",
+    "partial_zone.json",
     "quality.json",
     "splat.ply",
+    "unknown_zone.json",
     "visibility_manifest.json",
 }
 
