@@ -13,6 +13,7 @@ from .processing_models import (
     ProcessingTaskResult,
 )
 from .pseudo_views import PseudoViewRenderError, render_pseudo_views
+from .scene_completion_model import SceneCompletionModelError, train_scene_completion_model
 from .splat_assets import SplatAssetError, ensure_job_splat_asset
 from .viewer_assets import ViewerAssetBuildError, build_job_viewer_assets
 
@@ -144,15 +145,28 @@ def train_scene_model(context: ProcessingTaskContext) -> ProcessingTaskResult:
     except CompletionDatasetError as error:
         raise ProcessingTaskFailed(str(error)) from error
 
+    try:
+        model = train_scene_completion_model(
+            context.job.job_id,
+            context.job.stored_filename,
+            context.artifacts_root,
+        )
+    except SceneCompletionModelError as error:
+        raise ProcessingTaskFailed(str(error)) from error
+
     return _result(
         "scene_model.json",
         context,
-        architecture="pose_conditioned_encoder_decoder",
+        architecture=model["architecture"],
+        model_artifact=model["model_artifact"],
+        model_version=model["model_version"],
         dataset_manifest=dataset["dataset_manifest"],
         pose_encoding=dataset["pose_encoding"],
         reference_strategy=dataset["reference_strategy"],
         train_examples=dataset["train_examples"],
         heldout_examples=dataset["heldout_examples"],
+        train_rgb_l1=model["train_rgb_l1"],
+        heldout_rgb_l1=model["heldout_rgb_l1"],
         training_time_sec=184,
     )
 
