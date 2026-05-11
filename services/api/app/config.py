@@ -14,6 +14,9 @@ class ProcessingSettings:
     pose_backend: str = "stub"
     pose_command: str | None = None
     pose_timeout_sec: float = 30
+    gaussian_backend: str = "stub"
+    gaussian_command: str | None = None
+    gaussian_timeout_sec: float = 60
 
 
 @dataclass(frozen=True)
@@ -52,5 +55,8 @@ def default_settings() -> ApiSettings:
             pose_backend=environ.get("DREAMNAV_POSE_BACKEND", "stub"),
             pose_command=environ.get("DREAMNAV_POSE_COMMAND"),
             pose_timeout_sec=float(environ.get("DREAMNAV_POSE_TIMEOUT_SEC", "30")),
+            gaussian_backend=environ.get("DREAMNAV_GAUSSIAN_BACKEND", "stub"),
+            gaussian_command=environ.get("DREAMNAV_GAUSSIAN_COMMAND"),
+            gaussian_timeout_sec=float(environ.get("DREAMNAV_GAUSSIAN_TIMEOUT_SEC", "60")),
         ),
     )
