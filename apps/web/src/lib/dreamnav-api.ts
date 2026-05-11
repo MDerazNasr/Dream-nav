@@ -11,13 +11,20 @@ import {
   parseSceneAssets,
   parseSceneMetadata,
   parseUploadResponse,
-  parseVisibilityManifest
+  parseVisibilityManifest,
+  parseZoneArtifact
 } from "@dream-nav/shared";
 
 import type { DemoScene, JobArtifact, JobSceneBundle, JobStatus, SceneAssetStatus, UploadResponse } from "@dream-nav/shared";
+import { buildZoneArtifactsFromVisibility, type ConfidenceZoneArtifacts } from "./confidence-zones";
 
 export type ViewerSceneBundle = SceneBundle & {
   assetStatus: SceneAssetStatus;
+  zoneArtifacts: ConfidenceZoneArtifacts;
+};
+
+export type ProcessedJobSceneBundle = JobSceneBundle & {
+  zoneArtifacts: ConfidenceZoneArtifacts;
 };
 
 const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000";
@@ -81,7 +88,8 @@ export async function fetchSceneBundle(
     cameraPath,
     visibility,
     completion,
-    assetStatus: resolvedAssetStatus
+    assetStatus: resolvedAssetStatus,
+    zoneArtifacts: buildZoneArtifactsFromVisibility(sceneId, visibility)
   };
 }
 
@@ -117,14 +125,16 @@ export async function fetchJobArtifact(
 export async function fetchJobSceneBundle(
   jobId: string,
   apiBaseUrl = getDreamNavApiBaseUrl()
-): Promise<JobSceneBundle> {
+): Promise<ProcessedJobSceneBundle> {
   const jobSceneBundle = parseJobSceneBundle(await fetchJson(apiBaseUrl, `/jobs/${jobId}/scene-bundle`));
+  const zoneArtifacts = await fetchZoneArtifacts(apiBaseUrl, jobSceneBundle);
   return {
     ...jobSceneBundle,
     asset_status: {
       ...jobSceneBundle.asset_status,
       splat_url: new URL(jobSceneBundle.asset_status.splat_url, normalizeBaseUrl(apiBaseUrl)).toString()
-    }
+    },
+    zoneArtifacts
   };
 }
 
@@ -147,4 +157,19 @@ async function fetchJson(
 
 function normalizeBaseUrl(apiBaseUrl: string): string {
   return apiBaseUrl.endsWith("/") ? apiBaseUrl : `${apiBaseUrl}/`;
+}
+
+async function fetchZoneArtifacts(
+  apiBaseUrl: string,
+  jobSceneBundle: JobSceneBundle
+): Promise<ConfidenceZoneArtifacts> {
+  const metadataUrl = new URL(jobSceneBundle.assets.metadata_url, normalizeBaseUrl(apiBaseUrl));
+  const zoneEntries = await Promise.all(
+    Object.entries(jobSceneBundle.metadata.zones).map(async ([zone, fileName]) => [
+      zone,
+      parseZoneArtifact(await fetchJson(apiBaseUrl, new URL(fileName, metadataUrl).toString()))
+    ])
+  );
+
+  return Object.fromEntries(zoneEntries) as ConfidenceZoneArtifacts;
 }

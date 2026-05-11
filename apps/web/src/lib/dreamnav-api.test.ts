@@ -317,6 +317,7 @@ describe("DreamNav API client", () => {
     expect(bundle.cameraPath.poses).toHaveLength(1);
     expect(bundle.assetStatus.viewer_render_mode).toBe("splat");
     expect(bundle.assetStatus.splat_url).toBe("http://api.test/scenes/warehouse_01/splat.ply");
+    expect(bundle.zoneArtifacts.observed.cell_count).toBe(1);
   });
 
   it("throws a typed error when an API request fails", async () => {
@@ -409,7 +410,8 @@ describe("DreamNav API client", () => {
 
   it("loads completed job scene bundles", async () => {
     mockFetchFromPayloads({
-      "http://api.test/jobs/scene_abc123/scene-bundle": jobSceneBundlePayload
+      "http://api.test/jobs/scene_abc123/scene-bundle": jobSceneBundlePayload,
+      ...jobZonePayloads
     });
 
     const response = await fetchJobSceneBundle("scene_abc123", "http://api.test");
@@ -417,8 +419,51 @@ describe("DreamNav API client", () => {
     expect(response.output_scene_id).toBe("scene_abc123");
     expect(response.camera_path.poses).toHaveLength(2);
     expect(response.asset_status.splat_url).toBe("http://api.test/jobs/scene_abc123/viewer-assets/splat.ply");
+    expect(response.zoneArtifacts.completion.zone).toBe("completion");
   });
 });
+
+const jobZonePayloads = {
+  "http://api.test/jobs/scene_abc123/viewer-assets/observed_zone.json": {
+    scene_id: "scene_abc123",
+    zone: "observed",
+    source_manifest: "visibility_manifest.json",
+    cell_count: 1,
+    coverage_ratio: 1,
+    bounds: {
+      min: [0, 1, -0.5],
+      max: [0, 1, -0.5]
+    },
+    cells: jobSceneBundlePayload.visibility.cells
+  },
+  "http://api.test/jobs/scene_abc123/viewer-assets/partial_zone.json": {
+    scene_id: "scene_abc123",
+    zone: "partial",
+    source_manifest: "visibility_manifest.json",
+    cell_count: 0,
+    coverage_ratio: 0,
+    bounds: null,
+    cells: []
+  },
+  "http://api.test/jobs/scene_abc123/viewer-assets/completion_zone.json": {
+    scene_id: "scene_abc123",
+    zone: "completion",
+    source_manifest: "visibility_manifest.json",
+    cell_count: 0,
+    coverage_ratio: 0,
+    bounds: null,
+    cells: []
+  },
+  "http://api.test/jobs/scene_abc123/viewer-assets/unknown_zone.json": {
+    scene_id: "scene_abc123",
+    zone: "unknown",
+    source_manifest: "visibility_manifest.json",
+    cell_count: 0,
+    coverage_ratio: 0,
+    bounds: null,
+    cells: []
+  }
+};
 
 function mockFetchFromPayloads(payloads: Record<string, unknown>): void {
   vi.stubGlobal(
