@@ -341,7 +341,7 @@ describe("WorkflowShell", () => {
       expect(screen.getByText("Training geometrically consistent scene-specific completion model")).not.toBeNull();
     });
     expect(screen.getByText("Extracting video frames")).not.toBeNull();
-    expect(screen.getByRole("button", { name: "Open explorer" }).hasAttribute("disabled")).toBe(true);
+    expect(screen.getByRole("button", { name: "Open processed scene" }).hasAttribute("disabled")).toBe(true);
   });
 
   it("enables explorer when the worker completes the job", async () => {
@@ -366,7 +366,7 @@ describe("WorkflowShell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Start processing" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Open explorer" }).hasAttribute("disabled")).toBe(false);
+      expect(screen.getByRole("button", { name: "Open processed scene" }).hasAttribute("disabled")).toBe(false);
     });
   });
 
@@ -391,9 +391,9 @@ describe("WorkflowShell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Start processing" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Open explorer" }).hasAttribute("disabled")).toBe(false);
+      expect(screen.getByRole("button", { name: "Open processed scene" }).hasAttribute("disabled")).toBe(false);
     });
-    fireEvent.click(screen.getByRole("button", { name: "Open explorer" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open processed scene" }));
 
     await waitFor(() => {
       expect(screen.getByTestId("explorer-shell").textContent).toBe("2 poses");

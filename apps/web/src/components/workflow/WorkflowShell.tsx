@@ -257,7 +257,7 @@ export function WorkflowShell({ sceneBundle }: WorkflowShellProps) {
               onClick={openCompletedJobExplorer}
               type="button"
             >
-              {isOpeningExplorer ? "Opening explorer" : "Open explorer"}
+              {isOpeningExplorer ? "Opening processed scene" : "Open processed scene"}
             </button>
           </div>
         </section>
