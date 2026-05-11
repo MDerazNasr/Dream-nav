@@ -2,10 +2,41 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { WorkflowShell } from "./WorkflowShell";
 import type { ViewerSceneBundle } from "../../lib/dreamnav-api";
-import { fetchJobArtifact, fetchJobStatus } from "../../lib/dreamnav-api";
+import { fetchJobArtifact, fetchJobSceneBundle, fetchJobStatus } from "../../lib/dreamnav-api";
+
+const processedCameraPath = vi.hoisted(() => ({
+  scene_id: "warehouse_01",
+  coordinate_system: "dreamnav_viewer_v1",
+  intrinsics: {
+    width: 1280,
+    height: 720,
+    fx: 910,
+    fy: 910,
+    cx: 640,
+    cy: 360
+  },
+  poses: [
+    {
+      frame_index: 0,
+      timestamp_sec: 0,
+      position: [0, 1.55, 0],
+      rotation_xyzw: [0, 0, 0, 1],
+      fov_degrees: 60
+    },
+    {
+      frame_index: 12,
+      timestamp_sec: 0.4,
+      position: [0.2, 1.55, -0.6],
+      rotation_xyzw: [0, 0.03, 0, 0.9995],
+      fov_degrees: 60
+    }
+  ]
+}));
 
 vi.mock("../explorer/ExplorerShell", () => ({
-  ExplorerShell: () => <div data-testid="explorer-shell" />
+  ExplorerShell: ({ sceneBundle }: { sceneBundle: ViewerSceneBundle }) => (
+    <div data-testid="explorer-shell">{sceneBundle.cameraPath.poses.length} poses</div>
+  )
 }));
 
 vi.mock("../../lib/dreamnav-api", async (importOriginal) => {
@@ -32,6 +63,12 @@ vi.mock("../../lib/dreamnav-api", async (importOriginal) => {
         exit_code: 1,
         stderr: "ffmpeg failed"
       }
+    })),
+    fetchJobSceneBundle: vi.fn(async () => ({
+      job_id: "scene_abc123",
+      output_scene_id: "warehouse_01",
+      camera_path_artifact: "camera_path.json",
+      camera_path: processedCameraPath
     })),
     uploadWalkthrough: vi.fn(async () => ({
       job_id: "scene_abc123",
@@ -218,6 +255,37 @@ describe("WorkflowShell", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Open explorer" }).hasAttribute("disabled")).toBe(false);
     });
+  });
+
+  it("opens completed jobs with their generated camera path", async () => {
+    vi.mocked(fetchJobStatus).mockResolvedValueOnce({
+      job_id: "scene_abc123",
+      state: "completed",
+      stage: "completed",
+      progress: 1,
+      elapsed_sec: 240,
+      message: "Explorer ready",
+      output_scene_id: "warehouse_01",
+      error_message: null,
+      failed_stage: null,
+      failed_artifact: null
+    });
+    render(<WorkflowShell sceneBundle={sceneBundle} />);
+
+    fireEvent.change(screen.getByLabelText("Walkthrough video"), {
+      target: { files: [new File(["video"], "walkthrough.mp4", { type: "video/mp4" })] }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Start processing" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Open explorer" }).hasAttribute("disabled")).toBe(false);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Open explorer" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("explorer-shell").textContent).toBe("2 poses");
+    });
+    expect(fetchJobSceneBundle).toHaveBeenCalledWith("scene_abc123");
   });
 
   it("shows failed job guidance and lets the user return to upload", async () => {

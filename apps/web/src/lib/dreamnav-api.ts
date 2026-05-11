@@ -4,6 +4,7 @@ import {
   parseCompletionManifest,
   parseDemoScenesResponse,
   parseJobArtifact,
+  parseJobSceneBundle,
   parseJobStatus,
   parseQualityReport,
   parseSceneAssetStatus,
@@ -13,7 +14,7 @@ import {
   parseVisibilityManifest
 } from "@dream-nav/shared";
 
-import type { DemoScene, JobArtifact, JobStatus, SceneAssetStatus, UploadResponse } from "@dream-nav/shared";
+import type { DemoScene, JobArtifact, JobSceneBundle, JobStatus, SceneAssetStatus, UploadResponse } from "@dream-nav/shared";
 
 export type ViewerSceneBundle = SceneBundle & {
   assetStatus: SceneAssetStatus;
@@ -111,6 +112,13 @@ export async function fetchJobArtifact(
 ): Promise<JobArtifact> {
   const encodedArtifactName = encodeURIComponent(artifactName);
   return parseJobArtifact(await fetchJson(apiBaseUrl, `/jobs/${jobId}/artifacts/${encodedArtifactName}`));
+}
+
+export async function fetchJobSceneBundle(
+  jobId: string,
+  apiBaseUrl = getDreamNavApiBaseUrl()
+): Promise<JobSceneBundle> {
+  return parseJobSceneBundle(await fetchJson(apiBaseUrl, `/jobs/${jobId}/scene-bundle`));
 }
 
 async function fetchJson(

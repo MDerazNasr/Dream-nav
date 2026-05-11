@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DreamNavApiError,
   fetchJobArtifact,
+  fetchJobSceneBundle,
   fetchJobStatus,
   fetchSceneBundle,
   getDreamNavApiBaseUrl,
@@ -151,6 +152,40 @@ const apiPayloads: Record<string, unknown> = {
   }
 };
 
+const jobSceneBundlePayload = {
+  job_id: "scene_abc123",
+  output_scene_id: "warehouse_01",
+  camera_path_artifact: "camera_path.json",
+  camera_path: {
+    scene_id: "warehouse_01",
+    coordinate_system: "dreamnav_viewer_v1",
+    intrinsics: {
+      width: 1280,
+      height: 720,
+      fx: 910,
+      fy: 910,
+      cx: 640,
+      cy: 360
+    },
+    poses: [
+      {
+        frame_index: 0,
+        timestamp_sec: 0,
+        position: [0, 1.55, 0],
+        rotation_xyzw: [0, 0, 0, 1],
+        fov_degrees: 60
+      },
+      {
+        frame_index: 8,
+        timestamp_sec: 0.27,
+        position: [0.1, 1.55, -0.4],
+        rotation_xyzw: [0, 0.02, 0, 0.9998],
+        fov_degrees: 60
+      }
+    ]
+  }
+};
+
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
@@ -259,6 +294,17 @@ describe("DreamNav API client", () => {
     );
 
     expect(response.payload.stderr).toBe("ffmpeg failed");
+  });
+
+  it("loads completed job scene bundles", async () => {
+    mockFetchFromPayloads({
+      "http://api.test/jobs/scene_abc123/scene-bundle": jobSceneBundlePayload
+    });
+
+    const response = await fetchJobSceneBundle("scene_abc123", "http://api.test");
+
+    expect(response.output_scene_id).toBe("warehouse_01");
+    expect(response.camera_path.poses).toHaveLength(2);
   });
 });
 

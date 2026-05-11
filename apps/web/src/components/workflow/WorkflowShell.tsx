@@ -5,7 +5,7 @@ import { AlertTriangle, CheckCircle2, Film, LoaderCircle, RotateCcw, Upload, XCi
 import { useEffect, useMemo, useState } from "react";
 import { ExplorerShell } from "../explorer/ExplorerShell";
 import type { ViewerSceneBundle } from "../../lib/dreamnav-api";
-import { fetchJobArtifact, fetchJobStatus, uploadWalkthrough } from "../../lib/dreamnav-api";
+import { fetchJobArtifact, fetchJobSceneBundle, fetchJobStatus, uploadWalkthrough } from "../../lib/dreamnav-api";
 
 type WorkflowShellProps = {
   sceneBundle: ViewerSceneBundle;
@@ -37,8 +37,10 @@ export function WorkflowShell({ sceneBundle }: WorkflowShellProps) {
   const [jobArtifact, setJobArtifact] = useState<JobArtifact | null>(null);
   const [artifactError, setArtifactError] = useState<string | null>(null);
   const [isArtifactLoading, setIsArtifactLoading] = useState(false);
+  const [viewerSceneBundle, setViewerSceneBundle] = useState(sceneBundle);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isOpeningExplorer, setIsOpeningExplorer] = useState(false);
 
   const activeProgress = jobStatus?.progress ?? 0;
   const percent = Math.round(activeProgress * 100);
@@ -116,6 +118,31 @@ export function WorkflowShell({ sceneBundle }: WorkflowShellProps) {
     setArtifactError(null);
     setUploadError(null);
     setIsUploading(false);
+    setIsOpeningExplorer(false);
+  };
+
+  const openDemoExplorer = () => {
+    setViewerSceneBundle(sceneBundle);
+    setView("explorer");
+  };
+
+  const openCompletedJobExplorer = async () => {
+    if (!jobStatus || !jobCompleted) {
+      return;
+    }
+
+    setIsOpeningExplorer(true);
+    setUploadError(null);
+
+    try {
+      const jobSceneBundle = await fetchJobSceneBundle(jobStatus.job_id);
+      setViewerSceneBundle(toProcessedViewerBundle(sceneBundle, jobSceneBundle));
+      setView("explorer");
+    } catch {
+      setUploadError("Completed job artifacts unavailable");
+    } finally {
+      setIsOpeningExplorer(false);
+    }
   };
 
   const loadFailedArtifact = async () => {
@@ -137,7 +164,7 @@ export function WorkflowShell({ sceneBundle }: WorkflowShellProps) {
   };
 
   if (view === "explorer") {
-    return <ExplorerShell sceneBundle={sceneBundle} />;
+    return <ExplorerShell sceneBundle={viewerSceneBundle} />;
   }
 
   if (view === "processing") {
@@ -226,11 +253,11 @@ export function WorkflowShell({ sceneBundle }: WorkflowShellProps) {
             </button>
             <button
               className="primary-action"
-              disabled={!jobCompleted}
-              onClick={() => setView("explorer")}
+              disabled={!jobCompleted || isOpeningExplorer}
+              onClick={openCompletedJobExplorer}
               type="button"
             >
-              Open explorer
+              {isOpeningExplorer ? "Opening explorer" : "Open explorer"}
             </button>
           </div>
         </section>
@@ -271,7 +298,7 @@ export function WorkflowShell({ sceneBundle }: WorkflowShellProps) {
         {uploadError ? <p className="workflow-error">{uploadError}</p> : null}
 
         <div className="demo-row" aria-label="Demo scenes">
-          <button className="demo-scene" onClick={() => setView("explorer")} type="button">
+          <button className="demo-scene" onClick={openDemoExplorer} type="button">
             <span>{sceneBundle.demoScene.title}</span>
             <small>{sceneBundle.demoScene.description}</small>
           </button>
@@ -286,13 +313,37 @@ export function WorkflowShell({ sceneBundle }: WorkflowShellProps) {
           >
             {isUploading ? "Uploading" : "Start processing"}
           </button>
-          <button className="secondary-action" onClick={() => setView("explorer")} type="button">
+          <button className="secondary-action" onClick={openDemoExplorer} type="button">
             Open demo
           </button>
         </div>
       </section>
     </main>
   );
+}
+
+function toProcessedViewerBundle(
+  baseBundle: ViewerSceneBundle,
+  jobSceneBundle: Awaited<ReturnType<typeof fetchJobSceneBundle>>
+): ViewerSceneBundle {
+  const frameCount = jobSceneBundle.camera_path.poses.length;
+
+  return {
+    ...baseBundle,
+    cameraPath: jobSceneBundle.camera_path,
+    metadata: {
+      ...baseBundle.metadata,
+      scene_id: jobSceneBundle.output_scene_id,
+      title: "Processed walkthrough",
+      frame_count: frameCount,
+      camera_path: jobSceneBundle.camera_path_artifact
+    },
+    quality: {
+      ...baseBundle.quality,
+      scene_id: jobSceneBundle.output_scene_id,
+      frame_count: frameCount
+    }
+  };
 }
 
 function getStageLabel(stage: JobStatus["failed_stage"]): string | null {
