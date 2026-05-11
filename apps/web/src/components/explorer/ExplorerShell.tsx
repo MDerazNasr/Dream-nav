@@ -1,7 +1,7 @@
 "use client";
 
 import type { LensMode } from "@dream-nav/shared";
-import { BookmarkPlus, Gauge, Layers, Video } from "lucide-react";
+import { BookmarkPlus, Gauge, Layers, RotateCcw, Video } from "lucide-react";
 import { useState } from "react";
 import type { ViewerSceneBundle } from "../../lib/dreamnav-api";
 import { ConfidenceLegend } from "./ConfidenceLegend";
@@ -18,6 +18,7 @@ export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
   const [overlayEnabled, setOverlayEnabled] = useState(true);
   const [selectedLens, setSelectedLens] = useState<LensMode>("35mm");
   const [markerCount, setMarkerCount] = useState(0);
+  const [resetSignal, setResetSignal] = useState(0);
 
   return (
     <main className="explorer">
@@ -26,6 +27,7 @@ export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
         lensMode={selectedLens}
         overlayEnabled={overlayEnabled}
         renderMode={sceneBundle.assetStatus.viewer_render_mode}
+        resetSignal={resetSignal}
         splatUrl={sceneBundle.assetStatus.splat_url}
         zoneArtifacts={sceneBundle.zoneArtifacts}
       />
@@ -83,6 +85,15 @@ export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
           type="button"
         >
           <Layers size={18} aria-hidden="true" />
+        </button>
+        <button
+          aria-label="Reset camera view"
+          className="icon-button"
+          onClick={() => setResetSignal((current) => current + 1)}
+          title="Reset camera view"
+          type="button"
+        >
+          <RotateCcw size={18} aria-hidden="true" />
         </button>
         <button
           aria-label="Save camera marker"

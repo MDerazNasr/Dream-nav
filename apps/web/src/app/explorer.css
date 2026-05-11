@@ -12,6 +12,13 @@
 
 .viewport canvas {
   display: block;
+  cursor: grab;
+  outline: none;
+  touch-action: none;
+}
+
+.viewport canvas:active {
+  cursor: grabbing;
 }
 
 .top-bar,

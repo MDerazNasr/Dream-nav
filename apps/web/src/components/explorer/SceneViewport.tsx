@@ -12,6 +12,7 @@ type SceneViewportProps = {
   lensMode: LensMode;
   overlayEnabled: boolean;
   renderMode: ViewerRenderMode;
+  resetSignal: number;
   splatUrl: string;
   zoneArtifacts: ConfidenceZoneArtifacts;
 };
@@ -21,6 +22,7 @@ export function SceneViewport({
   lensMode,
   overlayEnabled,
   renderMode,
+  resetSignal,
   splatUrl,
   zoneArtifacts
 }: SceneViewportProps) {
@@ -37,16 +39,14 @@ export function SceneViewport({
     scene.background = new THREE.Color("#111412");
 
     const camera = new THREE.PerspectiveCamera(getLensFov(lensMode), 1, 0.1, 100);
-    const startPose = cameraPath.poses[0];
-    camera.position.set(
-      startPose?.position[0] ?? 0,
-      startPose?.position[1] ?? 1.55,
-      startPose?.position[2] ?? 3
-    );
+    const startPosition = startCameraPosition(cameraPath);
+    const rotationState = { pitch: 0, yaw: 0 };
+    resetCamera(camera, startPosition, rotationState);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.domElement.dataset.testid = "scene-canvas";
+    renderer.domElement.tabIndex = 0;
     mount.appendChild(renderer.domElement);
 
     const objects = createSceneObjects(zoneArtifacts, overlayEnabled, renderMode);
@@ -83,8 +83,38 @@ export function SceneViewport({
     const pressedKeys = new Set<string>();
     const onKeyDown = (event: KeyboardEvent) => pressedKeys.add(event.key.toLowerCase());
     const onKeyUp = (event: KeyboardEvent) => pressedKeys.delete(event.key.toLowerCase());
+    const pointerState = { active: false, x: 0, y: 0 };
+    const onPointerDown = (event: PointerEvent) => {
+      pointerState.active = true;
+      pointerState.x = event.clientX;
+      pointerState.y = event.clientY;
+      renderer.domElement.setPointerCapture(event.pointerId);
+      renderer.domElement.focus();
+    };
+    const onPointerMove = (event: PointerEvent) => {
+      if (!pointerState.active) {
+        return;
+      }
+
+      const dx = event.clientX - pointerState.x;
+      const dy = event.clientY - pointerState.y;
+      pointerState.x = event.clientX;
+      pointerState.y = event.clientY;
+      rotateCamera(camera, rotationState, dx, dy);
+    };
+    const endPointerLook = (event: PointerEvent) => {
+      pointerState.active = false;
+      if (renderer.domElement.hasPointerCapture(event.pointerId)) {
+        renderer.domElement.releasePointerCapture(event.pointerId);
+      }
+    };
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
+    renderer.domElement.addEventListener("pointerdown", onPointerDown);
+    renderer.domElement.addEventListener("pointermove", onPointerMove);
+    renderer.domElement.addEventListener("pointerup", endPointerLook);
+    renderer.domElement.addEventListener("pointercancel", endPointerLook);
+    renderer.domElement.addEventListener("lostpointercapture", endPointerLook);
 
     const resize = () => {
       const bounds = mount.getBoundingClientRect();
@@ -102,7 +132,7 @@ export function SceneViewport({
       const currentFrameTime = performance.now();
       const delta = (currentFrameTime - previousFrameTime) / 1000;
       previousFrameTime = currentFrameTime;
-      moveCamera(camera, pressedKeys, delta);
+      moveCamera(camera, pressedKeys, delta, rotationState.yaw);
       renderer.render(scene, camera);
       animationFrame = window.requestAnimationFrame(render);
     };
@@ -117,12 +147,17 @@ export function SceneViewport({
       window.removeEventListener("resize", resize);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
+      renderer.domElement.removeEventListener("pointerdown", onPointerDown);
+      renderer.domElement.removeEventListener("pointermove", onPointerMove);
+      renderer.domElement.removeEventListener("pointerup", endPointerLook);
+      renderer.domElement.removeEventListener("pointercancel", endPointerLook);
+      renderer.domElement.removeEventListener("lostpointercapture", endPointerLook);
       void disposeSplatViewer?.();
       [...objects, ...fallbackObjects].forEach(disposeObjectResources);
       renderer.dispose();
       mount.replaceChildren();
     };
-  }, [cameraPath, lensMode, overlayEnabled, renderMode, splatUrl, zoneArtifacts]);
+  }, [cameraPath, lensMode, overlayEnabled, renderMode, resetSignal, splatUrl, zoneArtifacts]);
 
   return <div className="viewport" data-testid="scene-viewport" ref={mountRef} />;
 }
@@ -178,23 +213,60 @@ function disposeObjectResources(object: THREE.Object3D): void {
 function moveCamera(
   camera: THREE.PerspectiveCamera,
   pressedKeys: Set<string>,
-  delta: number
+  delta: number,
+  yaw: number
 ): void {
-  const speed = 2.4 * delta;
+  const speed = (pressedKeys.has("shift") ? 4.2 : 2.4) * delta;
+  const forward = new THREE.Vector3(Math.sin(yaw), 0, -Math.cos(yaw));
+  const right = new THREE.Vector3(Math.cos(yaw), 0, Math.sin(yaw));
 
-  if (pressedKeys.has("w")) {
-    camera.position.z -= speed;
+  if (pressedKeys.has("w") || pressedKeys.has("arrowup")) {
+    camera.position.addScaledVector(forward, speed);
   }
 
-  if (pressedKeys.has("s")) {
-    camera.position.z += speed;
+  if (pressedKeys.has("s") || pressedKeys.has("arrowdown")) {
+    camera.position.addScaledVector(forward, -speed);
   }
 
-  if (pressedKeys.has("a")) {
-    camera.position.x -= speed;
+  if (pressedKeys.has("a") || pressedKeys.has("arrowleft")) {
+    camera.position.addScaledVector(right, -speed);
   }
 
-  if (pressedKeys.has("d")) {
-    camera.position.x += speed;
+  if (pressedKeys.has("d") || pressedKeys.has("arrowright")) {
+    camera.position.addScaledVector(right, speed);
   }
+}
+
+function rotateCamera(
+  camera: THREE.PerspectiveCamera,
+  rotationState: { pitch: number; yaw: number },
+  dx: number,
+  dy: number
+): void {
+  rotationState.yaw -= dx * 0.003;
+  rotationState.pitch = Math.max(-1.2, Math.min(1.2, rotationState.pitch - dy * 0.003));
+  camera.rotation.order = "YXZ";
+  camera.rotation.y = rotationState.yaw;
+  camera.rotation.x = rotationState.pitch;
+}
+
+function resetCamera(
+  camera: THREE.PerspectiveCamera,
+  startPosition: THREE.Vector3,
+  rotationState: { pitch: number; yaw: number }
+): void {
+  rotationState.pitch = 0;
+  rotationState.yaw = 0;
+  camera.position.copy(startPosition);
+  camera.rotation.order = "YXZ";
+  camera.rotation.set(0, 0, 0);
+}
+
+function startCameraPosition(cameraPath: CameraPath): THREE.Vector3 {
+  const startPose = cameraPath.poses[0];
+  return new THREE.Vector3(
+    startPose?.position[0] ?? 0,
+    startPose?.position[1] ?? 1.55,
+    startPose?.position[2] ?? 3
+  );
 }

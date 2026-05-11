@@ -5,7 +5,9 @@ import type { ViewerSceneBundle } from "../../lib/dreamnav-api";
 import { buildZoneArtifactsFromVisibility } from "../../lib/confidence-zones";
 
 vi.mock("./SceneViewport", () => ({
-  SceneViewport: () => <div data-testid="scene-viewport" />
+  SceneViewport: ({ resetSignal }: { resetSignal: number }) => (
+    <div data-testid="scene-viewport">{resetSignal}</div>
+  )
 }));
 
 const sceneVisibility: ViewerSceneBundle["visibility"] = {
@@ -190,5 +192,13 @@ describe("ExplorerShell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save camera marker" }));
 
     expect(screen.getByLabelText("Saved markers").textContent).toContain("1");
+  });
+
+  it("resets the camera view", () => {
+    render(<ExplorerShell sceneBundle={sceneBundle} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Reset camera view" }));
+
+    expect(screen.getByTestId("scene-viewport").textContent).toBe("1");
   });
 });
