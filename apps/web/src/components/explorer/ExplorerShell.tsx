@@ -99,6 +99,7 @@ export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
     <main className="explorer">
       <SceneViewport
         cameraPath={sceneBundle.cameraPath}
+        completionProjectionUrl={cachedCompletionMatch?.rgbUrl ?? null}
         lensMode={selectedLens}
         onCameraPoseChange={handleCameraPoseChange}
         overlayEnabled={overlayEnabled}

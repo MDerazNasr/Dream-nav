@@ -10,6 +10,7 @@ import type { ViewerCameraPose } from "./viewer-camera";
 
 type SceneViewportProps = {
   cameraPath: CameraPath;
+  completionProjectionUrl: string | null;
   lensMode: LensMode;
   overlayEnabled: boolean;
   onCameraPoseChange: (pose: ViewerCameraPose) => void;
@@ -23,13 +24,16 @@ type SceneViewportProps = {
 
 type ViewportRuntime = {
   camera: THREE.PerspectiveCamera;
+  completionProjection: THREE.Mesh | null;
   poseReporter: { emit: (force: boolean) => void };
   rotationState: { pitch: number; yaw: number };
+  scene: THREE.Scene;
   startPosition: THREE.Vector3;
 };
 
 export function SceneViewport({
   cameraPath,
+  completionProjectionUrl,
   lensMode,
   overlayEnabled,
   onCameraPoseChange,
@@ -41,8 +45,22 @@ export function SceneViewport({
   zoneArtifacts
 }: SceneViewportProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
+  const completionProjectionUrlRef = useRef(completionProjectionUrl);
   const lensModeRef = useRef(lensMode);
   const runtimeRef = useRef<ViewportRuntime | null>(null);
+
+  useEffect(() => {
+    completionProjectionUrlRef.current = completionProjectionUrl;
+    const runtime = runtimeRef.current;
+    if (!runtime) {
+      return;
+    }
+
+    replaceCompletionProjection(runtime, completionProjectionUrl, zoneArtifacts);
+    return () => {
+      removeCompletionProjection(runtime);
+    };
+  }, [completionProjectionUrl, zoneArtifacts]);
 
   useEffect(() => {
     lensModeRef.current = lensMode;
@@ -93,10 +111,13 @@ export function SceneViewport({
     const poseReporter = createCameraPoseReporter(camera, rotationState, lensModeRef, onCameraPoseChange);
     runtimeRef.current = {
       camera,
+      completionProjection: null,
       poseReporter,
       rotationState,
+      scene,
       startPosition
     };
+    replaceCompletionProjection(runtimeRef.current, completionProjectionUrlRef.current, zoneArtifacts);
     poseReporter.emit(true);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
@@ -214,6 +235,7 @@ export function SceneViewport({
       renderer.domElement.removeEventListener("pointercancel", endPointerLook);
       renderer.domElement.removeEventListener("lostpointercapture", endPointerLook);
       void disposeSplatViewer?.();
+      removeCompletionProjection(runtimeRef.current);
       [...objects, ...fallbackObjects].forEach(disposeObjectResources);
       renderer.dispose();
       runtimeRef.current = null;
@@ -221,7 +243,40 @@ export function SceneViewport({
     };
   }, [cameraPath, onCameraPoseChange, overlayEnabled, renderMode, splatUrl, zoneArtifacts]);
 
-  return <div className="viewport" data-testid="scene-viewport" ref={mountRef} />;
+  return (
+    <div
+      className="viewport"
+      data-completion-projection={completionProjectionUrl ? "active" : "inactive"}
+      data-testid="scene-viewport"
+      ref={mountRef}
+    />
+  );
+}
+
+function replaceCompletionProjection(
+  runtime: ViewportRuntime,
+  completionProjectionUrl: string | null,
+  zoneArtifacts: ConfidenceZoneArtifacts
+): void {
+  removeCompletionProjection(runtime);
+
+  if (!completionProjectionUrl) {
+    return;
+  }
+
+  const projection = createCompletionProjection(completionProjectionUrl, zoneArtifacts);
+  runtime.scene.add(projection);
+  runtime.completionProjection = projection;
+}
+
+function removeCompletionProjection(runtime: ViewportRuntime | null): void {
+  if (!runtime?.completionProjection) {
+    return;
+  }
+
+  runtime.scene.remove(runtime.completionProjection);
+  disposeObjectResources(runtime.completionProjection);
+  runtime.completionProjection = null;
 }
 
 function createSceneObjects(
@@ -264,11 +319,55 @@ function createVisibilityObjects(
   });
 }
 
+function createCompletionProjection(
+  completionProjectionUrl: string,
+  zoneArtifacts: ConfidenceZoneArtifacts
+): THREE.Mesh {
+  const material = new THREE.MeshBasicMaterial({
+    color: "#77d7c8",
+    opacity: 0.88,
+    side: THREE.DoubleSide,
+    transparent: true
+  });
+  const projection = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.9), material);
+  const anchor = completionProjectionAnchor(zoneArtifacts);
+  projection.name = "cached-completion-projection";
+  projection.position.set(anchor.x, anchor.y, anchor.z);
+  projection.rotation.y = Math.PI;
+
+  new THREE.TextureLoader().load(completionProjectionUrl, (texture) => {
+    texture.colorSpace = THREE.SRGBColorSpace;
+    material.map = texture;
+    material.color.set("#ffffff");
+    material.needsUpdate = true;
+  });
+
+  return projection;
+}
+
+function completionProjectionAnchor(zoneArtifacts: ConfidenceZoneArtifacts): THREE.Vector3 {
+  const completionCell = zoneArtifacts.completion.cells[0];
+  if (completionCell) {
+    return new THREE.Vector3(
+      completionCell.center[0],
+      Math.max(1.1, completionCell.center[1]),
+      completionCell.center[2]
+    );
+  }
+
+  return new THREE.Vector3(0, 1.4, -1.8);
+}
+
 function disposeObjectResources(object: THREE.Object3D): void {
   if (object instanceof THREE.Mesh) {
     object.geometry.dispose();
     const materials = Array.isArray(object.material) ? object.material : [object.material];
-    materials.forEach((material) => material.dispose());
+    materials.forEach((material) => {
+      if ("map" in material && material.map instanceof THREE.Texture) {
+        material.map.dispose();
+      }
+      material.dispose();
+    });
   }
 }
 

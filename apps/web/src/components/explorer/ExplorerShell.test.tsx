@@ -7,11 +7,13 @@ import { cameraBookmarkStorageKey } from "./camera-bookmarks";
 
 vi.mock("./SceneViewport", () => ({
   SceneViewport: ({
+    completionProjectionUrl,
     onCameraPoseChange,
     resetSignal,
     restorePose,
     restoreSignal
   }: {
+    completionProjectionUrl: string | null;
     onCameraPoseChange: (pose: {
       fovDegrees: number;
       lensMode: "24mm";
@@ -36,7 +38,7 @@ vi.mock("./SceneViewport", () => ({
       }
       type="button"
     >
-      reset:{resetSignal};restore:{restoreSignal};x:{restorePose?.position[0] ?? "none"}
+      projection:{completionProjectionUrl ?? "none"};reset:{resetSignal};restore:{restoreSignal};x:{restorePose?.position[0] ?? "none"}
     </button>
   )
 }));
@@ -229,6 +231,9 @@ describe("ExplorerShell", () => {
     expect(screen.getByLabelText("Completion preview")).not.toBeNull();
     expect(screen.getByAltText("Cached completion prediction").getAttribute("src")).toBe(
       "/dreamnav-assets/scenes/warehouse_01/completion/pred_001.svg"
+    );
+    expect(screen.getByTestId("scene-viewport").textContent).toContain(
+      "projection:/dreamnav-assets/scenes/warehouse_01/completion/pred_001.svg"
     );
     expect(screen.getAllByText(/pred_001/).length).toBeGreaterThan(0);
     expect(screen.getByText("12 ms")).not.toBeNull();
