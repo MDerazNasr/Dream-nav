@@ -95,10 +95,15 @@ def test_worker_completes_queued_job(tmp_path: Path) -> None:
     assert observed_zone["cell_count"] > 0
     assert completion_zone["zone"] == "completion"
     assert unknown_zone["cells"] == []
-    assert completion["cache_strategy"] == "none"
+    assert completion["cache_strategy"] == "planned_path"
+    assert completion["cached_predictions"][0]["rgb_asset"] == "completion/pred_001.svg"
+    assert quality["cached_completion"] is True
+    assert quality["completion_latency_ms_p50"] == 12
+    assert (tmp_path / "data" / "jobs" / response.job_id / "artifacts" / "completion" / "pred_001.svg").is_file()
     assert explorer_bundle["output_scene_id"] == response.job_id
     assert explorer_bundle["viewer_render_mode"] == "splat"
     assert "observed_zone.json" in explorer_bundle["viewer_assets"]
+    assert "completion/pred_001.svg" in explorer_bundle["viewer_assets"]
 
 
 def test_worker_reads_legacy_elapsed_time_job(tmp_path: Path) -> None:

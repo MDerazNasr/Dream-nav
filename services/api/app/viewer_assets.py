@@ -7,6 +7,10 @@ from typing import Any
 from .visibility_assets import VisibilityBuildError, build_visibility_manifest
 from .zone_assets import ZONE_FILE_NAMES, ZoneAssetBuildError, build_zone_artifacts
 
+CACHED_COMPLETION_LATENCY_MS = 12
+CACHED_COMPLETION_RGB_ASSET = "completion/pred_001.svg"
+CACHED_COMPLETION_MASK_ASSET = "completion/pred_001_mask.svg"
+
 
 class ViewerAssetBuildError(Exception):
     pass
@@ -45,7 +49,14 @@ def build_job_viewer_assets(
         zone_artifacts = build_zone_artifacts(job_id, visibility)
     except ZoneAssetBuildError as error:
         raise ViewerAssetBuildError(str(error)) from error
-    completion = _build_completion_manifest(job_id, scene_model, heldout_psnr, quality_gate_status)
+    cached_prediction = _build_cached_completion_prediction(artifacts_root, camera_path, quality_gate_status)
+    completion = _build_completion_manifest(
+        job_id,
+        scene_model,
+        heldout_psnr,
+        quality_gate_status,
+        cached_prediction,
+    )
     quality = _build_quality_report(
         job_id,
         frame_count,
@@ -55,6 +66,7 @@ def build_job_viewer_assets(
         heldout_psnr,
         quality_gate_status,
         artifacts_root / splat_file,
+        cached_prediction is not None,
     )
     metadata = _build_metadata(
         job_id,
@@ -69,6 +81,7 @@ def build_job_viewer_assets(
         quality,
         heldout_psnr,
         quality_gate_status,
+        cached_prediction is not None,
     )
 
     _write_json(artifacts_root / "metadata.json", metadata)
@@ -90,6 +103,7 @@ def build_job_viewer_assets(
             "visibility_manifest.json",
             "completion_manifest.json",
             *ZONE_FILE_NAMES,
+            *([CACHED_COMPLETION_RGB_ASSET, CACHED_COMPLETION_MASK_ASSET] if cached_prediction else []),
             splat_file,
         ],
         "missing_assets": missing_assets,
@@ -110,6 +124,7 @@ def _build_metadata(
     quality: dict[str, Any],
     heldout_psnr: float | None,
     quality_gate_status: str,
+    has_cached_completion: bool,
 ) -> dict[str, object]:
     return {
         "scene_id": scene_id,
@@ -143,7 +158,7 @@ def _build_metadata(
             "fp16_latency_ms_p50": None,
             "compiled_latency_ms_p50": None,
             "tensorrt_latency_ms_p50": None,
-            "cached_output_latency_ms_p50": None,
+            "cached_output_latency_ms_p50": CACHED_COMPLETION_LATENCY_MS if has_cached_completion else None,
         },
         "zones": {
             "observed": "observed_zone.json",
@@ -176,6 +191,7 @@ def _build_quality_report(
     heldout_psnr: float | None,
     quality_gate_status: str,
     splat_path: Path,
+    has_cached_completion: bool,
 ) -> dict[str, object]:
     return {
         "scene_id": scene_id,
@@ -186,10 +202,10 @@ def _build_quality_report(
         "scene_model_training_sec": _number_value(scene_model, "training_time_sec", 0),
         "heldout_psnr_median": heldout_psnr,
         "quality_gate": quality_gate_status,
-        "completion_latency_ms_p50": None,
-        "completion_latency_ms_p95": None,
+        "completion_latency_ms_p50": CACHED_COMPLETION_LATENCY_MS if has_cached_completion else None,
+        "completion_latency_ms_p95": CACHED_COMPLETION_LATENCY_MS + 6 if has_cached_completion else None,
         "runtime_path": "placeholder" if not splat_path.is_file() else "torch_fp16",
-        "cached_completion": False,
+        "cached_completion": has_cached_completion,
     }
 
 
@@ -198,6 +214,7 @@ def _build_completion_manifest(
     scene_model: dict[str, Any],
     heldout_psnr: float | None,
     quality_gate_status: str,
+    cached_prediction: dict[str, object] | None,
 ) -> dict[str, object]:
     return {
         "scene_id": scene_id,
@@ -205,9 +222,37 @@ def _build_completion_manifest(
         "architecture": _string_value(scene_model, "architecture", "pose_conditioned_encoder_decoder"),
         "quality_gate": quality_gate_status,
         "heldout_psnr_median": heldout_psnr,
-        "cache_strategy": "none",
-        "cached_predictions": [],
+        "cache_strategy": "planned_path" if cached_prediction else "none",
+        "cached_predictions": [cached_prediction] if cached_prediction else [],
     }
+
+
+def _build_cached_completion_prediction(
+    artifacts_root: Path,
+    camera_path: dict[str, Any],
+    quality_gate_status: str,
+) -> dict[str, object] | None:
+    if quality_gate_status == "fail":
+        return None
+
+    target_pose_index = _cached_prediction_pose_index(camera_path)
+    _write_text(artifacts_root / CACHED_COMPLETION_RGB_ASSET, _cached_completion_svg())
+    _write_text(artifacts_root / CACHED_COMPLETION_MASK_ASSET, _cached_completion_mask_svg())
+    return {
+        "prediction_id": "pred_001",
+        "camera_pose_index": target_pose_index,
+        "rgb_asset": CACHED_COMPLETION_RGB_ASSET,
+        "confidence_mask_asset": CACHED_COMPLETION_MASK_ASSET,
+        "latency_ms_p50": CACHED_COMPLETION_LATENCY_MS,
+    }
+
+
+def _cached_prediction_pose_index(camera_path: dict[str, Any]) -> int:
+    poses = camera_path.get("poses")
+    if not isinstance(poses, list) or not poses:
+        return 0
+
+    return min(1, len(poses) - 1)
 
 
 def _missing_viewer_assets(artifacts_root: Path) -> list[str]:
@@ -232,6 +277,48 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 def _write_json(path: Path, payload: dict[str, object]) -> None:
     path.write_text(dumps(payload, indent=2), encoding="utf-8")
+
+
+def _write_text(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+
+def _cached_completion_svg() -> str:
+    return """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" role="img">
+  <defs>
+    <linearGradient id="wall" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#64716a"/>
+      <stop offset="1" stop-color="#26302c"/>
+    </linearGradient>
+    <linearGradient id="floor" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#1b211e"/>
+      <stop offset="0.55" stop-color="#48564e"/>
+      <stop offset="1" stop-color="#131714"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="180" fill="#101411"/>
+  <polygon points="0,0 320,0 254,74 67,77" fill="url(#wall)"/>
+  <polygon points="0,180 67,77 254,74 320,180" fill="url(#floor)"/>
+  <polygon points="0,0 67,77 0,180" fill="#242c28"/>
+  <polygon points="320,0 254,74 320,180" fill="#19211d"/>
+  <rect x="130" y="29" width="58" height="50" fill="#18201d" opacity="0.82"/>
+  <rect x="145" y="40" width="30" height="39" fill="#91a9a0" opacity="0.36"/>
+  <path d="M74 124c41-13 92-17 169-5" fill="none" stroke="#77d7c8" stroke-width="3" opacity="0.7"/>
+  <circle cx="225" cy="119" r="16" fill="#4a8ee8" opacity="0.4"/>
+  <circle cx="225" cy="119" r="5" fill="#dfe7df"/>
+</svg>
+"""
+
+
+def _cached_completion_mask_svg() -> str:
+    return """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" role="img">
+  <rect width="320" height="180" fill="#111412"/>
+  <rect x="0" y="0" width="320" height="180" fill="#77d7c8" opacity="0.18"/>
+  <circle cx="225" cy="119" r="44" fill="#4a8ee8" opacity="0.82"/>
+  <path d="M74 124c41-13 92-17 169-5" fill="none" stroke="#f0c95a" stroke-width="9" opacity="0.72"/>
+</svg>
+"""
 
 
 def _int_value(payload: dict[str, Any], key: str, default: int = 0) -> int:
