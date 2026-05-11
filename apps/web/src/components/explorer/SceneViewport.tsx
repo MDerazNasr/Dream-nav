@@ -6,11 +6,13 @@ import * as THREE from "three";
 import { confidenceZoneColors, type ConfidenceZoneArtifacts, zoneCells } from "../../lib/confidence-zones";
 import { getLensFov } from "../../lib/lens";
 import { loadSplatScene } from "../../lib/splat-loader";
+import type { ViewerCameraPose } from "./viewer-camera";
 
 type SceneViewportProps = {
   cameraPath: CameraPath;
   lensMode: LensMode;
   overlayEnabled: boolean;
+  onCameraPoseChange: (pose: ViewerCameraPose) => void;
   renderMode: ViewerRenderMode;
   resetSignal: number;
   splatUrl: string;
@@ -21,6 +23,7 @@ export function SceneViewport({
   cameraPath,
   lensMode,
   overlayEnabled,
+  onCameraPoseChange,
   renderMode,
   resetSignal,
   splatUrl,
@@ -42,6 +45,8 @@ export function SceneViewport({
     const startPosition = startCameraPosition(cameraPath);
     const rotationState = { pitch: 0, yaw: 0 };
     resetCamera(camera, startPosition, rotationState);
+    const poseReporter = createCameraPoseReporter(camera, rotationState, lensMode, onCameraPoseChange);
+    poseReporter.emit(true);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -101,12 +106,14 @@ export function SceneViewport({
       pointerState.x = event.clientX;
       pointerState.y = event.clientY;
       rotateCamera(camera, rotationState, dx, dy);
+      poseReporter.emit(false);
     };
     const endPointerLook = (event: PointerEvent) => {
       pointerState.active = false;
       if (renderer.domElement.hasPointerCapture(event.pointerId)) {
         renderer.domElement.releasePointerCapture(event.pointerId);
       }
+      poseReporter.emit(true);
     };
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
@@ -132,7 +139,10 @@ export function SceneViewport({
       const currentFrameTime = performance.now();
       const delta = (currentFrameTime - previousFrameTime) / 1000;
       previousFrameTime = currentFrameTime;
-      moveCamera(camera, pressedKeys, delta, rotationState.yaw);
+      const moved = moveCamera(camera, pressedKeys, delta, rotationState.yaw);
+      if (moved) {
+        poseReporter.emit(false);
+      }
       renderer.render(scene, camera);
       animationFrame = window.requestAnimationFrame(render);
     };
@@ -157,7 +167,7 @@ export function SceneViewport({
       renderer.dispose();
       mount.replaceChildren();
     };
-  }, [cameraPath, lensMode, overlayEnabled, renderMode, resetSignal, splatUrl, zoneArtifacts]);
+  }, [cameraPath, lensMode, onCameraPoseChange, overlayEnabled, renderMode, resetSignal, splatUrl, zoneArtifacts]);
 
   return <div className="viewport" data-testid="scene-viewport" ref={mountRef} />;
 }
@@ -215,26 +225,33 @@ function moveCamera(
   pressedKeys: Set<string>,
   delta: number,
   yaw: number
-): void {
+): boolean {
   const speed = (pressedKeys.has("shift") ? 4.2 : 2.4) * delta;
   const forward = new THREE.Vector3(Math.sin(yaw), 0, -Math.cos(yaw));
   const right = new THREE.Vector3(Math.cos(yaw), 0, Math.sin(yaw));
+  let moved = false;
 
   if (pressedKeys.has("w") || pressedKeys.has("arrowup")) {
     camera.position.addScaledVector(forward, speed);
+    moved = true;
   }
 
   if (pressedKeys.has("s") || pressedKeys.has("arrowdown")) {
     camera.position.addScaledVector(forward, -speed);
+    moved = true;
   }
 
   if (pressedKeys.has("a") || pressedKeys.has("arrowleft")) {
     camera.position.addScaledVector(right, -speed);
+    moved = true;
   }
 
   if (pressedKeys.has("d") || pressedKeys.has("arrowright")) {
     camera.position.addScaledVector(right, speed);
+    moved = true;
   }
+
+  return moved;
 }
 
 function rotateCamera(
@@ -248,6 +265,33 @@ function rotateCamera(
   camera.rotation.order = "YXZ";
   camera.rotation.y = rotationState.yaw;
   camera.rotation.x = rotationState.pitch;
+}
+
+function createCameraPoseReporter(
+  camera: THREE.PerspectiveCamera,
+  rotationState: { pitch: number; yaw: number },
+  lensMode: LensMode,
+  onCameraPoseChange: (pose: ViewerCameraPose) => void
+): { emit: (force: boolean) => void } {
+  let lastEmitTime = 0;
+
+  return {
+    emit: (force) => {
+      const now = performance.now();
+      if (!force && now - lastEmitTime < 120) {
+        return;
+      }
+
+      lastEmitTime = now;
+      onCameraPoseChange({
+        fovDegrees: getLensFov(lensMode),
+        lensMode,
+        pitch: rotationState.pitch,
+        position: [camera.position.x, camera.position.y, camera.position.z],
+        yaw: rotationState.yaw
+      });
+    }
+  };
 }
 
 function resetCamera(

@@ -2,13 +2,14 @@
 
 import type { LensMode } from "@dream-nav/shared";
 import { BookmarkPlus, Gauge, Layers, RotateCcw, Video } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import type { ViewerSceneBundle } from "../../lib/dreamnav-api";
 import { ConfidenceLegend } from "./ConfidenceLegend";
 import { LensSelector } from "./LensSelector";
 import { MetricsPanel } from "./MetricsPanel";
 import { Minimap } from "./Minimap";
 import { SceneViewport } from "./SceneViewport";
+import { initialViewerCameraPose, type ViewerCameraPose } from "./viewer-camera";
 
 type ExplorerShellProps = {
   sceneBundle: ViewerSceneBundle;
@@ -17,14 +18,21 @@ type ExplorerShellProps = {
 export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
   const [overlayEnabled, setOverlayEnabled] = useState(true);
   const [selectedLens, setSelectedLens] = useState<LensMode>("35mm");
-  const [markerCount, setMarkerCount] = useState(0);
+  const [currentPose, setCurrentPose] = useState<ViewerCameraPose>(() =>
+    initialViewerCameraPose(sceneBundle.cameraPath, "35mm")
+  );
+  const [cameraMarkers, setCameraMarkers] = useState<ViewerCameraPose[]>([]);
   const [resetSignal, setResetSignal] = useState(0);
+  const handleCameraPoseChange = useCallback((pose: ViewerCameraPose) => {
+    setCurrentPose(pose);
+  }, []);
 
   return (
     <main className="explorer">
       <SceneViewport
         cameraPath={sceneBundle.cameraPath}
         lensMode={selectedLens}
+        onCameraPoseChange={handleCameraPoseChange}
         overlayEnabled={overlayEnabled}
         renderMode={sceneBundle.assetStatus.viewer_render_mode}
         resetSignal={resetSignal}
@@ -48,7 +56,12 @@ export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
         <div className="panel-header">
           <h2 className="panel-title">Path</h2>
         </div>
-        <Minimap cameraPath={sceneBundle.cameraPath} zoneArtifacts={sceneBundle.zoneArtifacts} />
+        <Minimap
+          cameraMarkers={cameraMarkers}
+          cameraPath={sceneBundle.cameraPath}
+          currentPose={currentPose}
+          zoneArtifacts={sceneBundle.zoneArtifacts}
+        />
       </aside>
 
       <aside className="right-panel">
@@ -63,7 +76,7 @@ export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
           />
         </section>
 
-        <MetricsPanel quality={sceneBundle.quality} />
+        <MetricsPanel cameraPose={currentPose} quality={sceneBundle.quality} />
 
         <ConfidenceLegend
           qualityGate={sceneBundle.quality.quality_gate}
@@ -98,14 +111,14 @@ export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
         <button
           aria-label="Save camera marker"
           className="icon-button"
-          onClick={() => setMarkerCount((current) => current + 1)}
+          onClick={() => setCameraMarkers((markers) => [...markers, currentPose])}
           title="Save camera marker"
           type="button"
         >
           <BookmarkPlus size={18} aria-hidden="true" />
         </button>
         <span className="badge" aria-label="Saved markers">
-          <Gauge size={15} aria-hidden="true" /> {markerCount}
+          <Gauge size={15} aria-hidden="true" /> {cameraMarkers.length}
         </span>
       </div>
     </main>

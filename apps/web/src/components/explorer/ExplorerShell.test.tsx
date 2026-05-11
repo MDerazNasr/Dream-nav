@@ -5,8 +5,34 @@ import type { ViewerSceneBundle } from "../../lib/dreamnav-api";
 import { buildZoneArtifactsFromVisibility } from "../../lib/confidence-zones";
 
 vi.mock("./SceneViewport", () => ({
-  SceneViewport: ({ resetSignal }: { resetSignal: number }) => (
-    <div data-testid="scene-viewport">{resetSignal}</div>
+  SceneViewport: ({
+    onCameraPoseChange,
+    resetSignal
+  }: {
+    onCameraPoseChange: (pose: {
+      fovDegrees: number;
+      lensMode: "24mm";
+      pitch: number;
+      position: [number, number, number];
+      yaw: number;
+    }) => void;
+    resetSignal: number;
+  }) => (
+    <button
+      data-testid="scene-viewport"
+      onClick={() =>
+        onCameraPoseChange({
+          fovDegrees: 73,
+          lensMode: "24mm",
+          pitch: 0.2,
+          position: [1.2, 1.55, -2.4],
+          yaw: 0.6
+        })
+      }
+      type="button"
+    >
+      {resetSignal}
+    </button>
   )
 }));
 
@@ -173,6 +199,8 @@ describe("ExplorerShell", () => {
     expect(screen.getByText("Observed")).not.toBeNull();
     expect(screen.getByText("Completion")).not.toBeNull();
     expect(screen.getByLabelText("Render mode").textContent).toContain("Placeholder");
+    expect(screen.getByLabelText("Current camera position")).not.toBeNull();
+    expect(screen.getByText("0.0, 0.0")).not.toBeNull();
   });
 
   it("toggles the confidence overlay button state", () => {
@@ -189,9 +217,20 @@ describe("ExplorerShell", () => {
   it("tracks saved camera markers", () => {
     render(<ExplorerShell sceneBundle={sceneBundle} />);
 
+    fireEvent.click(screen.getByTestId("scene-viewport"));
     fireEvent.click(screen.getByRole("button", { name: "Save camera marker" }));
 
     expect(screen.getByLabelText("Saved markers").textContent).toContain("1");
+    expect(screen.getByLabelText("Saved camera marker")).not.toBeNull();
+  });
+
+  it("updates the live camera pose from the viewport", () => {
+    render(<ExplorerShell sceneBundle={sceneBundle} />);
+
+    fireEvent.click(screen.getByTestId("scene-viewport"));
+
+    expect(screen.getByText("1.2, -2.4")).not.toBeNull();
+    expect(screen.getByText("73 deg")).not.toBeNull();
   });
 
   it("resets the camera view", () => {
