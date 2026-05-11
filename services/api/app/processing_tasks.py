@@ -13,6 +13,7 @@ from .processing_models import (
     ProcessingTaskResult,
 )
 from .pseudo_views import PseudoViewRenderError, render_pseudo_views
+from .quality_gate import QualityGateError, build_quality_gate_report, read_heldout_psnr
 from .scene_completion_model import SceneCompletionModelError, train_scene_completion_model
 from .splat_assets import SplatAssetError, ensure_job_splat_asset
 from .viewer_assets import ViewerAssetBuildError, build_job_viewer_assets
@@ -176,7 +177,12 @@ def evaluate_heldout_viewpoints(context: ProcessingTaskContext) -> ProcessingTas
 
 
 def apply_quality_gate(context: ProcessingTaskContext) -> ProcessingTaskResult:
-    return _result("quality_gate.json", context, quality_gate="warning")
+    try:
+        gate_report = build_quality_gate_report(read_heldout_psnr(context.artifacts_root))
+    except QualityGateError as error:
+        raise ProcessingTaskFailed(str(error), artifact_name="heldout_evaluation.json") from error
+
+    return _result("quality_gate.json", context, **gate_report)
 
 
 def prepare_explorer(context: ProcessingTaskContext) -> ProcessingTaskResult:

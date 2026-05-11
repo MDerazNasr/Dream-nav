@@ -19,6 +19,9 @@ def test_viewer_assets_write_cached_completion_outputs(tmp_path: Path) -> None:
     assert completion["cached_predictions"][0]["nearest_view_asset"] == "completion/baseline_nearest_001.png"
     assert completion["cached_predictions"][0]["nearest_view_camera_pose_index"] == 0
     assert quality["cached_completion"] is True
+    assert quality["completion_policy"] == "warning_overlay"
+    assert quality["warning_threshold_psnr"] == 20
+    assert quality["pass_threshold_psnr"] == 22
     assert quality["completion_latency_ms_p50"] == 12
     assert metadata["optimization"]["cached_output_latency_ms_p50"] == 12
     assert (tmp_path / "completion" / "pred_001.svg").is_file()
@@ -29,7 +32,7 @@ def test_viewer_assets_write_cached_completion_outputs(tmp_path: Path) -> None:
 
 
 def test_viewer_assets_disable_cached_completion_on_failed_quality_gate(tmp_path: Path) -> None:
-    _write_viewer_inputs(tmp_path, quality_gate="fail")
+    _write_viewer_inputs(tmp_path, quality_gate="fail", heldout_psnr=19.8)
 
     summary = build_job_viewer_assets("scene_abc123", "walkthrough.mp4", tmp_path)
 
@@ -39,12 +42,13 @@ def test_viewer_assets_disable_cached_completion_on_failed_quality_gate(tmp_path
     assert completion["cache_strategy"] == "none"
     assert completion["cached_predictions"] == []
     assert quality["cached_completion"] is False
+    assert quality["completion_policy"] == "disabled"
     assert quality["completion_latency_ms_p50"] is None
     assert not (tmp_path / "completion" / "pred_001.svg").exists()
     assert "completion/pred_001.svg" not in summary["viewer_assets"]
 
 
-def _write_viewer_inputs(artifacts_root: Path, quality_gate: str) -> None:
+def _write_viewer_inputs(artifacts_root: Path, quality_gate: str, heldout_psnr: float = 21.4) -> None:
     (artifacts_root / "camera_path.json").write_text(dumps(_camera_path()), encoding="utf-8")
     ensure_job_splat_asset(artifacts_root)
     _write_pseudo_views(artifacts_root)
@@ -59,8 +63,11 @@ def _write_viewer_inputs(artifacts_root: Path, quality_gate: str) -> None:
             "architecture": "pose_conditioned_encoder_decoder_stub",
             "training_time_sec": 184,
         },
-        "heldout_evaluation.json": {"heldout_psnr_median": 21.4},
-        "quality_gate.json": {"quality_gate": quality_gate},
+        "heldout_evaluation.json": {"heldout_psnr_median": heldout_psnr},
+        "quality_gate.json": {
+            "quality_gate": quality_gate,
+            "completion_policy": "disabled" if quality_gate == "fail" else "warning_overlay",
+        },
     }
     for file_name, payload in payloads.items():
         (artifacts_root / file_name).write_text(dumps(payload), encoding="utf-8")

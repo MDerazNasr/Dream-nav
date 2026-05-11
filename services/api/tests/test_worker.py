@@ -99,6 +99,9 @@ def test_worker_completes_queued_job(tmp_path: Path) -> None:
     assert completion["cached_predictions"][0]["rgb_asset"] == "completion/pred_001.svg"
     assert completion["cached_predictions"][0]["nearest_view_asset"] == "completion/baseline_nearest_001.png"
     assert quality["cached_completion"] is True
+    assert quality["completion_policy"] == "warning_overlay"
+    assert quality["warning_threshold_psnr"] == 20
+    assert quality["pass_threshold_psnr"] == 22
     assert quality["completion_latency_ms_p50"] == 12
     assert (tmp_path / "data" / "jobs" / response.job_id / "artifacts" / "completion" / "pred_001.svg").is_file()
     assert (

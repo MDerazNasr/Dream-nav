@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from .baseline_assets import write_nearest_view_baseline_asset
+from .quality_gate import normalize_quality_gate_report
 from .visibility_assets import VisibilityBuildError, build_visibility_manifest
 from .zone_assets import ZONE_FILE_NAMES, ZoneAssetBuildError, build_zone_artifacts
 
@@ -37,8 +38,9 @@ def build_job_viewer_assets(
 
     frame_count = _int_value(frame_extraction, "frame_count")
     splat_file = _string_value(gaussian_scene, "splat_file", "splat.ply")
-    quality_gate_status = _string_value(quality_gate, "quality_gate", "warning")
     heldout_psnr = _optional_number(heldout_evaluation, "heldout_psnr_median")
+    quality_gate_report = normalize_quality_gate_report(quality_gate, heldout_psnr)
+    quality_gate_status = str(quality_gate_report["quality_gate"])
     try:
         visibility = build_visibility_manifest(
             job_id,
@@ -67,7 +69,7 @@ def build_job_viewer_assets(
         visibility_support,
         scene_model,
         heldout_psnr,
-        quality_gate_status,
+        quality_gate_report,
         artifacts_root / splat_file,
         cached_prediction is not None,
     )
@@ -200,7 +202,7 @@ def _build_quality_report(
     visibility_support: dict[str, Any],
     scene_model: dict[str, Any],
     heldout_psnr: float | None,
-    quality_gate_status: str,
+    quality_gate_report: dict[str, object],
     splat_path: Path,
     has_cached_completion: bool,
 ) -> dict[str, object]:
@@ -212,7 +214,11 @@ def _build_quality_report(
         "splat_fps": 42 if splat_path.is_file() else 0,
         "scene_model_training_sec": _number_value(scene_model, "training_time_sec", 0),
         "heldout_psnr_median": heldout_psnr,
-        "quality_gate": quality_gate_status,
+        "quality_gate": quality_gate_report["quality_gate"],
+        "completion_policy": quality_gate_report["completion_policy"],
+        "quality_gate_reason": quality_gate_report["quality_gate_reason"],
+        "warning_threshold_psnr": quality_gate_report["warning_threshold_psnr"],
+        "pass_threshold_psnr": quality_gate_report["pass_threshold_psnr"],
         "completion_latency_ms_p50": CACHED_COMPLETION_LATENCY_MS if has_cached_completion else None,
         "completion_latency_ms_p95": CACHED_COMPLETION_LATENCY_MS + 6 if has_cached_completion else None,
         "runtime_path": "placeholder" if not splat_path.is_file() else "torch_fp16",

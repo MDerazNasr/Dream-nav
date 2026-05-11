@@ -66,6 +66,10 @@ class QualityReport(StrictModel):
     scene_model_training_sec: float = Field(ge=0)
     heldout_psnr_median: float | None
     quality_gate: str
+    completion_policy: str = "warning_overlay"
+    quality_gate_reason: str = "Quality gate details unavailable."
+    warning_threshold_psnr: float = Field(default=20, ge=0)
+    pass_threshold_psnr: float = Field(default=22, ge=0)
     completion_latency_ms_p50: float | None
     completion_latency_ms_p95: float | None
     runtime_path: str
