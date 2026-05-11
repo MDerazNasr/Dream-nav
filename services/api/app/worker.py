@@ -39,6 +39,7 @@ class ProcessingWorker:
             return None
 
         failed_stage = job.stage
+        output_scene_id = self.output_scene_id
         try:
             for task in self.tasks:
                 self.job_repository.update_stage(job.job_id, task.step)
@@ -56,9 +57,11 @@ class ProcessingWorker:
 
                 result = task.run(context)
                 self.job_repository.write_artifact(job.job_id, result.artifact_name, result.payload)
+                if result.artifact_name == "explorer_bundle.json":
+                    output_scene_id = _viewer_output_scene_id(result.payload, self.output_scene_id)
                 sleep(self.step_delay_sec)
 
-            self.job_repository.complete_job(job.job_id, self.output_scene_id)
+            self.job_repository.complete_job(job.job_id, output_scene_id)
         except ProcessingTaskFailed as error:
             self.job_repository.fail_job(
                 job.job_id,
@@ -110,3 +113,11 @@ def _task_commands(command_or_commands: ProcessingCommand | list[ProcessingComma
         return command_or_commands
 
     return [command_or_commands]
+
+
+def _viewer_output_scene_id(payload: dict[str, object], fallback_scene_id: str) -> str:
+    output_scene_id = payload.get("output_scene_id")
+    if isinstance(output_scene_id, str) and output_scene_id:
+        return output_scene_id
+
+    return fallback_scene_id

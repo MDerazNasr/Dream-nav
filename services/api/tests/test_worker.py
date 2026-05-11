@@ -36,7 +36,7 @@ def test_worker_completes_queued_job(tmp_path: Path) -> None:
     assert status.failed_stage is None
     assert status.failed_artifact is None
     assert status.progress == 1
-    assert status.output_scene_id == "warehouse_01"
+    assert status.output_scene_id == response.job_id
     artifact_path = tmp_path / "data" / "jobs" / response.job_id / "artifacts" / "capture_quality.json"
     assert artifact_path.is_file()
     capture_quality = loads(artifact_path.read_text(encoding="utf-8"))
@@ -74,6 +74,18 @@ def test_worker_completes_queued_job(tmp_path: Path) -> None:
     assert camera_path["scene_id"] == response.job_id
     assert camera_path["coordinate_system"] == "dreamnav_viewer_v1"
     assert camera_path["poses"][1]["timestamp_sec"] == 0.5
+    metadata = _read_job_artifact(tmp_path, response.job_id, "metadata.json")
+    quality = _read_job_artifact(tmp_path, response.job_id, "quality.json")
+    visibility = _read_job_artifact(tmp_path, response.job_id, "visibility_manifest.json")
+    completion = _read_job_artifact(tmp_path, response.job_id, "completion_manifest.json")
+    explorer_bundle = _read_job_artifact(tmp_path, response.job_id, "explorer_bundle.json")
+    assert metadata["scene_id"] == response.job_id
+    assert metadata["frame_count"] == 3
+    assert quality["runtime_path"] == "placeholder"
+    assert visibility["scene_id"] == response.job_id
+    assert completion["cache_strategy"] == "none"
+    assert explorer_bundle["output_scene_id"] == response.job_id
+    assert explorer_bundle["viewer_render_mode"] == "placeholder"
 
 
 def test_worker_reads_legacy_elapsed_time_job(tmp_path: Path) -> None:
@@ -458,3 +470,8 @@ def _command_failing_task() -> ProcessingTask:
         run=run,
         command_builder=command_builder,
     )
+
+
+def _read_job_artifact(tmp_path: Path, job_id: str, artifact_name: str) -> dict[str, object]:
+    artifact_path = tmp_path / "data" / "jobs" / job_id / "artifacts" / artifact_name
+    return loads(artifact_path.read_text(encoding="utf-8"))

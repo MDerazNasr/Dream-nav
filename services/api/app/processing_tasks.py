@@ -12,6 +12,7 @@ from .colmap_pose_parser import ColmapPoseParseError, parse_colmap_text_model
 from .config import ProcessingSettings
 from .jobs import ProcessingStep, StoredJob
 from .pose_normalization import PoseNormalizationError, normalize_camera_path, stub_raw_poses_from_frames
+from .viewer_assets import ViewerAssetBuildError, build_job_viewer_assets
 from .video_probe import VideoProbeError, probe_video_file
 
 
@@ -248,7 +249,16 @@ def apply_quality_gate(context: ProcessingTaskContext) -> ProcessingTaskResult:
 
 
 def prepare_explorer(context: ProcessingTaskContext) -> ProcessingTaskResult:
-    return _result("explorer_bundle.json", context, output_scene_id="warehouse_01")
+    try:
+        payload = build_job_viewer_assets(
+            context.job.job_id,
+            context.job.stored_filename,
+            context.artifacts_root,
+        )
+    except ViewerAssetBuildError as error:
+        raise ProcessingTaskFailed(str(error)) from error
+
+    return ProcessingTaskResult("explorer_bundle.json", payload)
 
 
 def build_camera_motion_command(context: ProcessingTaskContext) -> ProcessingCommand:
