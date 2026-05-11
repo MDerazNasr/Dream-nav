@@ -26,6 +26,9 @@ export function BaselineComparison({ cameraPath, match, quality }: BaselineCompa
           {quality.quality_gate}
         </span>
       </div>
+      <p className="quality-gate-note" data-status={quality.quality_gate}>
+        {quality.quality_gate_reason}
+      </p>
       {match && referenceView ? (
         <div className="baseline-comparison">
           <article className="baseline-method">

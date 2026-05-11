@@ -14,6 +14,7 @@ export function MetricsPanel({ cameraPose, completionCacheStatus, quality }: Met
     ["Splat FPS", quality.splat_fps.toFixed(0)],
     ["PSNR", formatNullableMetric(quality.heldout_psnr_median, " dB")],
     ["Gate", quality.quality_gate],
+    ["Policy", formatCompletionPolicy(quality.completion_policy)],
     ["Runtime", quality.runtime_path],
     ["Pose", formatPose(cameraPose)],
     ["FOV", `${cameraPose.fovDegrees} deg`],
@@ -45,6 +46,18 @@ function formatNullableMetric(value: number | null, suffix: string): string {
   }
 
   return `${value}${suffix}`;
+}
+
+function formatCompletionPolicy(policy: QualityReport["completion_policy"]): string {
+  if (policy === "enabled") {
+    return "Enabled";
+  }
+
+  if (policy === "disabled") {
+    return "Disabled";
+  }
+
+  return "Warn";
 }
 
 function formatPose(cameraPose: ViewerCameraPose): string {

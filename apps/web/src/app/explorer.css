@@ -299,6 +299,21 @@
   padding: 0 12px 12px;
 }
 
+.quality-gate-note {
+  margin: 0 12px 10px;
+  color: #b8c6bd;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.quality-gate-note[data-status="warning"] {
+  color: #f0c95a;
+}
+
+.quality-gate-note[data-status="fail"] {
+  color: #ffb196;
+}
+
 .baseline-method {
   display: grid;
   gap: 8px;

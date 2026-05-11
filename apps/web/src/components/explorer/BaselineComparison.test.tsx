@@ -49,6 +49,10 @@ const quality: QualityReport = {
   scene_model_training_sec: 184,
   heldout_psnr_median: 21.4,
   quality_gate: "warning",
+  completion_policy: "warning_overlay",
+  quality_gate_reason: "Held-out PSNR is below 22 dB but at least 20 dB.",
+  warning_threshold_psnr: 20,
+  pass_threshold_psnr: 22,
   completion_latency_ms_p50: 68,
   completion_latency_ms_p95: 91,
   runtime_path: "torch_fp16",
@@ -92,6 +96,7 @@ describe("BaselineComparison", () => {
     );
     expect(screen.getByText("DreamNav")).not.toBeNull();
     expect(screen.getByText("21.4 dB")).not.toBeNull();
+    expect(screen.getByText("Held-out PSNR is below 22 dB but at least 20 dB.")).not.toBeNull();
     expect(screen.getByText("Nearest view")).not.toBeNull();
     expect(screen.getByText("Pose 1")).not.toBeNull();
   });
