@@ -1,10 +1,10 @@
 from json import dumps
 from pathlib import Path
 
-from app.baseline_assets import build_nearest_view_baseline_svg
+from app.baseline_assets import write_nearest_view_baseline_asset
 
 
-def test_baseline_asset_converts_nearest_pseudo_view_ppm_to_svg(tmp_path: Path) -> None:
+def test_baseline_asset_converts_nearest_pseudo_view_ppm_to_png(tmp_path: Path) -> None:
     _write_camera_path(tmp_path)
     _write_pseudo_views(tmp_path)
     rgb_path = tmp_path / "pseudo_views" / "rgb" / "train_pose0000_offset00.ppm"
@@ -14,20 +14,31 @@ def test_baseline_asset_converts_nearest_pseudo_view_ppm_to_svg(tmp_path: Path) 
         encoding="ascii",
     )
 
-    svg = build_nearest_view_baseline_svg(
+    asset_path = write_nearest_view_baseline_asset(
         tmp_path,
         _camera_path(),
         nearest_pose_index=0,
+        png_asset_path="completion/baseline_nearest_001.png",
+        fallback_svg_asset_path="completion/baseline_nearest_001.svg",
     )
 
-    assert 'fill="rgb(10,20,30)"' in svg
-    assert 'fill="rgb(40,50,60)"' in svg
-    assert "pseudo-view pose 0" in svg
+    png_path = tmp_path / "completion" / "baseline_nearest_001.png"
+    assert asset_path == "completion/baseline_nearest_001.png"
+    assert png_path.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+    assert not (tmp_path / "completion" / "baseline_nearest_001.svg").exists()
 
 
 def test_baseline_asset_falls_back_without_pseudo_views(tmp_path: Path) -> None:
-    svg = build_nearest_view_baseline_svg(tmp_path, _camera_path(), nearest_pose_index=0)
+    asset_path = write_nearest_view_baseline_asset(
+        tmp_path,
+        _camera_path(),
+        nearest_pose_index=0,
+        png_asset_path="completion/baseline_nearest_001.png",
+        fallback_svg_asset_path="completion/baseline_nearest_001.svg",
+    )
+    svg = (tmp_path / "completion" / "baseline_nearest_001.svg").read_text(encoding="utf-8")
 
+    assert asset_path == "completion/baseline_nearest_001.svg"
     assert "nearest view pose 0" in svg
 
 

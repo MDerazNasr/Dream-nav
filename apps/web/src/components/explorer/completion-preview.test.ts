@@ -48,7 +48,7 @@ const completion: CompletionManifest = {
       camera_pose_index: 1,
       rgb_asset: "completion/pred_001.svg",
       confidence_mask_asset: "completion/pred_001_mask.svg",
-      nearest_view_asset: "completion/baseline_nearest_001.svg",
+      nearest_view_asset: "completion/baseline_nearest_001.png",
       nearest_view_camera_pose_index: 0,
       latency_ms_p50: 12
     }
@@ -75,7 +75,7 @@ describe("completion preview selection", () => {
     expect(match?.prediction.prediction_id).toBe("pred_001");
     expect(match?.rgbUrl).toBe("http://api.test/scenes/warehouse_01/completion/pred_001.svg");
     expect(match?.maskUrl).toBe("http://api.test/scenes/warehouse_01/completion/pred_001_mask.svg");
-    expect(match?.baselineUrl).toBe("http://api.test/scenes/warehouse_01/completion/baseline_nearest_001.svg");
+    expect(match?.baselineUrl).toBe("http://api.test/scenes/warehouse_01/completion/baseline_nearest_001.png");
     expect(formatCompletionCacheStatus(completion, match)).toContain("pred_001");
   });
 
@@ -89,7 +89,7 @@ describe("completion preview selection", () => {
 
     expect(match?.rgbUrl).toBe("/dreamnav-assets/scenes/warehouse_01/completion/pred_001.svg");
     expect(match?.maskUrl).toBe("/dreamnav-assets/scenes/warehouse_01/completion/pred_001_mask.svg");
-    expect(match?.baselineUrl).toBe("/dreamnav-assets/scenes/warehouse_01/completion/baseline_nearest_001.svg");
+    expect(match?.baselineUrl).toBe("/dreamnav-assets/scenes/warehouse_01/completion/baseline_nearest_001.png");
   });
 
   it("keeps the mask URL nullable when a cached prediction has no confidence mask", () => {

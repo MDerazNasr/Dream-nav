@@ -1,31 +1,41 @@
 from __future__ import annotations
 
+from binascii import crc32
 from json import JSONDecodeError, loads
 from pathlib import Path
+from struct import pack
 from typing import Any
+from zlib import compress
 
 
-def build_nearest_view_baseline_svg(
+def write_nearest_view_baseline_asset(
     artifacts_root: Path,
     camera_path: dict[str, Any],
     nearest_pose_index: int | None,
+    png_asset_path: str,
+    fallback_svg_asset_path: str,
 ) -> str:
     if nearest_pose_index is None:
-        return fallback_nearest_view_svg(None)
+        _write_text(artifacts_root / fallback_svg_asset_path, fallback_nearest_view_svg(None))
+        return fallback_svg_asset_path
 
     pseudo_view = _nearest_pseudo_view(artifacts_root, camera_path, nearest_pose_index)
     if pseudo_view is None:
-        return fallback_nearest_view_svg(nearest_pose_index)
+        _write_text(artifacts_root / fallback_svg_asset_path, fallback_nearest_view_svg(nearest_pose_index))
+        return fallback_svg_asset_path
 
     rgb_path = pseudo_view.get("rgb_path")
     if not isinstance(rgb_path, str):
-        return fallback_nearest_view_svg(nearest_pose_index)
+        _write_text(artifacts_root / fallback_svg_asset_path, fallback_nearest_view_svg(nearest_pose_index))
+        return fallback_svg_asset_path
 
     pixels = _read_ppm_pixels(artifacts_root / rgb_path)
     if pixels is None:
-        return fallback_nearest_view_svg(nearest_pose_index)
+        _write_text(artifacts_root / fallback_svg_asset_path, fallback_nearest_view_svg(nearest_pose_index))
+        return fallback_svg_asset_path
 
-    return _ppm_pixels_to_svg(pixels, nearest_pose_index)
+    _write_png(artifacts_root / png_asset_path, pixels)
+    return png_asset_path
 
 
 def fallback_nearest_view_svg(nearest_pose_index: int | None) -> str:
@@ -123,32 +133,33 @@ def _read_ppm_pixels(path: Path) -> tuple[int, int, list[tuple[int, int, int]]] 
     return width, height, pixels
 
 
-def _ppm_pixels_to_svg(pixels: tuple[int, int, list[tuple[int, int, int]]], nearest_pose_index: int) -> str:
+def _write_png(path: Path, pixels: tuple[int, int, list[tuple[int, int, int]]]) -> None:
     width, height, colors = pixels
-    cell_width = 320 / width
-    cell_height = 180 / height
-    rects = []
-    for index, color in enumerate(colors):
-        x = (index % width) * cell_width
-        y = (index // width) * cell_height
-        rects.append(
-            f'  <rect x="{x:.2f}" y="{y:.2f}" width="{cell_width:.2f}" height="{cell_height:.2f}" '
-            f'fill="rgb({color[0]},{color[1]},{color[2]})"/>'
-        )
 
-    label = (
-        '  <text x="18" y="162" fill="#111412" font-family="Arial, sans-serif" '
-        f'font-size="14">pseudo-view pose {nearest_pose_index}</text>'
+    rows = []
+    for row_index in range(height):
+        row = bytearray([0])
+        for r, g, b in colors[row_index * width : (row_index + 1) * width]:
+            row.extend((r, g, b))
+        rows.append(bytes(row))
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(
+        b"\x89PNG\r\n\x1a\n"
+        + _png_chunk(b"IHDR", pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+        + _png_chunk(b"IDAT", compress(b"".join(rows)))
+        + _png_chunk(b"IEND", b"")
     )
-    return "\n".join(
-        [
-            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" role="img">',
-            *rects,
-            label,
-            "</svg>",
-            "",
-        ]
-    )
+
+
+def _png_chunk(kind: bytes, data: bytes) -> bytes:
+    checksum = crc32(kind + data) & 0xFFFFFFFF
+    return pack(">I", len(data)) + kind + data + pack(">I", checksum)
+
+
+def _write_text(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
 
 
 def _int_token(token: str) -> int | None:

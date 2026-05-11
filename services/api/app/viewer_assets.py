@@ -4,12 +4,13 @@ from json import JSONDecodeError, dumps, loads
 from pathlib import Path
 from typing import Any
 
-from .baseline_assets import build_nearest_view_baseline_svg
+from .baseline_assets import write_nearest_view_baseline_asset
 from .visibility_assets import VisibilityBuildError, build_visibility_manifest
 from .zone_assets import ZONE_FILE_NAMES, ZoneAssetBuildError, build_zone_artifacts
 
 CACHED_COMPLETION_LATENCY_MS = 12
-CACHED_COMPLETION_BASELINE_ASSET = "completion/baseline_nearest_001.svg"
+CACHED_COMPLETION_BASELINE_ASSET = "completion/baseline_nearest_001.png"
+CACHED_COMPLETION_BASELINE_FALLBACK_ASSET = "completion/baseline_nearest_001.svg"
 CACHED_COMPLETION_RGB_ASSET = "completion/pred_001.svg"
 CACHED_COMPLETION_MASK_ASSET = "completion/pred_001_mask.svg"
 
@@ -109,7 +110,7 @@ def build_job_viewer_assets(
                 [
                     CACHED_COMPLETION_RGB_ASSET,
                     CACHED_COMPLETION_MASK_ASSET,
-                    CACHED_COMPLETION_BASELINE_ASSET,
+                    str(cached_prediction["nearest_view_asset"]),
                 ]
                 if cached_prediction
                 else []
@@ -249,16 +250,19 @@ def _build_cached_completion_prediction(
     nearest_pose_index = _nearest_reference_pose_index(camera_path, target_pose_index)
     _write_text(artifacts_root / CACHED_COMPLETION_RGB_ASSET, _cached_completion_svg())
     _write_text(artifacts_root / CACHED_COMPLETION_MASK_ASSET, _cached_completion_mask_svg())
-    _write_text(
-        artifacts_root / CACHED_COMPLETION_BASELINE_ASSET,
-        build_nearest_view_baseline_svg(artifacts_root, camera_path, nearest_pose_index),
+    baseline_asset = write_nearest_view_baseline_asset(
+        artifacts_root,
+        camera_path,
+        nearest_pose_index,
+        CACHED_COMPLETION_BASELINE_ASSET,
+        CACHED_COMPLETION_BASELINE_FALLBACK_ASSET,
     )
     return {
         "prediction_id": "pred_001",
         "camera_pose_index": target_pose_index,
         "rgb_asset": CACHED_COMPLETION_RGB_ASSET,
         "confidence_mask_asset": CACHED_COMPLETION_MASK_ASSET,
-        "nearest_view_asset": CACHED_COMPLETION_BASELINE_ASSET,
+        "nearest_view_asset": baseline_asset,
         "nearest_view_camera_pose_index": nearest_pose_index,
         "latency_ms_p50": CACHED_COMPLETION_LATENCY_MS,
     }
