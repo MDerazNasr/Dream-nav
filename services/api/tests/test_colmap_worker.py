@@ -40,7 +40,8 @@ def test_worker_fails_colmap_backend_when_pose_outputs_are_missing(tmp_path: Pat
 
     assert status.state == "failed"
     assert status.failed_stage == "estimating_camera_motion"
-    assert status.error_message == "COLMAP cameras.txt is missing."
+    assert status.failed_artifact == "colmap_model_selection_command.json"
+    assert "exit code 1" in (status.error_message or "")
 
 
 def test_worker_stops_at_failed_colmap_pipeline_step(tmp_path: Path) -> None:

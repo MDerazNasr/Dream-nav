@@ -210,14 +210,19 @@ def test_worker_runs_configured_colmap_command(tmp_path: Path) -> None:
         "#!/usr/bin/env python3\n"
         "from pathlib import Path\n"
         "import sys\n"
-        "root = Path('colmap')\n"
-        "root.mkdir(exist_ok=True)\n"
-        "(root / 'cameras.txt').write_text('1 PINHOLE 1920 1080 1200 1210 960 540\\n')\n"
-        "(root / 'images.txt').write_text(\n"
-        "    '1 1 0 0 0 0 0 0 1 frame_0000.jpg\\n\\n'\n"
-        "    '2 1 0 0 0 -1 -2 -3 1 frame_0001.jpg\\n\\n'\n"
-        "    '3 1 0 0 0 -2 -4 -6 1 frame_0002.jpg\\n\\n'\n"
-        ")\n"
+        "if sys.argv[1] == 'mapper':\n"
+        "    sparse = Path(sys.argv[sys.argv.index('--output_path') + 1])\n"
+        "    (sparse / '0').mkdir(parents=True, exist_ok=True)\n"
+        "if sys.argv[1] == 'model_converter':\n"
+        "    output = Path(sys.argv[sys.argv.index('--output_path') + 1])\n"
+        "    output.mkdir(parents=True, exist_ok=True)\n"
+        "    (output / 'cameras.txt').write_text('1 PINHOLE 1920 1080 1200 1210 960 540\\n')\n"
+        "    (output / 'images.txt').write_text(\n"
+        "        '1 1 0 0 0 0 0 0 1 frame_0000.jpg\\n\\n'\n"
+        "        '2 1 0 0 0 -1 -2 -3 1 frame_0001.jpg\\n\\n'\n"
+        "        '3 1 0 0 0 -2 -4 -6 1 frame_0002.jpg\\n\\n'\n"
+        "    )\n"
+        "    (output / 'points3D.txt').write_text('')\n"
         "print('fake colmap ' + ' '.join(sys.argv[1:]))\n",
         encoding="utf-8",
     )
@@ -263,7 +268,10 @@ def test_worker_runs_configured_colmap_command(tmp_path: Path) -> None:
         / "jobs"
         / response.job_id
         / "artifacts"
-        / "colmap_model_converter_command.json"
+        / "colmap_model_selection_command.json"
+    )
+    selection_path = (
+        tmp_path / "data" / "jobs" / response.job_id / "artifacts" / "colmap" / "colmap_model_selection.json"
     )
     command_artifact = loads(command_path.read_text(encoding="utf-8"))
     camera_motion = loads(
@@ -284,6 +292,7 @@ def test_worker_runs_configured_colmap_command(tmp_path: Path) -> None:
     assert matcher_command_path.is_file()
     assert mapper_command_path.is_file()
     assert converter_command_path.is_file()
+    assert selection_path.is_file()
     assert camera_motion["backend"] == "colmap"
     assert camera_motion["command_mode"] == "external"
     assert camera_motion["camera_path"] == "camera_path.json"

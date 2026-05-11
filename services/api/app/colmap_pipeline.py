@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import sys
 
 
 @dataclass(frozen=True)
@@ -56,16 +57,16 @@ def build_colmap_pipeline_commands(
             ],
         ),
         ColmapPipelineCommand(
-            artifact_name="colmap_model_converter_command.json",
+            artifact_name="colmap_model_selection_command.json",
             command=[
+                sys.executable,
+                str(Path(__file__).with_name("colmap_model_selection.py")),
+                "--colmap-command",
                 colmap_command,
-                "model_converter",
-                "--input_path",
-                str(sparse_root / "0"),
-                "--output_path",
+                "--sparse-root",
+                str(sparse_root),
+                "--output-root",
                 str(colmap_root),
-                "--output_type",
-                "TXT",
             ],
         ),
     ]

@@ -14,13 +14,13 @@ def test_build_colmap_pipeline_commands_are_ordered(tmp_path: Path) -> None:
         "feature_extractor",
         "exhaustive_matcher",
         "mapper",
-        "model_converter",
+        str(Path(__file__).parents[1] / "app" / "colmap_model_selection.py"),
     ]
     assert [command.artifact_name for command in commands] == [
         "colmap_feature_extractor_command.json",
         "colmap_exhaustive_matcher_command.json",
         "colmap_mapper_command.json",
-        "colmap_model_converter_command.json",
+        "colmap_model_selection_command.json",
     ]
-    assert "--output_type" in commands[-1].command
+    assert "--sparse-root" in commands[-1].command
     assert (tmp_path / "artifacts" / "colmap" / "sparse").is_dir()
