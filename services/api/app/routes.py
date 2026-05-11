@@ -1,6 +1,7 @@
 from threading import Thread
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse
 
 from .jobs import JobArtifactNameError, JobArtifactNotFoundError, JobDataError, JobNotFoundError, JobRepository
 from .repository import SceneDataError, SceneNotFoundError, SceneRepository
@@ -17,6 +18,15 @@ from .schemas import (
 )
 
 router = APIRouter()
+
+VIEWER_ASSET_NAMES = {
+    "camera_path.json",
+    "completion_manifest.json",
+    "metadata.json",
+    "quality.json",
+    "splat.ply",
+    "visibility_manifest.json",
+}
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -89,14 +99,46 @@ def job_scene_bundle(job_id: str, request: Request) -> JobSceneBundle:
         raise HTTPException(status_code=409, detail="Job explorer bundle is not ready")
 
     camera_path_artifact = "camera_path.json"
+    metadata = job_repository.read_artifact(job_id, "metadata.json")
+    quality_report = job_repository.read_artifact(job_id, "quality.json")
     camera_path = job_repository.read_artifact(job_id, camera_path_artifact)
+    visibility = job_repository.read_artifact(job_id, "visibility_manifest.json")
+    completion = job_repository.read_artifact(job_id, "completion_manifest.json")
+    asset_status = _job_asset_status(job_id, status.output_scene_id, job_repository)
 
     return JobSceneBundle(
         job_id=job_id,
         output_scene_id=status.output_scene_id,
+        assets=SceneAssets(
+            scene_id=status.output_scene_id,
+            splat_url=f"/jobs/{job_id}/viewer-assets/splat.ply",
+            metadata_url=f"/jobs/{job_id}/viewer-assets/metadata.json",
+            visibility_manifest_url=f"/jobs/{job_id}/viewer-assets/visibility_manifest.json",
+            completion_manifest_url=f"/jobs/{job_id}/viewer-assets/completion_manifest.json",
+            quality_report_url=f"/jobs/{job_id}/viewer-assets/quality.json",
+        ),
+        metadata=metadata,
+        quality=quality_report,
         camera_path_artifact=camera_path_artifact,
         camera_path=camera_path,
+        visibility=visibility,
+        completion=completion,
+        asset_status=asset_status,
     )
+
+
+@router.get("/jobs/{job_id}/viewer-assets/{asset_name:path}")
+def job_viewer_asset(job_id: str, asset_name: str, request: Request) -> FileResponse:
+    job_repository = _job_repository(request)
+    job_repository.get_status(job_id)
+    if asset_name not in VIEWER_ASSET_NAMES:
+        raise HTTPException(status_code=400, detail="Unsafe viewer asset name")
+
+    asset_path = job_repository.artifact_root(job_id) / asset_name
+    if not asset_path.is_file():
+        raise HTTPException(status_code=404, detail="Viewer asset not found")
+
+    return FileResponse(asset_path)
 
 
 def _repository(request: Request) -> SceneRepository:
@@ -105,6 +147,18 @@ def _repository(request: Request) -> SceneRepository:
 
 def _job_repository(request: Request) -> JobRepository:
     return request.app.state.job_repository
+
+
+def _job_asset_status(job_id: str, scene_id: str, job_repository: JobRepository) -> SceneAssetStatus:
+    splat_path = job_repository.artifact_root(job_id) / "splat.ply"
+    splat_available = splat_path.is_file()
+    return SceneAssetStatus(
+        scene_id=scene_id,
+        splat_url=f"/jobs/{job_id}/viewer-assets/splat.ply",
+        splat_available=splat_available,
+        viewer_render_mode="splat" if splat_available else "placeholder",
+        missing_assets=[] if splat_available else ["splat.ply"],
+    )
 
 
 def map_scene_errors(error: Exception) -> HTTPException:

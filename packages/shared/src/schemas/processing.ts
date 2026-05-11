@@ -1,5 +1,11 @@
 import { z } from "zod";
+import { sceneAssetStatusSchema } from "./asset-status.js";
+import { sceneAssetsSchema } from "./api-contracts.js";
 import { cameraPathSchema } from "./camera-path.js";
+import { completionManifestSchema } from "./completion-manifest.js";
+import { qualityReportSchema } from "./quality-report.js";
+import { sceneMetadataSchema } from "./scene-metadata.js";
+import { visibilityManifestSchema } from "./visibility-manifest.js";
 
 export const processingStageSchema = z.enum([
   "checking_capture_quality",
@@ -47,8 +53,14 @@ export const jobArtifactSchema = z.object({
 export const jobSceneBundleSchema = z.object({
   job_id: z.string().min(1),
   output_scene_id: z.string().min(1),
+  assets: sceneAssetsSchema,
+  metadata: sceneMetadataSchema,
+  quality: qualityReportSchema,
   camera_path_artifact: z.string().min(1),
-  camera_path: cameraPathSchema
+  camera_path: cameraPathSchema,
+  visibility: visibilityManifestSchema,
+  completion: completionManifestSchema,
+  asset_status: sceneAssetStatusSchema
 });
 
 export type JobLifecycleState = z.infer<typeof jobLifecycleStateSchema>;

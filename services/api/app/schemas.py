@@ -57,13 +57,6 @@ class JobArtifact(StrictModel):
     payload: dict[str, Any]
 
 
-class JobSceneBundle(StrictModel):
-    job_id: str
-    output_scene_id: str
-    camera_path_artifact: str
-    camera_path: dict[str, Any]
-
-
 class QualityReport(StrictModel):
     scene_id: str
     pose_backend: str
@@ -144,6 +137,19 @@ class SceneMetadata(StrictModel):
     zones: ZoneAssets
     quality: CaptureQuality
     product_tools: ProductTools
+
+
+class JobSceneBundle(StrictModel):
+    job_id: str
+    output_scene_id: str
+    assets: SceneAssets
+    metadata: SceneMetadata
+    quality: QualityReport
+    camera_path_artifact: str
+    camera_path: dict[str, Any]
+    visibility: dict[str, Any]
+    completion: dict[str, Any]
+    asset_status: SceneAssetStatus
 
 
 class HealthResponse(StrictModel):

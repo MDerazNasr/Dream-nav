@@ -118,7 +118,14 @@ export async function fetchJobSceneBundle(
   jobId: string,
   apiBaseUrl = getDreamNavApiBaseUrl()
 ): Promise<JobSceneBundle> {
-  return parseJobSceneBundle(await fetchJson(apiBaseUrl, `/jobs/${jobId}/scene-bundle`));
+  const jobSceneBundle = parseJobSceneBundle(await fetchJson(apiBaseUrl, `/jobs/${jobId}/scene-bundle`));
+  return {
+    ...jobSceneBundle,
+    asset_status: {
+      ...jobSceneBundle.asset_status,
+      splat_url: new URL(jobSceneBundle.asset_status.splat_url, normalizeBaseUrl(apiBaseUrl)).toString()
+    }
+  };
 }
 
 async function fetchJson(
