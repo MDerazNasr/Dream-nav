@@ -13,7 +13,7 @@ vi.mock("./SceneViewport", () => ({
     restorePose,
     restoreSignal
   }: {
-    completionProjection: { cameraPoseIndex: number; url: string } | null;
+    completionProjection: { cameraPoseIndex: number; maskUrl: string | null; url: string } | null;
     onCameraPoseChange: (pose: {
       fovDegrees: number;
       lensMode: "24mm";
@@ -39,6 +39,7 @@ vi.mock("./SceneViewport", () => ({
       type="button"
     >
       projection:{completionProjection?.url ?? "none"};pose:{completionProjection?.cameraPoseIndex ?? "none"};
+      mask:{completionProjection?.maskUrl ?? "none"};
       reset:{resetSignal};restore:{restoreSignal};x:{restorePose?.position[0] ?? "none"}
     </button>
   )
@@ -237,6 +238,9 @@ describe("ExplorerShell", () => {
       "projection:/dreamnav-assets/scenes/warehouse_01/completion/pred_001.svg"
     );
     expect(screen.getByTestId("scene-viewport").textContent).toContain("pose:1");
+    expect(screen.getByTestId("scene-viewport").textContent).toContain(
+      "mask:/dreamnav-assets/scenes/warehouse_01/completion/pred_001_mask.svg"
+    );
     expect(screen.getAllByText(/pred_001/).length).toBeGreaterThan(0);
     expect(screen.getByText("12 ms")).not.toBeNull();
   });

@@ -4,6 +4,7 @@ import type { ConfidenceZoneArtifacts } from "../../lib/confidence-zones";
 
 export type CompletionProjectionTarget = {
   cameraPoseIndex: number;
+  maskUrl: string | null;
   url: string;
 };
 
@@ -33,6 +34,7 @@ export function createCompletionProjection(
   projection.quaternion.copy(frame.quaternion);
   projection.userData.cameraPoseIndex = target.cameraPoseIndex;
   projection.userData.distanceMeters = frame.distanceMeters;
+  projection.userData.hasConfidenceMask = target.maskUrl !== null;
 
   new THREE.TextureLoader().load(target.url, (texture) => {
     texture.colorSpace = THREE.SRGBColorSpace;
@@ -40,6 +42,14 @@ export function createCompletionProjection(
     material.color.set("#ffffff");
     material.needsUpdate = true;
   });
+
+  if (target.maskUrl) {
+    new THREE.TextureLoader().load(target.maskUrl, (texture) => {
+      material.alphaMap = texture;
+      material.alphaTest = 0.04;
+      material.needsUpdate = true;
+    });
+  }
 
   return projection;
 }

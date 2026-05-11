@@ -55,7 +55,7 @@ const visibility: VisibilityManifest = {
 describe("completion projection", () => {
   it("uses the cached prediction camera pose to build a projected view plane", () => {
     const frame = buildCompletionProjectionFrame(
-      { cameraPoseIndex: 1, url: "/completion/pred_001.svg" },
+      { cameraPoseIndex: 1, maskUrl: "/completion/pred_001_mask.svg", url: "/completion/pred_001.svg" },
       cameraPath,
       buildZoneArtifactsFromVisibility("warehouse_01", visibility)
     );

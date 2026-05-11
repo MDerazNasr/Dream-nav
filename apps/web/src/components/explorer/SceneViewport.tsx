@@ -247,6 +247,7 @@ export function SceneViewport({
   return (
     <div
       className="viewport"
+      data-completion-mask={completionProjection?.maskUrl ? "active" : "inactive"}
       data-completion-projection={completionProjection ? "active" : "inactive"}
       data-completion-projection-pose={completionProjection?.cameraPoseIndex ?? "none"}
       data-testid="scene-viewport"
@@ -329,6 +330,9 @@ function disposeObjectResources(object: THREE.Object3D): void {
     materials.forEach((material) => {
       if ("map" in material && material.map instanceof THREE.Texture) {
         material.map.dispose();
+      }
+      if ("alphaMap" in material && material.alphaMap instanceof THREE.Texture) {
+        material.alphaMap.dispose();
       }
       material.dispose();
     });

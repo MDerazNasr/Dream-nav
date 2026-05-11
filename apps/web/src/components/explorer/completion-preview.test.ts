@@ -47,7 +47,7 @@ const completion: CompletionManifest = {
       prediction_id: "pred_001",
       camera_pose_index: 1,
       rgb_asset: "completion/pred_001.svg",
-      confidence_mask_asset: null,
+      confidence_mask_asset: "completion/pred_001_mask.svg",
       latency_ms_p50: 12
     }
   ]
@@ -72,6 +72,7 @@ describe("completion preview selection", () => {
 
     expect(match?.prediction.prediction_id).toBe("pred_001");
     expect(match?.rgbUrl).toBe("http://api.test/scenes/warehouse_01/completion/pred_001.svg");
+    expect(match?.maskUrl).toBe("http://api.test/scenes/warehouse_01/completion/pred_001_mask.svg");
     expect(formatCompletionCacheStatus(completion, match)).toContain("pred_001");
   });
 
@@ -84,6 +85,31 @@ describe("completion preview selection", () => {
     );
 
     expect(match?.rgbUrl).toBe("/dreamnav-assets/scenes/warehouse_01/completion/pred_001.svg");
+    expect(match?.maskUrl).toBe("/dreamnav-assets/scenes/warehouse_01/completion/pred_001_mask.svg");
+  });
+
+  it("keeps the mask URL nullable when a cached prediction has no confidence mask", () => {
+    const unmaskedCompletion = {
+      ...completion,
+      cached_predictions: [
+        {
+          camera_pose_index: 1,
+          confidence_mask_asset: null,
+          latency_ms_p50: 12,
+          prediction_id: "pred_001",
+          rgb_asset: "completion/pred_001.svg"
+        }
+      ]
+    } satisfies CompletionManifest;
+
+    const match = selectNearestCachedCompletion(
+      unmaskedCompletion,
+      cameraPath,
+      currentPose,
+      "http://api.test/scenes/warehouse_01/"
+    );
+
+    expect(match?.maskUrl).toBeNull();
   });
 
   it("disables cached completion when the quality gate fails", () => {

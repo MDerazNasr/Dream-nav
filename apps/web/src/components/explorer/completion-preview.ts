@@ -3,6 +3,7 @@ import type { ViewerCameraPose } from "./viewer-camera";
 
 export type CachedCompletionMatch = {
   distanceMeters: number;
+  maskUrl: string | null;
   prediction: CompletionManifest["cached_predictions"][number];
   rgbUrl: string;
 };
@@ -26,6 +27,9 @@ export function selectNearestCachedCompletion(
 
       return {
         distanceMeters: positionDistance(currentPose.position, pose.position),
+        maskUrl: prediction.confidence_mask_asset
+          ? resolvePredictionAssetUrl(assetBaseUrl, prediction.confidence_mask_asset)
+          : null,
         prediction,
         rgbUrl: resolvePredictionAssetUrl(assetBaseUrl, prediction.rgb_asset)
       };

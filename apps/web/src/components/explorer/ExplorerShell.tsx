@@ -58,10 +58,11 @@ export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
       cachedCompletionMatch
         ? {
             cameraPoseIndex: cachedCompletionMatch.prediction.camera_pose_index,
+            maskUrl: cachedCompletionMatch.maskUrl,
             url: cachedCompletionMatch.rgbUrl
           }
         : null,
-    [cachedCompletionMatch?.prediction.camera_pose_index, cachedCompletionMatch?.rgbUrl]
+    [cachedCompletionMatch?.maskUrl, cachedCompletionMatch?.prediction.camera_pose_index, cachedCompletionMatch?.rgbUrl]
   );
 
   useEffect(() => {
