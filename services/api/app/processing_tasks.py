@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .camera_processing import build_camera_motion_command, estimate_camera_motion
+from .completion_dataset import CompletionDatasetError, build_completion_dataset
 from .frame_processing import build_frame_extraction_command, extract_video_frames, validate_capture_quality
 from .gaussian_reconstruction import GaussianReconstructionConfigError, build_gaussian_reconstruction_command, normalized_gaussian_backend
 from .jobs import ProcessingStep
@@ -134,10 +135,24 @@ def render_training_views(context: ProcessingTaskContext) -> ProcessingTaskResul
 
 
 def train_scene_model(context: ProcessingTaskContext) -> ProcessingTaskResult:
+    try:
+        dataset = build_completion_dataset(
+            context.job.job_id,
+            context.job.stored_filename,
+            context.artifacts_root,
+        )
+    except CompletionDatasetError as error:
+        raise ProcessingTaskFailed(str(error)) from error
+
     return _result(
         "scene_model.json",
         context,
         architecture="pose_conditioned_encoder_decoder",
+        dataset_manifest=dataset["dataset_manifest"],
+        pose_encoding=dataset["pose_encoding"],
+        reference_strategy=dataset["reference_strategy"],
+        train_examples=dataset["train_examples"],
+        heldout_examples=dataset["heldout_examples"],
         training_time_sec=184,
     )
 
