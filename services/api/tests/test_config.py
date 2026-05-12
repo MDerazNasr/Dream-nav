@@ -80,3 +80,11 @@ def test_default_settings_prefers_internal_gaussian_wrapper_when_colmap_is_avail
     assert settings.processing.gaussian_backend == "command"
     assert settings.processing.gaussian_command is not None
     assert settings.processing.gaussian_command.endswith("colmap_sparse_to_splat.py")
+
+
+def test_default_settings_uses_real_pose_timeout_budget(monkeypatch) -> None:
+    monkeypatch.delenv("DREAMNAV_POSE_TIMEOUT_SEC", raising=False)
+
+    settings = default_settings()
+
+    assert settings.processing.pose_timeout_sec == 180

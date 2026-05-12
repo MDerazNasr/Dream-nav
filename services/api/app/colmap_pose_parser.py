@@ -21,11 +21,6 @@ def parse_colmap_text_model(
     camera_by_id = _parse_cameras(model_root / "cameras.txt")
     poses, camera_id = _parse_images(model_root / "images.txt", camera_by_id, _frame_index_by_name(frames), frame_rate)
 
-    if len(poses) != len(frames):
-        raise ColmapPoseParseError(
-            f"COLMAP pose count {len(poses)} does not match extracted frame count {len(frames)}."
-        )
-
     if not poses:
         raise ColmapPoseParseError("COLMAP output did not contain camera poses.")
 
@@ -126,6 +121,9 @@ def _image_lines(images_path: Path) -> list[str]:
 
 def _camera_intrinsics(model: str, width: int, height: int, params: list[float]) -> CameraIntrinsics:
     if model == "SIMPLE_PINHOLE" and len(params) >= 3:
+        return CameraIntrinsics(width=width, height=height, fx=params[0], fy=params[0], cx=params[1], cy=params[2])
+
+    if model == "SIMPLE_RADIAL" and len(params) >= 3:
         return CameraIntrinsics(width=width, height=height, fx=params[0], fy=params[0], cx=params[1], cy=params[2])
 
     if model == "PINHOLE" and len(params) >= 4:

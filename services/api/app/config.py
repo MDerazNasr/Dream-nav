@@ -3,21 +3,25 @@ from os import environ
 from pathlib import Path
 from shutil import which
 
+DEFAULT_FRAME_TIMEOUT_SEC = 30
+DEFAULT_POSE_TIMEOUT_SEC = 180
+DEFAULT_GAUSSIAN_TIMEOUT_SEC = 60
+
 
 @dataclass(frozen=True)
 class ProcessingSettings:
     frame_backend: str = "stub"
     frame_command: str | None = None
-    frame_timeout_sec: float = 30
+    frame_timeout_sec: float = DEFAULT_FRAME_TIMEOUT_SEC
     frame_rate: float = 2
     frame_max_count: int = 240
     frame_max_duration_sec: float = 60
     pose_backend: str = "stub"
     pose_command: str | None = None
-    pose_timeout_sec: float = 30
+    pose_timeout_sec: float = DEFAULT_POSE_TIMEOUT_SEC
     gaussian_backend: str = "stub"
     gaussian_command: str | None = None
-    gaussian_timeout_sec: float = 60
+    gaussian_timeout_sec: float = DEFAULT_GAUSSIAN_TIMEOUT_SEC
 
 
 @dataclass(frozen=True)
@@ -68,16 +72,16 @@ def default_settings() -> ApiSettings:
         processing=ProcessingSettings(
             frame_backend=resolved_frame_backend,
             frame_command=resolved_frame_command,
-            frame_timeout_sec=float(environ.get("DREAMNAV_FRAME_TIMEOUT_SEC", "30")),
+            frame_timeout_sec=float(environ.get("DREAMNAV_FRAME_TIMEOUT_SEC", str(DEFAULT_FRAME_TIMEOUT_SEC))),
             frame_rate=float(environ.get("DREAMNAV_FRAME_RATE", "2")),
             frame_max_count=int(environ.get("DREAMNAV_FRAME_MAX_COUNT", "240")),
             frame_max_duration_sec=float(environ.get("DREAMNAV_FRAME_MAX_DURATION_SEC", "60")),
             pose_backend=resolved_pose_backend,
             pose_command=resolved_pose_command,
-            pose_timeout_sec=float(environ.get("DREAMNAV_POSE_TIMEOUT_SEC", "30")),
+            pose_timeout_sec=float(environ.get("DREAMNAV_POSE_TIMEOUT_SEC", str(DEFAULT_POSE_TIMEOUT_SEC))),
             gaussian_backend=resolved_gaussian_backend,
             gaussian_command=resolved_gaussian_command,
-            gaussian_timeout_sec=float(environ.get("DREAMNAV_GAUSSIAN_TIMEOUT_SEC", "60")),
+            gaussian_timeout_sec=float(environ.get("DREAMNAV_GAUSSIAN_TIMEOUT_SEC", str(DEFAULT_GAUSSIAN_TIMEOUT_SEC))),
         ),
     )
 

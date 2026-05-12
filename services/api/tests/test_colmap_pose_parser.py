@@ -44,6 +44,19 @@ def test_parse_colmap_text_model_supports_simple_pinhole(tmp_path: Path) -> None
     assert intrinsics.fy == 1240
 
 
+def test_parse_colmap_text_model_supports_simple_radial(tmp_path: Path) -> None:
+    model_root = _write_model(
+        tmp_path,
+        cameras="1 SIMPLE_RADIAL 1920 1080 1240 960 540 0.01\n",
+        images="1 1 0 0 0 0 0 0 1 frame_0000.jpg\n\n",
+    )
+
+    _poses, intrinsics = parse_colmap_text_model(model_root, [Path("frame_0000.jpg")], frame_rate=2)
+
+    assert intrinsics.fx == 1240
+    assert intrinsics.fy == 1240
+
+
 def test_parse_colmap_text_model_rejects_missing_outputs(tmp_path: Path) -> None:
     with pytest.raises(ColmapPoseParseError, match="cameras.txt is missing"):
         parse_colmap_text_model(tmp_path / "missing", [Path("frame_0000.jpg")], frame_rate=2)
@@ -60,19 +73,20 @@ def test_parse_colmap_text_model_rejects_unknown_frame_names(tmp_path: Path) -> 
         parse_colmap_text_model(model_root, [Path("frame_0000.jpg")], frame_rate=2)
 
 
-def test_parse_colmap_text_model_rejects_pose_count_mismatch(tmp_path: Path) -> None:
+def test_parse_colmap_text_model_allows_partial_registered_frames(tmp_path: Path) -> None:
     model_root = _write_model(
         tmp_path,
         cameras="1 PINHOLE 1920 1080 1200 1210 960 540\n",
         images="1 1 0 0 0 0 0 0 1 frame_0000.jpg\n\n",
     )
 
-    with pytest.raises(ColmapPoseParseError, match="does not match extracted frame count"):
-        parse_colmap_text_model(
-            model_root,
-            [Path("frame_0000.jpg"), Path("frame_0001.jpg")],
-            frame_rate=2,
-        )
+    poses, _intrinsics = parse_colmap_text_model(
+        model_root,
+        [Path("frame_0000.jpg"), Path("frame_0001.jpg")],
+        frame_rate=2,
+    )
+
+    assert [pose.frame_index for pose in poses] == [0]
 
 
 def test_parse_colmap_text_model_rejects_malformed_pose_rows(tmp_path: Path) -> None:
