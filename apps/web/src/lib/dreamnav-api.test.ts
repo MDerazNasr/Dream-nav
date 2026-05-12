@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DreamNavApiError,
+  fetchFeaturedSceneBundle,
   fetchReconstructionCapabilities,
   fetchJobArtifact,
   fetchJobSceneBundle,
@@ -320,6 +321,19 @@ describe("DreamNav API client", () => {
     expect(response.camera_path.poses).toHaveLength(2);
     expect(response.asset_status.splat_url).toBe("http://api.test/jobs/scene_abc123/viewer-assets/splat.ply");
     expect(response.zoneArtifacts.completion.zone).toBe("completion");
+  });
+
+  it("loads the featured completed scene bundle", async () => {
+    mockFetchFromPayloads({
+      "http://api.test/featured-job-scene-bundle": jobSceneBundlePayload,
+      ...jobZonePayloads
+    });
+
+    const response = await fetchFeaturedSceneBundle("http://api.test");
+
+    expect(response.demoScene.description).toBe("Latest generated reconstruction from local uploads");
+    expect(response.assetStatus.splat_url).toBe("http://api.test/jobs/scene_abc123/viewer-assets/splat.ply");
+    expect(response.metadata.scene_id).toBe("scene_abc123");
   });
 });
 

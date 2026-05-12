@@ -198,6 +198,23 @@ class JobRepository:
     def artifact_root(self, job_id: str) -> Path:
         return self.jobs_root / job_id / "artifacts"
 
+    def latest_completed_job_id(self) -> str | None:
+        self.jobs_root.mkdir(parents=True, exist_ok=True)
+        completed_jobs = sorted(
+            (self._read_job(path.stem) for path in self.jobs_root.glob("scene_*.json")),
+            key=lambda job: job.updated_at_sec,
+            reverse=True,
+        )
+
+        for job in completed_jobs:
+            if job.state != "completed" or job.output_scene_id is None:
+                continue
+
+            if self._featured_scene_ready(job.job_id):
+                return job.job_id
+
+        return None
+
     def write_artifact(self, job_id: str, artifact_name: str, payload: object) -> Path:
         artifact_root = self.artifact_root(job_id)
         artifact_root.mkdir(parents=True, exist_ok=True)
@@ -300,3 +317,22 @@ class JobRepository:
             "failed_stage": payload.get("failed_stage", None),
             "failed_artifact": payload.get("failed_artifact", None),
         }
+
+    def _featured_scene_ready(self, job_id: str) -> bool:
+        artifacts_root = self.artifact_root(job_id)
+        required_assets = [
+            "camera_motion.json",
+            "camera_path.json",
+            "completion_manifest.json",
+            "gaussian_scene.json",
+            "metadata.json",
+            "quality.json",
+            "splat.ply",
+            "visibility_manifest.json",
+        ]
+        if not all((artifacts_root / asset_name).is_file() for asset_name in required_assets):
+            return False
+
+        camera_motion = self.read_artifact(job_id, "camera_motion.json")
+        gaussian_scene = self.read_artifact(job_id, "gaussian_scene.json")
+        return camera_motion.get("backend") != "stub" and gaussian_scene.get("backend") == "command"

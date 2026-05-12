@@ -119,33 +119,21 @@ def job_scene_bundle(job_id: str, request: Request) -> JobSceneBundle:
     if status.state != "completed" or status.output_scene_id is None:
         raise HTTPException(status_code=409, detail="Job explorer bundle is not ready")
 
-    camera_path_artifact = "camera_path.json"
-    metadata = job_repository.read_artifact(job_id, "metadata.json")
-    quality_report = job_repository.read_artifact(job_id, "quality.json")
-    camera_path = job_repository.read_artifact(job_id, camera_path_artifact)
-    visibility = job_repository.read_artifact(job_id, "visibility_manifest.json")
-    completion = job_repository.read_artifact(job_id, "completion_manifest.json")
-    asset_status = _job_asset_status(job_id, status.output_scene_id, job_repository)
+    return _build_job_scene_bundle(job_id, status.output_scene_id, job_repository)
 
-    return JobSceneBundle(
-        job_id=job_id,
-        output_scene_id=status.output_scene_id,
-        assets=SceneAssets(
-            scene_id=status.output_scene_id,
-            splat_url=f"/jobs/{job_id}/viewer-assets/splat.ply",
-            metadata_url=f"/jobs/{job_id}/viewer-assets/metadata.json",
-            visibility_manifest_url=f"/jobs/{job_id}/viewer-assets/visibility_manifest.json",
-            completion_manifest_url=f"/jobs/{job_id}/viewer-assets/completion_manifest.json",
-            quality_report_url=f"/jobs/{job_id}/viewer-assets/quality.json",
-        ),
-        metadata=metadata,
-        quality=quality_report,
-        camera_path_artifact=camera_path_artifact,
-        camera_path=camera_path,
-        visibility=visibility,
-        completion=completion,
-        asset_status=asset_status,
-    )
+
+@router.get("/featured-job-scene-bundle", response_model=JobSceneBundle)
+def featured_job_scene_bundle(request: Request) -> JobSceneBundle:
+    job_repository = _job_repository(request)
+    job_id = job_repository.latest_completed_job_id()
+    if job_id is None:
+        raise HTTPException(status_code=404, detail="Featured job scene is not available")
+
+    status = job_repository.get_status(job_id)
+    if status.output_scene_id is None:
+        raise HTTPException(status_code=404, detail="Featured job scene is not available")
+
+    return _build_job_scene_bundle(job_id, status.output_scene_id, job_repository)
 
 
 @router.get("/jobs/{job_id}/viewer-assets/{asset_name:path}")
@@ -179,6 +167,36 @@ def _job_asset_status(job_id: str, scene_id: str, job_repository: JobRepository)
         splat_available=splat_available,
         viewer_render_mode="splat" if splat_available else "placeholder",
         missing_assets=[] if splat_available else ["splat.ply"],
+    )
+
+
+def _build_job_scene_bundle(job_id: str, output_scene_id: str, job_repository: JobRepository) -> JobSceneBundle:
+    camera_path_artifact = "camera_path.json"
+    metadata = job_repository.read_artifact(job_id, "metadata.json")
+    quality_report = job_repository.read_artifact(job_id, "quality.json")
+    camera_path = job_repository.read_artifact(job_id, camera_path_artifact)
+    visibility = job_repository.read_artifact(job_id, "visibility_manifest.json")
+    completion = job_repository.read_artifact(job_id, "completion_manifest.json")
+    asset_status = _job_asset_status(job_id, output_scene_id, job_repository)
+
+    return JobSceneBundle(
+        job_id=job_id,
+        output_scene_id=output_scene_id,
+        assets=SceneAssets(
+            scene_id=output_scene_id,
+            splat_url=f"/jobs/{job_id}/viewer-assets/splat.ply",
+            metadata_url=f"/jobs/{job_id}/viewer-assets/metadata.json",
+            visibility_manifest_url=f"/jobs/{job_id}/viewer-assets/visibility_manifest.json",
+            completion_manifest_url=f"/jobs/{job_id}/viewer-assets/completion_manifest.json",
+            quality_report_url=f"/jobs/{job_id}/viewer-assets/quality.json",
+        ),
+        metadata=metadata,
+        quality=quality_report,
+        camera_path_artifact=camera_path_artifact,
+        camera_path=camera_path,
+        visibility=visibility,
+        completion=completion,
+        asset_status=asset_status,
     )
 
 

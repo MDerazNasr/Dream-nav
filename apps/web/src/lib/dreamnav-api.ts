@@ -68,6 +68,13 @@ export async function fetchReconstructionCapabilities(
   return parseReconstructionCapabilities(await fetchJson(apiBaseUrl, "/reconstruction-capabilities"));
 }
 
+export async function fetchFeaturedSceneBundle(
+  apiBaseUrl = getDreamNavApiBaseUrl()
+): Promise<ViewerSceneBundle> {
+  const featuredJobSceneBundle = await fetchJobSceneBundleFromPath("/featured-job-scene-bundle", apiBaseUrl);
+  return toViewerSceneBundleFromJob(featuredJobSceneBundle);
+}
+
 export async function fetchSceneBundle(
   sceneId: string,
   apiBaseUrl = getDreamNavApiBaseUrl()
@@ -153,16 +160,7 @@ export async function fetchJobSceneBundle(
   jobId: string,
   apiBaseUrl = getDreamNavApiBaseUrl()
 ): Promise<ProcessedJobSceneBundle> {
-  const jobSceneBundle = parseJobSceneBundle(await fetchJson(apiBaseUrl, `/jobs/${jobId}/scene-bundle`));
-  const zoneArtifacts = await fetchZoneArtifacts(apiBaseUrl, jobSceneBundle);
-  return {
-    ...jobSceneBundle,
-    asset_status: {
-      ...jobSceneBundle.asset_status,
-      splat_url: new URL(jobSceneBundle.asset_status.splat_url, normalizeBaseUrl(apiBaseUrl)).toString()
-    },
-    zoneArtifacts
-  };
+  return fetchJobSceneBundleFromPath(`/jobs/${jobId}/scene-bundle`, apiBaseUrl);
 }
 
 async function fetchJson(
@@ -199,4 +197,65 @@ async function fetchZoneArtifacts(
   );
 
   return Object.fromEntries(zoneEntries) as ConfidenceZoneArtifacts;
+}
+
+async function fetchJobSceneBundleFromPath(
+  path: string,
+  apiBaseUrl: string
+): Promise<ProcessedJobSceneBundle> {
+  const jobSceneBundle = parseJobSceneBundle(await fetchJson(apiBaseUrl, path));
+  const zoneArtifacts = await fetchZoneArtifacts(apiBaseUrl, jobSceneBundle);
+  return {
+    ...jobSceneBundle,
+    asset_status: {
+      ...jobSceneBundle.asset_status,
+      splat_url: new URL(jobSceneBundle.asset_status.splat_url, normalizeBaseUrl(apiBaseUrl)).toString()
+    },
+    zoneArtifacts
+  };
+}
+
+function toViewerSceneBundleFromJob(jobSceneBundle: ProcessedJobSceneBundle): ViewerSceneBundle {
+  return {
+    demoScene: {
+      scene_id: jobSceneBundle.output_scene_id,
+      title: jobSceneBundle.metadata.title,
+      thumbnail_url: "/thumbs/warehouse_01.jpg",
+      description: "Latest generated reconstruction from local uploads"
+    },
+    assets: jobSceneBundle.assets,
+    metadata: jobSceneBundle.metadata,
+    quality: jobSceneBundle.quality,
+    cameraPath: jobSceneBundle.camera_path,
+    visibility: jobSceneBundle.visibility,
+    completion: jobSceneBundle.completion,
+    completionAssetBaseUrl: resolveBrowserAssetDirectoryUrl(jobSceneBundle.assets.completion_manifest_url),
+    readiness: {
+      scene_id: jobSceneBundle.output_scene_id,
+      locked_scene: false,
+      required_assets_present: jobSceneBundle.asset_status.missing_assets.length === 0,
+      fallback_assets_present: jobSceneBundle.completion.cached_predictions.length > 0,
+      quality_gate: jobSceneBundle.quality.quality_gate,
+      cached_completion: jobSceneBundle.quality.cached_completion,
+      viewer_render_mode: jobSceneBundle.asset_status.viewer_render_mode,
+      status:
+        jobSceneBundle.quality.quality_gate === "fail"
+          ? "blocked"
+          : jobSceneBundle.quality.quality_gate === "warning" ||
+              jobSceneBundle.completion.cached_predictions.length === 0
+            ? "degraded"
+            : "ready",
+      blockers: jobSceneBundle.quality.quality_gate === "fail" ? ["Quality gate failed."] : [],
+      warnings: [
+        ...(jobSceneBundle.quality.quality_gate === "warning"
+          ? ["Completion must stay labeled as lower confidence."]
+          : []),
+        ...(jobSceneBundle.completion.cached_predictions.length === 0
+          ? ["Cached completion fallback assets unavailable."]
+          : [])
+      ]
+    },
+    assetStatus: jobSceneBundle.asset_status,
+    zoneArtifacts: jobSceneBundle.zoneArtifacts
+  };
 }
