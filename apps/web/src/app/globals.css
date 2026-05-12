@@ -169,7 +169,39 @@ button {
 
 .import-actions {
   display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
   justify-content: flex-end;
+}
+
+.import-review {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(245, 247, 244, 0.12);
+  border-radius: 8px;
+  background: rgba(245, 247, 244, 0.04);
+}
+
+.import-review-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.import-review-grid article {
+  display: grid;
+  gap: 4px;
+}
+
+.import-review-grid span {
+  color: #b8c6bd;
+  font-size: 12px;
+}
+
+.import-review-grid strong {
+  font-size: 15px;
+  font-weight: 650;
 }
 
 .demo-row {

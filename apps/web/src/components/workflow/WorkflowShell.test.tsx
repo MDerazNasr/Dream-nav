@@ -170,7 +170,14 @@ describe("WorkflowShell", () => {
     fireEvent.change(screen.getByLabelText("Gaussian asset"), {
       target: { files: [new File(["ply"], "dense_scene.ply", { type: "application/octet-stream" })] }
     });
-    fireEvent.click(screen.getByRole("button", { name: "Import and open scene" }));
+    fireEvent.click(screen.getByRole("button", { name: "Import dense asset" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Imported scene review").textContent).toContain("24,000");
+    });
+    expect(screen.getByText("Imported asset passed the featured-scene gate.")).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open imported scene" }));
 
     await waitFor(() => {
       expect(screen.getByTestId("explorer-shell").textContent).toBe("2 poses");
