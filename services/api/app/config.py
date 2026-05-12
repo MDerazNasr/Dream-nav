@@ -50,12 +50,18 @@ def default_settings() -> ApiSettings:
     configured_pose_backend = environ.get("DREAMNAV_POSE_BACKEND")
     resolved_pose_backend = configured_pose_backend or _default_pose_backend()
     resolved_pose_command = environ.get("DREAMNAV_POSE_COMMAND")
+    configured_gaussian_backend = environ.get("DREAMNAV_GAUSSIAN_BACKEND")
+    resolved_gaussian_backend = configured_gaussian_backend or _default_gaussian_backend(resolved_pose_backend)
+    resolved_gaussian_command = environ.get("DREAMNAV_GAUSSIAN_COMMAND")
 
     if resolved_frame_backend == "ffmpeg" and not resolved_frame_command:
         resolved_frame_command = which("ffmpeg")
 
     if resolved_pose_backend == "colmap" and not resolved_pose_command:
         resolved_pose_command = which("colmap")
+
+    if resolved_gaussian_backend == "command" and not resolved_gaussian_command:
+        resolved_gaussian_command = _default_gaussian_command(resolved_pose_backend)
 
     return ApiSettings(
         repo_root=Path(__file__).resolve().parents[3],
@@ -69,8 +75,8 @@ def default_settings() -> ApiSettings:
             pose_backend=resolved_pose_backend,
             pose_command=resolved_pose_command,
             pose_timeout_sec=float(environ.get("DREAMNAV_POSE_TIMEOUT_SEC", "30")),
-            gaussian_backend=environ.get("DREAMNAV_GAUSSIAN_BACKEND", "stub"),
-            gaussian_command=environ.get("DREAMNAV_GAUSSIAN_COMMAND"),
+            gaussian_backend=resolved_gaussian_backend,
+            gaussian_command=resolved_gaussian_command,
             gaussian_timeout_sec=float(environ.get("DREAMNAV_GAUSSIAN_TIMEOUT_SEC", "60")),
         ),
     )
@@ -82,3 +88,19 @@ def _default_frame_backend() -> str:
 
 def _default_pose_backend() -> str:
     return "colmap" if which("colmap") else "stub"
+
+
+def _default_gaussian_backend(pose_backend: str) -> str:
+    return "command" if pose_backend == "colmap" and _internal_gaussian_wrapper_path().is_file() else "stub"
+
+
+def _default_gaussian_command(pose_backend: str) -> str | None:
+    if pose_backend != "colmap":
+        return None
+
+    wrapper = _internal_gaussian_wrapper_path()
+    return str(wrapper) if wrapper.is_file() else None
+
+
+def _internal_gaussian_wrapper_path() -> Path:
+    return Path(__file__).with_name("colmap_sparse_to_splat.py")

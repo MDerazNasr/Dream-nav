@@ -109,6 +109,60 @@ def test_worker_fails_when_gaussian_command_skips_splat(tmp_path: Path) -> None:
     assert status.error_message == "Gaussian reconstruction did not produce splat.ply."
 
 
+def test_worker_builds_splat_from_colmap_sparse_points(tmp_path: Path) -> None:
+    repo = _job_repository(tmp_path)
+    fake_colmap = tmp_path / "fake_colmap.py"
+    fake_colmap.write_text(
+        "#!/usr/bin/env python3\n"
+        "from pathlib import Path\n"
+        "import sys\n"
+        "if sys.argv[1] == 'mapper':\n"
+        "    sparse = Path(sys.argv[sys.argv.index('--output_path') + 1])\n"
+        "    (sparse / '0').mkdir(parents=True, exist_ok=True)\n"
+        "if sys.argv[1] == 'model_converter':\n"
+        "    output = Path(sys.argv[sys.argv.index('--output_path') + 1])\n"
+        "    output.mkdir(parents=True, exist_ok=True)\n"
+        "    (output / 'cameras.txt').write_text('1 PINHOLE 1920 1080 1200 1210 960 540\\n')\n"
+        "    (output / 'images.txt').write_text(\n"
+        "        '1 1 0 0 0 0 0 0 1 frame_0000.jpg\\n\\n'\n"
+        "        '2 1 0 0 0 -1 -2 -3 1 frame_0001.jpg\\n\\n'\n"
+        "        '3 1 0 0 0 -2 -4 -6 1 frame_0002.jpg\\n\\n'\n"
+        "    )\n"
+        "    (output / 'points3D.txt').write_text(\n"
+        "        '1 0.0 1.0 -2.0 255 0 0 0.5 1 1 2\\n'\n"
+        "        '2 0.5 1.2 -2.4 0 255 128 1.0 1 2 2\\n'\n"
+        "    )\n"
+        "print('fake colmap ' + ' '.join(sys.argv[1:]))\n",
+        encoding="utf-8",
+    )
+    fake_colmap.chmod(0o755)
+    response = anyio.run(
+        repo.create_upload_job,
+        UploadFile(filename="walkthrough.mp4", file=BytesIO(b"video-bytes")),
+    )
+    worker = ProcessingWorker(
+        repo,
+        processing_settings=ProcessingSettings(
+            pose_backend="colmap",
+            pose_command=str(fake_colmap),
+            gaussian_backend="command",
+            gaussian_command=str(Path(__file__).parents[1] / "app" / "colmap_sparse_to_splat.py"),
+            pose_timeout_sec=5,
+            gaussian_timeout_sec=5,
+        ),
+        step_delay_sec=0,
+    )
+
+    worker.process_next_job()
+    status = repo.get_status(response.job_id)
+    gaussian_scene = _read_job_artifact(tmp_path, response.job_id, "gaussian_scene.json")
+
+    assert status.state == "completed"
+    assert gaussian_scene["backend"] == "command"
+    assert gaussian_scene["gaussian_count"] == 2
+    assert gaussian_scene["splat_source"] == "existing"
+
+
 def _job_repository(tmp_path: Path) -> JobRepository:
     return JobRepository(
         jobs_root=tmp_path / "data" / "jobs",

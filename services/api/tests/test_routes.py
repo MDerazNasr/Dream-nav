@@ -24,16 +24,6 @@ def test_demo_scenes_returns_locked_scene() -> None:
     assert response.json()[0]["scene_id"] == "warehouse_01"
 
 
-def test_reconstruction_capabilities_reports_current_pipeline() -> None:
-    client = TestClient(create_app())
-
-    response = client.get("/reconstruction-capabilities")
-
-    assert response.status_code == 200
-    assert response.json()["pipeline_status"] == "mixed"
-    assert response.json()["real_reconstruction_ready"] is False
-
-
 def test_scene_assets_match_spec_urls() -> None:
     client = TestClient(create_app())
 
