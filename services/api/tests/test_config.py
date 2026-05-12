@@ -1,3 +1,4 @@
+import app.config as config_module
 from app.config import default_settings
 
 
@@ -29,3 +30,14 @@ def test_default_settings_reads_pose_backend_env(monkeypatch) -> None:
     assert settings.processing.gaussian_backend == "command"
     assert settings.processing.gaussian_command == "/opt/bin/reconstruct"
     assert settings.processing.gaussian_timeout_sec == 90
+
+
+def test_default_settings_prefers_ffmpeg_when_available(monkeypatch) -> None:
+    monkeypatch.delenv("DREAMNAV_FRAME_BACKEND", raising=False)
+    monkeypatch.delenv("DREAMNAV_FRAME_COMMAND", raising=False)
+    monkeypatch.setattr(config_module, "which", lambda command: "/opt/homebrew/bin/ffmpeg" if command == "ffmpeg" else None)
+
+    settings = default_settings()
+
+    assert settings.processing.frame_backend == "ffmpeg"
+    assert settings.processing.frame_command == "/opt/homebrew/bin/ffmpeg"

@@ -30,7 +30,7 @@ def test_reconstruction_capabilities_reports_current_pipeline() -> None:
     response = client.get("/reconstruction-capabilities")
 
     assert response.status_code == 200
-    assert response.json()["pipeline_status"] == "stub"
+    assert response.json()["pipeline_status"] == "mixed"
     assert response.json()["real_reconstruction_ready"] is False
 
 
