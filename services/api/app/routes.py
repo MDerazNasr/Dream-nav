@@ -22,6 +22,8 @@ router = APIRouter()
 VIEWER_ASSET_NAMES = {
     "camera_path.json",
     "completion_manifest.json",
+    "completion/baseline_nearest_001.png",
+    "completion/baseline_nearest_001.svg",
     "completion/pred_001.svg",
     "completion/pred_001_mask.svg",
     "completion_zone.json",

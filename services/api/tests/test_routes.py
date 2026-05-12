@@ -236,11 +236,15 @@ def test_job_viewer_asset_serves_cached_completion_preview(tmp_path: Path) -> No
     completion_root = app.state.job_repository.artifact_root(job_id) / "completion"
     completion_root.mkdir()
     (completion_root / "pred_001.svg").write_text("<svg />", encoding="utf-8")
+    (completion_root / "baseline_nearest_001.png").write_bytes(b"\x89PNG\r\n\x1a\n")
 
     response = client.get(f"/jobs/{job_id}/viewer-assets/completion/pred_001.svg")
+    baseline_response = client.get(f"/jobs/{job_id}/viewer-assets/completion/baseline_nearest_001.png")
 
     assert response.status_code == 200
     assert response.text == "<svg />"
+    assert baseline_response.status_code == 200
+    assert baseline_response.content.startswith(b"\x89PNG\r\n\x1a\n")
 
 
 def test_job_viewer_asset_serves_zone_json(tmp_path: Path) -> None:
