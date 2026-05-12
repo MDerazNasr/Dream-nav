@@ -2,8 +2,9 @@ import { chromium } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 
-const baseUrl = process.env.DREAMNAV_VERIFY_URL ?? "http://127.0.0.1:3000";
+const baseUrl = process.env.DREAMNAV_VERIFY_URL ?? "http://localhost:3001";
 const outputDir = join(process.cwd(), "../../.context/viewer-checks");
+const startupTimeoutMs = 30000;
 
 const viewports = [
   { name: "desktop", width: 1440, height: 960 },
@@ -27,7 +28,8 @@ try {
       }
     });
 
-    await page.goto(baseUrl, { waitUntil: "networkidle" });
+    await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
+    await waitForStartupState(page);
     const openDemoButton = page.getByRole("button", { name: "Open demo" });
 
     if (await openDemoButton.isVisible()) {
@@ -84,4 +86,26 @@ try {
   }
 } finally {
   await browser.close();
+}
+
+async function waitForStartupState(page) {
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < startupTimeoutMs) {
+    if (await page.locator("[data-testid='scene-canvas']").count()) {
+      return;
+    }
+
+    if (await page.getByRole("button", { name: "Open demo" }).count()) {
+      return;
+    }
+
+    if (await page.getByText("Scene API unavailable", { exact: true }).count()) {
+      throw new Error("Home page reached the API unavailable state before the explorer could load.");
+    }
+
+    await page.waitForTimeout(250);
+  }
+
+  throw new Error("Home page never reached a usable startup state.");
 }

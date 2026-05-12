@@ -43,6 +43,7 @@ export type ProcessedJobSceneBundle = JobSceneBundle & {
 };
 
 const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000";
+const API_REQUEST_TIMEOUT_MS = 5000;
 
 export class DreamNavApiError extends Error {
   constructor(
@@ -57,6 +58,21 @@ export class DreamNavApiError extends Error {
 export function getDreamNavApiBaseUrl(): string {
   return process.env.NEXT_PUBLIC_DREAMNAV_API_URL ?? process.env.DREAMNAV_API_URL ?? DEFAULT_API_BASE_URL;
 }
+
+export const fallbackReconstructionCapabilities: ReconstructionCapabilities = {
+  frame_backend: "stub",
+  pose_backend: "stub",
+  gaussian_backend: "stub",
+  frame_command: null,
+  pose_command: null,
+  gaussian_command: null,
+  pipeline_status: "stub",
+  real_reconstruction_ready: false,
+  dense_reconstruction_ready: false,
+  dense_reconstruction_reason: "Reconstruction status unavailable because the API did not respond.",
+  missing_requirements: ["Restore the DreamNav API to inspect live reconstruction capability."],
+  warnings: ["Showing fallback reconstruction status because the API is unavailable."]
+};
 
 export async function fetchDemoScenes(
   apiBaseUrl = getDreamNavApiBaseUrl()
@@ -186,10 +202,23 @@ async function fetchJson(
   path: string,
   init?: RequestInit
 ): Promise<unknown> {
-  const response = await fetch(new URL(path, normalizeBaseUrl(apiBaseUrl)), {
-    cache: "no-store",
-    ...init
-  });
+  const timeoutSignal = AbortSignal.timeout(API_REQUEST_TIMEOUT_MS);
+  const signal = init?.signal ? AbortSignal.any([init.signal, timeoutSignal]) : timeoutSignal;
+  let response: Response;
+
+  try {
+    response = await fetch(new URL(path, normalizeBaseUrl(apiBaseUrl)), {
+      cache: "no-store",
+      ...init,
+      signal
+    });
+  } catch (error) {
+    if (timeoutSignal.aborted) {
+      throw new DreamNavApiError(`DreamNav API request timed out for ${path}`, 504);
+    }
+
+    throw error;
+  }
 
   if (!response.ok) {
     throw new DreamNavApiError(`DreamNav API request failed for ${path}`, response.status);
