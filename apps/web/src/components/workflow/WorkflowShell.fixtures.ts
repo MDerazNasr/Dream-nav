@@ -248,6 +248,25 @@ export const sceneBundle = {
   zoneArtifacts: zoneArtifactsFor("warehouse_01", [])
 } satisfies ViewerSceneBundle;
 
+export const reconstructionCapabilities = {
+  frame_backend: "ffmpeg",
+  pose_backend: "stub",
+  gaussian_backend: "stub",
+  frame_command: "/opt/homebrew/bin/ffmpeg",
+  pose_command: null,
+  gaussian_command: null,
+  pipeline_status: "mixed",
+  real_reconstruction_ready: false,
+  missing_requirements: [
+    "Install COLMAP and set DREAMNAV_POSE_BACKEND=colmap.",
+    "Set DREAMNAV_GAUSSIAN_BACKEND=command and DREAMNAV_GAUSSIAN_COMMAND to a real reconstruction wrapper."
+  ],
+  warnings: [
+    "The current pipeline still falls back to placeholder geometry.",
+    "Uploads will not produce a measured 3D reconstruction until every backend leaves stub mode."
+  ]
+} as const;
+
 function zoneArtifactsFor(
   sceneId: string,
   cells: ProcessedJobSceneBundle["visibility"]["cells"]

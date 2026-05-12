@@ -1,9 +1,17 @@
 "use client";
 
-import type { DemoReadiness, JobArtifact, JobStatus, ProcessingStage, UploadResponse } from "@dream-nav/shared";
+import type {
+  DemoReadiness,
+  JobArtifact,
+  JobStatus,
+  ProcessingStage,
+  ReconstructionCapabilities,
+  UploadResponse
+} from "@dream-nav/shared";
 import { AlertTriangle, CheckCircle2, Film, LoaderCircle, RotateCcw, Upload, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ExplorerShell } from "../explorer/ExplorerShell";
+import { ReconstructionStatusPanel } from "./ReconstructionStatusPanel";
 import type { ViewerSceneBundle } from "../../lib/dreamnav-api";
 import {
   fetchJobArtifact,
@@ -14,6 +22,7 @@ import {
 } from "../../lib/dreamnav-api";
 
 type WorkflowShellProps = {
+  reconstructionCapabilities: ReconstructionCapabilities;
   sceneBundle: ViewerSceneBundle;
 };
 
@@ -35,7 +44,7 @@ const processingStages: ProcessingStageItem[] = [
   { stage: "preparing_explorer", label: "Preparing explorer" }
 ];
 
-export function WorkflowShell({ sceneBundle }: WorkflowShellProps) {
+export function WorkflowShell({ reconstructionCapabilities, sceneBundle }: WorkflowShellProps) {
   const [view, setView] = useState<"select" | "processing" | "explorer">("select");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadResponse, setUploadResponse] = useState<UploadResponse | null>(null);
@@ -321,6 +330,8 @@ export function WorkflowShell({ sceneBundle }: WorkflowShellProps) {
             ) : null}
           </button>
         </div>
+
+        <ReconstructionStatusPanel capabilities={reconstructionCapabilities} />
 
         <div className="workflow-actions">
           <button

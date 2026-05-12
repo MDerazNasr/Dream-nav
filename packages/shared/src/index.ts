@@ -2,14 +2,19 @@ export { SCENE_SCHEMA_VERSION } from "./constants.js";
 export {
   type DemoReadiness,
   type DemoReadinessStatus,
+  type ReconstructionCapabilities,
+  type ReconstructionPipelineStatus,
   type DemoScene,
   type SceneAssets,
   demoReadinessSchema,
   demoReadinessStatusSchema,
+  reconstructionCapabilitiesSchema,
+  reconstructionPipelineStatusSchema,
   demoSceneSchema,
   demoScenesResponseSchema,
   parseDemoReadiness,
   parseDemoScenesResponse,
+  parseReconstructionCapabilities,
   parseSceneAssets,
   sceneAssetsSchema
 } from "./schemas/api-contracts.js";

@@ -21,6 +21,8 @@ export const demoScenesResponseSchema = z.array(demoSceneSchema);
 
 export const demoReadinessStatusSchema = z.enum(["ready", "degraded", "blocked"]);
 
+export const reconstructionPipelineStatusSchema = z.enum(["stub", "mixed", "real"]);
+
 export const demoReadinessSchema = z.object({
   scene_id: sceneIdSchema,
   locked_scene: z.boolean(),
@@ -34,11 +36,28 @@ export const demoReadinessSchema = z.object({
   warnings: z.array(z.string().min(1))
 });
 
+export const reconstructionCapabilitiesSchema = z.object({
+  frame_backend: z.string().min(1),
+  pose_backend: z.string().min(1),
+  gaussian_backend: z.string().min(1),
+  frame_command: z.string().min(1).nullable(),
+  pose_command: z.string().min(1).nullable(),
+  gaussian_command: z.string().min(1).nullable(),
+  pipeline_status: reconstructionPipelineStatusSchema,
+  real_reconstruction_ready: z.boolean(),
+  missing_requirements: z.array(z.string().min(1)),
+  warnings: z.array(z.string().min(1))
+});
+
 export type DemoScene = z.infer<typeof demoSceneSchema>;
 
 export type DemoReadiness = z.infer<typeof demoReadinessSchema>;
 
 export type DemoReadinessStatus = z.infer<typeof demoReadinessStatusSchema>;
+
+export type ReconstructionCapabilities = z.infer<typeof reconstructionCapabilitiesSchema>;
+
+export type ReconstructionPipelineStatus = z.infer<typeof reconstructionPipelineStatusSchema>;
 
 export type SceneAssets = z.infer<typeof sceneAssetsSchema>;
 
@@ -52,4 +71,8 @@ export function parseSceneAssets(input: unknown): SceneAssets {
 
 export function parseDemoReadiness(input: unknown): DemoReadiness {
   return demoReadinessSchema.parse(input);
+}
+
+export function parseReconstructionCapabilities(input: unknown): ReconstructionCapabilities {
+  return reconstructionCapabilitiesSchema.parse(input);
 }

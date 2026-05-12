@@ -4,6 +4,7 @@ import {
   parseCompletionManifest,
   parseDemoReadiness,
   parseDemoScenesResponse,
+  parseReconstructionCapabilities,
   parseJobArtifact,
   parseJobSceneBundle,
   parseJobStatus,
@@ -16,7 +17,16 @@ import {
   parseZoneArtifact
 } from "@dream-nav/shared";
 
-import type { DemoReadiness, DemoScene, JobArtifact, JobSceneBundle, JobStatus, SceneAssetStatus, UploadResponse } from "@dream-nav/shared";
+import type {
+  DemoReadiness,
+  DemoScene,
+  JobArtifact,
+  JobSceneBundle,
+  JobStatus,
+  ReconstructionCapabilities,
+  SceneAssetStatus,
+  UploadResponse
+} from "@dream-nav/shared";
 import { buildZoneArtifactsFromVisibility, type ConfidenceZoneArtifacts } from "./confidence-zones";
 
 export type ViewerSceneBundle = SceneBundle & {
@@ -50,6 +60,12 @@ export async function fetchDemoScenes(
   apiBaseUrl = getDreamNavApiBaseUrl()
 ): Promise<DemoScene[]> {
   return parseDemoScenesResponse(await fetchJson(apiBaseUrl, "/demo-scenes"));
+}
+
+export async function fetchReconstructionCapabilities(
+  apiBaseUrl = getDreamNavApiBaseUrl()
+): Promise<ReconstructionCapabilities> {
+  return parseReconstructionCapabilities(await fetchJson(apiBaseUrl, "/reconstruction-capabilities"));
 }
 
 export async function fetchSceneBundle(

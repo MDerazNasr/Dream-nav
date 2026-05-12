@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { parseDemoReadiness, parseDemoScenesResponse, parseSceneAssets } from "./api-contracts.js";
+import {
+  parseDemoReadiness,
+  parseDemoScenesResponse,
+  parseReconstructionCapabilities,
+  parseSceneAssets
+} from "./api-contracts.js";
 
 describe("api contract schemas", () => {
   it("accepts demo scene listings from GET /demo-scenes", () => {
@@ -43,5 +48,25 @@ describe("api contract schemas", () => {
     });
 
     expect(readiness.status).toBe("degraded");
+  });
+
+  it("accepts reconstruction capability summaries from GET /reconstruction-capabilities", () => {
+    const capabilities = parseReconstructionCapabilities({
+      frame_backend: "ffmpeg",
+      pose_backend: "stub",
+      gaussian_backend: "stub",
+      frame_command: "/opt/homebrew/bin/ffmpeg",
+      pose_command: null,
+      gaussian_command: null,
+      pipeline_status: "mixed",
+      real_reconstruction_ready: false,
+      missing_requirements: [
+        "Install COLMAP and set DREAMNAV_POSE_BACKEND=colmap.",
+        "Set DREAMNAV_GAUSSIAN_BACKEND=command and DREAMNAV_GAUSSIAN_COMMAND to a real reconstruction wrapper."
+      ],
+      warnings: ["The current pipeline still falls back to placeholder geometry."]
+    });
+
+    expect(capabilities.pipeline_status).toBe("mixed");
   });
 });

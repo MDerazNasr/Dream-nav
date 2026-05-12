@@ -208,6 +208,42 @@ button {
   background: rgba(255, 177, 150, 0.12);
 }
 
+.reconstruction-panel {
+  margin: 16px 22px 0;
+  padding: 16px;
+  border: 1px solid rgba(245, 247, 244, 0.14);
+  border-radius: 8px;
+  background: rgba(245, 247, 244, 0.05);
+}
+
+.reconstruction-panel .workflow-heading {
+  padding: 0;
+}
+
+.reconstruction-panel .workflow-heading h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.reconstruction-panel .workflow-heading p {
+  margin-top: 4px;
+}
+
+.reconstruction-summary {
+  display: grid;
+  gap: 8px;
+}
+
+.reconstruction-list {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: #f5f7f4;
+}
+
+.reconstruction-list[data-tone="warning"] {
+  color: #f5c36b;
+}
+
 .workflow-actions {
   display: flex;
   flex-wrap: wrap;

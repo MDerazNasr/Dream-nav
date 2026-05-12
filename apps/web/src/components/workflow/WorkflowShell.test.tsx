@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { WorkflowShell } from "./WorkflowShell";
-import { sceneBundle } from "./WorkflowShell.fixtures";
+import { reconstructionCapabilities, sceneBundle } from "./WorkflowShell.fixtures";
 import type { ViewerSceneBundle } from "../../lib/dreamnav-api";
 import { fetchJobArtifact, fetchJobSceneBundle, fetchJobStatus } from "../../lib/dreamnav-api";
 
@@ -49,10 +49,11 @@ vi.mock("../../lib/dreamnav-api", async (importOriginal) => {
 
 describe("WorkflowShell", () => {
   it("opens the prevalidated demo scene", () => {
-    render(<WorkflowShell sceneBundle={sceneBundle} />);
+    render(<WorkflowShell reconstructionCapabilities={reconstructionCapabilities} sceneBundle={sceneBundle} />);
 
     expect(screen.getByLabelText("Demo readiness").textContent).toContain("Degraded");
     expect(screen.getByText("3DGS locked · Cached completion")).not.toBeNull();
+    expect(screen.getByLabelText("Reconstruction pipeline").textContent).toContain("Partial pipeline");
 
     fireEvent.click(screen.getByRole("button", { name: "Open demo" }));
 
@@ -60,7 +61,7 @@ describe("WorkflowShell", () => {
   });
 
   it("uploads a video and shows processing progress", async () => {
-    render(<WorkflowShell sceneBundle={sceneBundle} />);
+    render(<WorkflowShell reconstructionCapabilities={reconstructionCapabilities} sceneBundle={sceneBundle} />);
     const input = screen.getByLabelText("Walkthrough video");
     const file = new File(["video"], "walkthrough.mp4", { type: "video/mp4" });
 
@@ -90,7 +91,7 @@ describe("WorkflowShell", () => {
       failed_stage: null,
       failed_artifact: null
     });
-    render(<WorkflowShell sceneBundle={sceneBundle} />);
+    render(<WorkflowShell reconstructionCapabilities={reconstructionCapabilities} sceneBundle={sceneBundle} />);
     const input = screen.getByLabelText("Walkthrough video");
 
     fireEvent.change(input, {
@@ -116,7 +117,7 @@ describe("WorkflowShell", () => {
       failed_stage: null,
       failed_artifact: null
     });
-    render(<WorkflowShell sceneBundle={sceneBundle} />);
+    render(<WorkflowShell reconstructionCapabilities={reconstructionCapabilities} sceneBundle={sceneBundle} />);
 
     fireEvent.change(screen.getByLabelText("Walkthrough video"), {
       target: { files: [new File(["video"], "walkthrough.mp4", { type: "video/mp4" })] }
@@ -147,7 +148,7 @@ describe("WorkflowShell", () => {
       failed_stage: "extracting_video_frames",
       failed_artifact: "frame_extraction_command.json"
     });
-    render(<WorkflowShell sceneBundle={sceneBundle} />);
+    render(<WorkflowShell reconstructionCapabilities={reconstructionCapabilities} sceneBundle={sceneBundle} />);
     const input = screen.getByLabelText("Walkthrough video");
 
     fireEvent.change(input, {
@@ -181,7 +182,7 @@ describe("WorkflowShell", () => {
       failed_stage: "extracting_video_frames",
       failed_artifact: "frame_extraction_command.json"
     });
-    render(<WorkflowShell sceneBundle={sceneBundle} />);
+    render(<WorkflowShell reconstructionCapabilities={reconstructionCapabilities} sceneBundle={sceneBundle} />);
 
     fireEvent.change(screen.getByLabelText("Walkthrough video"), {
       target: { files: [new File(["video"], "walkthrough.mp4", { type: "video/mp4" })] }

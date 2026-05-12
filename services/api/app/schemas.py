@@ -27,6 +27,19 @@ class DemoReadiness(StrictModel):
     warnings: list[str]
 
 
+class ReconstructionCapabilities(StrictModel):
+    frame_backend: str
+    pose_backend: str
+    gaussian_backend: str
+    frame_command: str | None
+    pose_command: str | None
+    gaussian_command: str | None
+    pipeline_status: Literal["stub", "mixed", "real"]
+    real_reconstruction_ready: bool
+    missing_requirements: list[str]
+    warnings: list[str]
+
+
 class SceneAssets(StrictModel):
     scene_id: str
     splat_url: str

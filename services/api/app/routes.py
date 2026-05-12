@@ -5,6 +5,7 @@ from fastapi.responses import FileResponse
 
 from .jobs import JobArtifactNameError, JobArtifactNotFoundError, JobDataError, JobNotFoundError, JobRepository
 from .repository import SceneDataError, SceneNotFoundError, SceneRepository
+from .reconstruction_capabilities import detect_reconstruction_capabilities
 from .schemas import (
     DemoScene,
     DemoReadiness,
@@ -13,6 +14,7 @@ from .schemas import (
     JobSceneBundle,
     JobStatus,
     QualityReport,
+    ReconstructionCapabilities,
     SceneAssetStatus,
     SceneAssets,
     UploadResponse,
@@ -46,6 +48,11 @@ def health() -> HealthResponse:
 @router.get("/demo-scenes", response_model=list[DemoScene])
 def demo_scenes(request: Request) -> list[DemoScene]:
     return _repository(request).list_demo_scenes()
+
+
+@router.get("/reconstruction-capabilities", response_model=ReconstructionCapabilities)
+def reconstruction_capabilities(request: Request) -> ReconstructionCapabilities:
+    return detect_reconstruction_capabilities(request.app.state.settings.processing)
 
 
 @router.get("/demo-readiness/{scene_id}", response_model=DemoReadiness)

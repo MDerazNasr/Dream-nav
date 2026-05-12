@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DreamNavApiError,
+  fetchReconstructionCapabilities,
   fetchJobArtifact,
   fetchJobSceneBundle,
   fetchJobStatus,
@@ -168,6 +169,21 @@ const apiPayloads: Record<string, unknown> = {
     status: "degraded",
     blockers: [],
     warnings: ["Completion must stay labeled as lower confidence."]
+  },
+  "http://api.test/reconstruction-capabilities": {
+    frame_backend: "ffmpeg",
+    pose_backend: "stub",
+    gaussian_backend: "stub",
+    frame_command: "/opt/homebrew/bin/ffmpeg",
+    pose_command: null,
+    gaussian_command: null,
+    pipeline_status: "mixed",
+    real_reconstruction_ready: false,
+    missing_requirements: [
+      "Install COLMAP and set DREAMNAV_POSE_BACKEND=colmap.",
+      "Set DREAMNAV_GAUSSIAN_BACKEND=command and DREAMNAV_GAUSSIAN_COMMAND to a real reconstruction wrapper."
+    ],
+    warnings: ["The current pipeline still falls back to placeholder geometry."]
   }
 };
 
@@ -193,6 +209,15 @@ describe("DreamNav API client", () => {
     expect(bundle.assetStatus.splat_url).toBe("http://api.test/scenes/warehouse_01/splat.ply");
     expect(bundle.readiness.status).toBe("degraded");
     expect(bundle.zoneArtifacts.observed.cell_count).toBe(1);
+  });
+
+  it("loads reconstruction capability summaries", async () => {
+    mockFetchFromPayloads(apiPayloads);
+
+    const capabilities = await fetchReconstructionCapabilities("http://api.test");
+
+    expect(capabilities.pipeline_status).toBe("mixed");
+    expect(capabilities.frame_command).toBe("/opt/homebrew/bin/ffmpeg");
   });
 
   it("throws a typed error when an API request fails", async () => {
