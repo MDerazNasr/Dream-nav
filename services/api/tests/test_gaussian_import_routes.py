@@ -20,6 +20,13 @@ def test_import_gaussian_route_converts_point_cloud_for_completed_job(tmp_path) 
     assert response.json()["viewer_render_mode"] == "splat"
     assert response.json()["featured_candidate"] is False
     assert (app.state.job_repository.artifact_root(job_id) / "splat.ply").is_file()
+    gaussian_scene = app.state.job_repository.read_artifact(job_id, "gaussian_scene.json")
+    visibility = app.state.job_repository.read_artifact(job_id, "visibility_manifest.json")
+    explorer_bundle = app.state.job_repository.read_artifact(job_id, "explorer_bundle.json")
+    assert gaussian_scene["backend"] == "import"
+    assert gaussian_scene["command_mode"] == "imported"
+    assert len(visibility["cells"]) > 1
+    assert explorer_bundle["viewer_render_mode"] == "splat"
 
 
 def test_import_gaussian_route_rejects_incomplete_job(tmp_path) -> None:
@@ -90,6 +97,19 @@ def _point_cloud_ply(vertex_count: int) -> bytes:
 
 def _write_viewer_assets(job_repository, job_id: str) -> None:
     for artifact_name, payload in {
+        "capture_quality.json": {
+            "job_id": job_id,
+            "source_video": "walkthrough.mov",
+            "duration_sec": 4.2,
+            "warnings": [],
+        },
+        "frame_extraction.json": {
+            "job_id": job_id,
+            "source_video": "walkthrough.mov",
+            "backend": "ffmpeg",
+            "command_mode": "external",
+            "frame_count": 3,
+        },
         "camera_motion.json": {
             "job_id": job_id,
             "source_video": "walkthrough.mov",
@@ -98,7 +118,7 @@ def _write_viewer_assets(job_repository, job_id: str) -> None:
             "camera_path": "camera_path.json",
             "coordinate_system": "dreamnav_viewer_v1",
             "intrinsics_source": "colmap",
-            "pose_count": 1,
+            "pose_count": 3,
         },
         "camera_path.json": {
             "scene_id": job_id,
@@ -118,7 +138,21 @@ def _write_viewer_assets(job_repository, job_id: str) -> None:
                     "position": [0, 1.55, 0],
                     "rotation_xyzw": [0, 0, 0, 1],
                     "fov_degrees": 60,
-                }
+                },
+                {
+                    "frame_index": 1,
+                    "timestamp_sec": 0.5,
+                    "position": [0.2, 1.55, -0.8],
+                    "rotation_xyzw": [0, 0.02, 0, 0.9998],
+                    "fov_degrees": 60,
+                },
+                {
+                    "frame_index": 2,
+                    "timestamp_sec": 1.0,
+                    "position": [-0.2, 1.55, -1.0],
+                    "rotation_xyzw": [0, -0.02, 0, 0.9998],
+                    "fov_degrees": 60,
+                },
             ],
         },
         "gaussian_scene.json": {
@@ -136,7 +170,7 @@ def _write_viewer_assets(job_repository, job_id: str) -> None:
             "title": "Processed walkthrough",
             "input_video": "walkthrough.mov",
             "duration_sec": 0,
-            "frame_count": 1,
+            "frame_count": 3,
             "pose_backend": "colmap",
             "camera_path": "camera_path.json",
             "splat_file": "splat.ply",
@@ -188,7 +222,7 @@ def _write_viewer_assets(job_repository, job_id: str) -> None:
         "quality.json": {
             "scene_id": job_id,
             "pose_backend": "colmap",
-            "frame_count": 1,
+            "frame_count": 3,
             "visibility_threshold_observed": 3,
             "splat_fps": 0,
             "scene_model_training_sec": 184,
@@ -226,6 +260,39 @@ def _write_viewer_assets(job_repository, job_id: str) -> None:
             "heldout_psnr_median": 21.4,
             "cache_strategy": "none",
             "cached_predictions": [],
+        },
+        "visibility_support.json": {
+            "job_id": job_id,
+            "source_video": "walkthrough.mov",
+            "observed_threshold": 3,
+            "method": "voxel_visibility_v1",
+        },
+        "training_views.json": {
+            "job_id": job_id,
+            "source_video": "walkthrough.mov",
+            "train_views": 520,
+            "heldout_views": 80,
+        },
+        "scene_model.json": {
+            "job_id": job_id,
+            "source_video": "walkthrough.mov",
+            "architecture": "pose_conditioned_encoder_decoder",
+            "training_time_sec": 184,
+        },
+        "heldout_evaluation.json": {
+            "job_id": job_id,
+            "source_video": "walkthrough.mov",
+            "heldout_psnr_median": 21.4,
+        },
+        "quality_gate.json": {
+            "job_id": job_id,
+            "source_video": "walkthrough.mov",
+            "heldout_psnr_median": 21.4,
+            "quality_gate": "warning",
+            "completion_policy": "warning_overlay",
+            "quality_gate_reason": "Held-out PSNR is below 22 dB but at least 20 dB.",
+            "warning_threshold_psnr": 20,
+            "pass_threshold_psnr": 22,
         },
         "observed_zone.json": {
             "scene_id": job_id,

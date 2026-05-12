@@ -21,6 +21,7 @@ from .schemas import (
     UploadResponse,
 )
 from .splat_assets import SplatAssetError, import_job_splat_asset
+from .viewer_assets import ViewerAssetBuildError, build_job_viewer_assets
 
 router = APIRouter()
 
@@ -123,12 +124,13 @@ async def import_gaussian_asset(
     except SplatAssetError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
+    source_video = _job_source_video(job_id, job_repository)
     job_repository.write_artifact(
         job_id,
         "gaussian_scene.json",
         {
             "job_id": job_id,
-            "source_video": "imported_gaussian",
+            "source_video": source_video,
             "backend": "import",
             "command_mode": "imported",
             "splat_file": "splat.ply",
@@ -150,6 +152,15 @@ async def import_gaussian_asset(
             "file_size_bytes": imported.file_size_bytes,
         },
     )
+    try:
+        explorer_bundle = build_job_viewer_assets(
+            job_id,
+            source_video,
+            job_repository.artifact_root(job_id),
+        )
+    except ViewerAssetBuildError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    job_repository.write_artifact(job_id, "explorer_bundle.json", explorer_bundle)
 
     return GaussianImportResponse(
         job_id=job_id,
@@ -230,6 +241,16 @@ def _job_asset_status(job_id: str, scene_id: str, job_repository: JobRepository)
         viewer_render_mode="splat" if splat_available else "placeholder",
         missing_assets=[] if splat_available else ["splat.ply"],
     )
+
+
+def _job_source_video(job_id: str, job_repository: JobRepository) -> str:
+    try:
+        metadata = job_repository.read_artifact(job_id, "metadata.json")
+    except JobArtifactNotFoundError:
+        return "imported_gaussian"
+
+    input_video = metadata.get("input_video")
+    return input_video if isinstance(input_video, str) and input_video else "imported_gaussian"
 
 
 def _build_job_scene_bundle(job_id: str, output_scene_id: str, job_repository: JobRepository) -> JobSceneBundle:
