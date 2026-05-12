@@ -47,9 +47,15 @@ def default_settings() -> ApiSettings:
     configured_frame_backend = environ.get("DREAMNAV_FRAME_BACKEND")
     resolved_frame_backend = configured_frame_backend or _default_frame_backend()
     resolved_frame_command = environ.get("DREAMNAV_FRAME_COMMAND")
+    configured_pose_backend = environ.get("DREAMNAV_POSE_BACKEND")
+    resolved_pose_backend = configured_pose_backend or _default_pose_backend()
+    resolved_pose_command = environ.get("DREAMNAV_POSE_COMMAND")
 
     if resolved_frame_backend == "ffmpeg" and not resolved_frame_command:
         resolved_frame_command = which("ffmpeg")
+
+    if resolved_pose_backend == "colmap" and not resolved_pose_command:
+        resolved_pose_command = which("colmap")
 
     return ApiSettings(
         repo_root=Path(__file__).resolve().parents[3],
@@ -60,8 +66,8 @@ def default_settings() -> ApiSettings:
             frame_rate=float(environ.get("DREAMNAV_FRAME_RATE", "2")),
             frame_max_count=int(environ.get("DREAMNAV_FRAME_MAX_COUNT", "240")),
             frame_max_duration_sec=float(environ.get("DREAMNAV_FRAME_MAX_DURATION_SEC", "60")),
-            pose_backend=environ.get("DREAMNAV_POSE_BACKEND", "stub"),
-            pose_command=environ.get("DREAMNAV_POSE_COMMAND"),
+            pose_backend=resolved_pose_backend,
+            pose_command=resolved_pose_command,
             pose_timeout_sec=float(environ.get("DREAMNAV_POSE_TIMEOUT_SEC", "30")),
             gaussian_backend=environ.get("DREAMNAV_GAUSSIAN_BACKEND", "stub"),
             gaussian_command=environ.get("DREAMNAV_GAUSSIAN_COMMAND"),
@@ -72,3 +78,7 @@ def default_settings() -> ApiSettings:
 
 def _default_frame_backend() -> str:
     return "ffmpeg" if which("ffmpeg") else "stub"
+
+
+def _default_pose_backend() -> str:
+    return "colmap" if which("colmap") else "stub"

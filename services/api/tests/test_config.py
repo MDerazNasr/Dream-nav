@@ -35,9 +35,28 @@ def test_default_settings_reads_pose_backend_env(monkeypatch) -> None:
 def test_default_settings_prefers_ffmpeg_when_available(monkeypatch) -> None:
     monkeypatch.delenv("DREAMNAV_FRAME_BACKEND", raising=False)
     monkeypatch.delenv("DREAMNAV_FRAME_COMMAND", raising=False)
+    monkeypatch.delenv("DREAMNAV_POSE_BACKEND", raising=False)
+    monkeypatch.delenv("DREAMNAV_POSE_COMMAND", raising=False)
     monkeypatch.setattr(config_module, "which", lambda command: "/opt/homebrew/bin/ffmpeg" if command == "ffmpeg" else None)
 
     settings = default_settings()
 
     assert settings.processing.frame_backend == "ffmpeg"
     assert settings.processing.frame_command == "/opt/homebrew/bin/ffmpeg"
+
+
+def test_default_settings_prefers_colmap_when_available(monkeypatch) -> None:
+    monkeypatch.delenv("DREAMNAV_FRAME_BACKEND", raising=False)
+    monkeypatch.delenv("DREAMNAV_FRAME_COMMAND", raising=False)
+    monkeypatch.delenv("DREAMNAV_POSE_BACKEND", raising=False)
+    monkeypatch.delenv("DREAMNAV_POSE_COMMAND", raising=False)
+    monkeypatch.setattr(
+        config_module,
+        "which",
+        lambda command: "/opt/homebrew/bin/colmap" if command == "colmap" else None,
+    )
+
+    settings = default_settings()
+
+    assert settings.processing.pose_backend == "colmap"
+    assert settings.processing.pose_command == "/opt/homebrew/bin/colmap"
