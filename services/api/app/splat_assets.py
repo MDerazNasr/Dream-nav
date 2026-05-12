@@ -4,8 +4,29 @@ from dataclasses import dataclass
 from json import JSONDecodeError, loads
 from math import log
 from pathlib import Path
+from re import sub
 from struct import pack, unpack
 from typing import Any
+
+from .point_cloud_to_splat import PointCloudToSplatError, read_ply_points, write_splat_from_points
+
+IMPORTED_POINT_CLOUD_MAX_POINTS = 50000
+_SPLAT_PROPERTIES = {
+    "x",
+    "y",
+    "z",
+    "f_dc_0",
+    "f_dc_1",
+    "f_dc_2",
+    "opacity",
+    "scale_0",
+    "scale_1",
+    "scale_2",
+    "rot_0",
+    "rot_1",
+    "rot_2",
+    "rot_3",
+}
 
 
 class SplatAssetError(Exception):
@@ -27,6 +48,14 @@ class SplatPoint:
     z: float
 
 
+@dataclass(frozen=True)
+class ImportedSplatAssetSummary:
+    source_file: str
+    import_format: str
+    gaussian_count: int
+    file_size_bytes: int
+
+
 def ensure_job_splat_asset(artifacts_root: Path, allow_stub: bool = True) -> SplatAssetSummary:
     splat_path = artifacts_root / "splat.ply"
     if splat_path.is_file() and splat_path.stat().st_size > 0:
@@ -39,6 +68,46 @@ def ensure_job_splat_asset(artifacts_root: Path, allow_stub: bool = True) -> Spl
     splats = _splats_from_camera_path(camera_path)
     _write_splat_ply(splat_path, splats)
     return _summary(splat_path, "stub")
+
+
+def import_job_splat_asset(
+    artifacts_root: Path,
+    source_filename: str,
+    payload: bytes,
+    max_points: int = IMPORTED_POINT_CLOUD_MAX_POINTS,
+) -> ImportedSplatAssetSummary:
+    if not payload:
+        raise SplatAssetError("Imported Gaussian asset is empty.")
+
+    source_suffix = Path(source_filename).suffix.lower()
+    if source_suffix != ".ply":
+        raise SplatAssetError("Imported Gaussian asset must be a .ply file.")
+
+    import_root = artifacts_root / "imports"
+    import_root.mkdir(parents=True, exist_ok=True)
+    source_file = _safe_import_filename(source_filename)
+    imported_path = import_root / source_file
+    imported_path.write_bytes(payload)
+
+    splat_path = artifacts_root / "splat.ply"
+    if _is_splat_ply(imported_path):
+        splat_path.write_bytes(payload)
+        gaussian_count = _read_vertex_count(splat_path)
+        import_format = "splat_ply"
+    else:
+        try:
+            points = read_ply_points(imported_path)
+            gaussian_count = write_splat_from_points(points, splat_path, max_points=max_points)
+        except PointCloudToSplatError as error:
+            raise SplatAssetError(str(error)) from error
+        import_format = "point_cloud_ply"
+
+    return ImportedSplatAssetSummary(
+        source_file=f"imports/{source_file}",
+        import_format=import_format,
+        gaussian_count=gaussian_count,
+        file_size_bytes=imported_path.stat().st_size,
+    )
 
 
 def _splats_from_camera_path(camera_path: dict[str, Any]) -> list[dict[str, object]]:
@@ -197,3 +266,14 @@ def _properties_from_header(header: str) -> list[str]:
             properties.append(parts[2])
 
     return properties
+
+
+def _is_splat_ply(path: Path) -> bool:
+    header = path.read_bytes().split(b"end_header\n", 1)[0].decode("utf-8", errors="replace")
+    return "format binary_little_endian 1.0" in header and _SPLAT_PROPERTIES.issubset(_properties_from_header(header))
+
+
+def _safe_import_filename(filename: str) -> str:
+    stem = Path(filename).stem or "gaussian_input"
+    safe_stem = sub(r"[^A-Za-z0-9_.-]+", "_", stem).strip("._") or "gaussian_input"
+    return f"{safe_stem}.ply"

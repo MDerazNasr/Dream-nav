@@ -9,6 +9,7 @@ from .reconstruction_capabilities import detect_reconstruction_capabilities
 from .schemas import (
     DemoScene,
     DemoReadiness,
+    GaussianImportResponse,
     HealthResponse,
     JobArtifact,
     JobSceneBundle,
@@ -19,6 +20,7 @@ from .schemas import (
     SceneAssets,
     UploadResponse,
 )
+from .splat_assets import SplatAssetError, import_job_splat_asset
 
 router = APIRouter()
 
@@ -98,6 +100,66 @@ async def upload_walkthrough(
         Thread(target=request.app.state.processing_worker.process_available_jobs, daemon=True).start()
 
     return response
+
+
+@router.post("/jobs/{job_id}/import-gaussian", response_model=GaussianImportResponse)
+async def import_gaussian_asset(
+    job_id: str,
+    request: Request,
+    file: UploadFile = File(...),
+) -> GaussianImportResponse:
+    job_repository = _job_repository(request)
+    status = job_repository.get_status(job_id)
+    if status.state != "completed":
+        raise HTTPException(status_code=409, detail="Job scene bundle is not ready for Gaussian import")
+
+    payload = await file.read()
+    try:
+        imported = import_job_splat_asset(
+            job_repository.artifact_root(job_id),
+            file.filename or "gaussian_input.ply",
+            payload,
+        )
+    except SplatAssetError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+    job_repository.write_artifact(
+        job_id,
+        "gaussian_scene.json",
+        {
+            "job_id": job_id,
+            "source_video": "imported_gaussian",
+            "backend": "import",
+            "command_mode": "imported",
+            "splat_file": "splat.ply",
+            "gaussian_count": imported.gaussian_count,
+            "splat_source": "imported",
+            "splat_file_size_bytes": (job_repository.artifact_root(job_id) / "splat.ply").stat().st_size,
+            "import_format": imported.import_format,
+            "import_file": imported.source_file,
+        },
+    )
+    job_repository.write_artifact(
+        job_id,
+        "gaussian_import.json",
+        {
+            "job_id": job_id,
+            "source_file": imported.source_file,
+            "import_format": imported.import_format,
+            "gaussian_count": imported.gaussian_count,
+            "file_size_bytes": imported.file_size_bytes,
+        },
+    )
+
+    return GaussianImportResponse(
+        job_id=job_id,
+        source_file=imported.source_file,
+        import_format=imported.import_format,
+        gaussian_count=imported.gaussian_count,
+        file_size_bytes=imported.file_size_bytes,
+        viewer_render_mode="splat",
+        featured_candidate=job_repository.featured_scene_ready(job_id),
+    )
 
 
 @router.get("/status/{job_id}", response_model=JobStatus)

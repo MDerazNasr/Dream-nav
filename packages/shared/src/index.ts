@@ -47,16 +47,19 @@ export {
   parseCompletionManifest
 } from "./schemas/completion-manifest.js";
 export {
+  type GaussianImportResponse,
   type JobStatus,
   type JobArtifact,
   type JobSceneBundle,
   type JobLifecycleState,
   type ProcessingStage,
   type UploadResponse,
+  gaussianImportResponseSchema,
   jobArtifactSchema,
   jobSceneBundleSchema,
   jobStatusSchema,
   jobLifecycleStateSchema,
+  parseGaussianImportResponse,
   parseJobArtifact,
   parseJobSceneBundle,
   parseJobStatus,

@@ -66,6 +66,16 @@ class UploadResponse(StrictModel):
     estimated_processing_time_sec: int = Field(ge=0)
 
 
+class GaussianImportResponse(StrictModel):
+    job_id: str
+    source_file: str
+    import_format: str
+    gaussian_count: int = Field(ge=0)
+    file_size_bytes: int = Field(ge=0)
+    viewer_render_mode: Literal["placeholder", "splat"]
+    featured_candidate: bool
+
+
 class JobStatus(StrictModel):
     job_id: str
     state: str

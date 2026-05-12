@@ -31,6 +31,16 @@ export const uploadResponseSchema = z.object({
   estimated_processing_time_sec: z.number().min(0)
 });
 
+export const gaussianImportResponseSchema = z.object({
+  job_id: z.string().min(1),
+  source_file: z.string().min(1),
+  import_format: z.string().min(1),
+  gaussian_count: z.number().min(0),
+  file_size_bytes: z.number().min(0),
+  viewer_render_mode: z.enum(["placeholder", "splat"]),
+  featured_candidate: z.boolean()
+});
+
 export const jobStatusSchema = z.object({
   job_id: z.string().min(1),
   state: jobLifecycleStateSchema,
@@ -69,6 +79,8 @@ export type ProcessingStage = z.infer<typeof processingStageSchema>;
 
 export type UploadResponse = z.infer<typeof uploadResponseSchema>;
 
+export type GaussianImportResponse = z.infer<typeof gaussianImportResponseSchema>;
+
 export type JobStatus = z.infer<typeof jobStatusSchema>;
 
 export type JobArtifact = z.infer<typeof jobArtifactSchema>;
@@ -77,6 +89,10 @@ export type JobSceneBundle = z.infer<typeof jobSceneBundleSchema>;
 
 export function parseUploadResponse(input: unknown): UploadResponse {
   return uploadResponseSchema.parse(input);
+}
+
+export function parseGaussianImportResponse(input: unknown): GaussianImportResponse {
+  return gaussianImportResponseSchema.parse(input);
 }
 
 export function parseJobStatus(input: unknown): JobStatus {

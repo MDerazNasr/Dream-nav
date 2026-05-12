@@ -1,7 +1,7 @@
 from json import dumps
 from pathlib import Path
 
-from app.splat_assets import ensure_job_splat_asset
+from app.splat_assets import ensure_job_splat_asset, import_job_splat_asset
 
 
 def test_splat_asset_generator_writes_browser_ply(tmp_path: Path) -> None:
@@ -27,6 +27,60 @@ def test_splat_asset_generator_keeps_existing_splat(tmp_path: Path) -> None:
     assert summary.source == "existing"
     assert summary.gaussian_count == 1
     assert (tmp_path / "splat.ply").read_bytes() == existing_splat
+
+
+def test_import_job_splat_asset_converts_point_cloud_ply(tmp_path: Path) -> None:
+    payload = (
+        "ply\n"
+        "format ascii 1.0\n"
+        "element vertex 3\n"
+        "property float x\n"
+        "property float y\n"
+        "property float z\n"
+        "property uchar red\n"
+        "property uchar green\n"
+        "property uchar blue\n"
+        "end_header\n"
+        "0 1 -2 255 0 0\n"
+        "0.4 1.1 -2.2 0 255 64\n"
+        "0.8 1.3 -2.6 0 32 255\n"
+    ).encode("utf-8")
+
+    summary = import_job_splat_asset(tmp_path, "dense_scene.ply", payload)
+
+    assert summary.import_format == "point_cloud_ply"
+    assert summary.gaussian_count == 3
+    assert summary.source_file == "imports/dense_scene.ply"
+    assert (tmp_path / "splat.ply").read_bytes().startswith(b"ply\nformat binary_little_endian 1.0")
+
+
+def test_import_job_splat_asset_keeps_imported_splat(tmp_path: Path) -> None:
+    imported_splat = (
+        "ply\n"
+        "format binary_little_endian 1.0\n"
+        "element vertex 1\n"
+        "property float x\n"
+        "property float y\n"
+        "property float z\n"
+        "property float f_dc_0\n"
+        "property float f_dc_1\n"
+        "property float f_dc_2\n"
+        "property float opacity\n"
+        "property float scale_0\n"
+        "property float scale_1\n"
+        "property float scale_2\n"
+        "property float rot_0\n"
+        "property float rot_1\n"
+        "property float rot_2\n"
+        "property float rot_3\n"
+        "end_header\n"
+    ).encode("utf-8") + (b"\x00" * (14 * 4))
+
+    summary = import_job_splat_asset(tmp_path, "dense_scene.ply", imported_splat)
+
+    assert summary.import_format == "splat_ply"
+    assert summary.gaussian_count == 1
+    assert (tmp_path / "splat.ply").read_bytes() == imported_splat
 
 
 def _write_camera_path(tmp_path: Path) -> None:

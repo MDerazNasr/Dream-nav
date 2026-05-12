@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { parseJobArtifact, parseJobSceneBundle, parseJobStatus, parseUploadResponse } from "./processing.js";
+import {
+  parseGaussianImportResponse,
+  parseJobArtifact,
+  parseJobSceneBundle,
+  parseJobStatus,
+  parseUploadResponse
+} from "./processing.js";
 
 describe("processing schemas", () => {
   it("accepts upload responses with validation warnings", () => {
@@ -103,6 +109,21 @@ describe("processing schemas", () => {
     });
 
     expect(artifact.payload.stderr).toBe("ffmpeg failed");
+  });
+
+  it("accepts imported Gaussian summaries", () => {
+    const response = parseGaussianImportResponse({
+      job_id: "scene_abc123",
+      source_file: "imports/dense_scene.ply",
+      import_format: "point_cloud_ply",
+      gaussian_count: 24000,
+      file_size_bytes: 128000,
+      viewer_render_mode: "splat",
+      featured_candidate: true
+    });
+
+    expect(response.featured_candidate).toBe(true);
+    expect(response.viewer_render_mode).toBe("splat");
   });
 
   it("accepts completed job viewer bundles", () => {

@@ -218,6 +218,10 @@ class JobRepository:
 
         return None
 
+    def featured_scene_ready(self, job_id: str) -> bool:
+        self._read_job(job_id)
+        return self._featured_scene_ready(job_id)
+
     def write_artifact(self, job_id: str, artifact_name: str, payload: object) -> Path:
         artifact_root = self.artifact_root(job_id)
         artifact_root.mkdir(parents=True, exist_ok=True)
@@ -342,7 +346,7 @@ class JobRepository:
         quality_report = self.read_artifact(job_id, "quality.json")
         return (
             camera_motion.get("backend") != "stub"
-            and gaussian_scene.get("backend") == "command"
+            and gaussian_scene.get("backend") in {"command", "import"}
             and _float_value(gaussian_scene.get("gaussian_count")) >= FEATURED_SCENE_MIN_GAUSSIANS
             and _float_value(visibility_manifest.get("observed_ratio")) >= FEATURED_SCENE_MIN_OBSERVED_RATIO
             and _float_value(visibility_manifest.get("completion_candidate_ratio")) <= FEATURED_SCENE_MAX_COMPLETION_RATIO
