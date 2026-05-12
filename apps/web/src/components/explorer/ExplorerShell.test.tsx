@@ -245,6 +245,8 @@ describe("ExplorerShell", () => {
     expect(screen.getByLabelText("Render mode").textContent).toContain("Placeholder");
     expect(screen.getByLabelText("Current camera position")).not.toBeNull();
     expect(screen.getByText("0.0, 0.0")).not.toBeNull();
+    expect(screen.getByLabelText("Quality report")).not.toBeNull();
+    expect(screen.getByLabelText("Quality report text").textContent).toContain("Warehouse Scout");
     expect(screen.getByLabelText("Completion preview")).not.toBeNull();
     expect(screen.getByAltText("Cached completion prediction").getAttribute("src")).toBe(
       "/dreamnav-assets/scenes/warehouse_01/completion/pred_001.svg"

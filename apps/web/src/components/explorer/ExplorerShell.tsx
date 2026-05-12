@@ -20,6 +20,7 @@ import { ConfidenceLegend } from "./ConfidenceLegend";
 import { LensSelector } from "./LensSelector";
 import { MetricsPanel } from "./MetricsPanel";
 import { Minimap } from "./Minimap";
+import { QualityReportPanel } from "./QualityReportPanel";
 import { SceneViewport } from "./SceneViewport";
 import { initialViewerCameraPose, type ViewerCameraPose } from "./viewer-camera";
 
@@ -163,6 +164,15 @@ export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
           cameraPose={currentPose}
           completionCacheStatus={completionCacheStatus}
           quality={sceneBundle.quality}
+        />
+
+        <QualityReportPanel
+          completion={sceneBundle.completion}
+          currentPose={currentPose}
+          match={cachedCompletionMatch}
+          metadata={sceneBundle.metadata}
+          quality={sceneBundle.quality}
+          visibility={sceneBundle.visibility}
         />
 
         <CompletionPreview completion={sceneBundle.completion} match={cachedCompletionMatch} />

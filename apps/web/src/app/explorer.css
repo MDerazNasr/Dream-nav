@@ -160,6 +160,62 @@
   font-weight: 620;
 }
 
+.report-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid rgba(245, 247, 244, 0.14);
+  border-radius: 8px;
+  background: rgba(245, 247, 244, 0.08);
+  color: #dfe7df;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.report-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 12px 10px;
+}
+
+.report-grid dt,
+.report-grid dd {
+  margin: 0;
+}
+
+.report-grid dt {
+  color: #b8c6bd;
+  font-size: 11px;
+}
+
+.report-grid dd {
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+  color: #f5f7f4;
+  font-size: 13px;
+  font-weight: 620;
+}
+
+.report-output {
+  max-height: 156px;
+  margin: 0 12px 12px;
+  overflow: auto;
+  white-space: pre-wrap;
+  border: 1px solid rgba(245, 247, 244, 0.12);
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(245, 247, 244, 0.05);
+  color: #dfe7df;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 .minimap {
   aspect-ratio: 1 / 1;
   width: 100%;
