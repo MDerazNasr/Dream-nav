@@ -51,6 +51,9 @@ describe("WorkflowShell", () => {
   it("opens the prevalidated demo scene", () => {
     render(<WorkflowShell sceneBundle={sceneBundle} />);
 
+    expect(screen.getByLabelText("Demo readiness").textContent).toContain("Degraded");
+    expect(screen.getByText("3DGS locked · Cached completion")).not.toBeNull();
+
     fireEvent.click(screen.getByRole("button", { name: "Open demo" }));
 
     expect(screen.getByTestId("explorer-shell")).not.toBeNull();

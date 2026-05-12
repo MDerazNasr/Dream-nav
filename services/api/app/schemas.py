@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -12,6 +12,19 @@ class DemoScene(StrictModel):
     title: str
     thumbnail_url: str
     description: str
+
+
+class DemoReadiness(StrictModel):
+    scene_id: str
+    locked_scene: bool
+    required_assets_present: bool
+    fallback_assets_present: bool
+    quality_gate: Literal["pass", "warning", "fail"]
+    cached_completion: bool
+    viewer_render_mode: Literal["placeholder", "splat"]
+    status: Literal["ready", "degraded", "blocked"]
+    blockers: list[str]
+    warnings: list[str]
 
 
 class SceneAssets(StrictModel):

@@ -1,6 +1,6 @@
 "use client";
 
-import type { JobArtifact, JobStatus, ProcessingStage, UploadResponse } from "@dream-nav/shared";
+import type { DemoReadiness, JobArtifact, JobStatus, ProcessingStage, UploadResponse } from "@dream-nav/shared";
 import { AlertTriangle, CheckCircle2, Film, LoaderCircle, RotateCcw, Upload, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ExplorerShell } from "../explorer/ExplorerShell";
@@ -307,6 +307,18 @@ export function WorkflowShell({ sceneBundle }: WorkflowShellProps) {
           <button className="demo-scene" onClick={openDemoExplorer} type="button">
             <span>{sceneBundle.demoScene.title}</span>
             <small>{sceneBundle.demoScene.description}</small>
+            <span className="demo-readiness" aria-label="Demo readiness">
+              <span className="readiness-pill" data-status={sceneBundle.readiness.status}>
+                {formatReadinessStatus(sceneBundle.readiness.status)}
+              </span>
+              <small>
+                {sceneBundle.readiness.viewer_render_mode === "splat" ? "3DGS locked" : "Fallback view"} ·{" "}
+                {sceneBundle.readiness.cached_completion ? "Cached completion" : "No cached completion"}
+              </small>
+            </span>
+            {sceneBundle.readiness.blockers[0] ?? sceneBundle.readiness.warnings[0] ? (
+              <small>{sceneBundle.readiness.blockers[0] ?? sceneBundle.readiness.warnings[0]}</small>
+            ) : null}
           </button>
         </div>
 
@@ -347,9 +359,48 @@ function toProcessedViewerBundle(
     visibility: jobSceneBundle.visibility,
     completion: jobSceneBundle.completion,
     completionAssetBaseUrl: resolveBrowserAssetDirectoryUrl(jobSceneBundle.assets.completion_manifest_url),
+    readiness: buildProcessedReadiness(jobSceneBundle),
     assetStatus: jobSceneBundle.asset_status,
     zoneArtifacts: jobSceneBundle.zoneArtifacts
   };
+}
+
+function buildProcessedReadiness(
+  jobSceneBundle: Awaited<ReturnType<typeof fetchJobSceneBundle>>
+): DemoReadiness {
+  const blockers = jobSceneBundle.quality.quality_gate === "fail" ? ["Quality gate failed."] : [];
+  const warnings = jobSceneBundle.quality.quality_gate === "warning"
+    ? ["Completion must stay labeled as lower confidence."]
+    : [];
+
+  if (!jobSceneBundle.quality.cached_completion || jobSceneBundle.completion.cached_predictions.length === 0) {
+    warnings.push("Cached completion fallback assets unavailable.");
+  }
+
+  return {
+    scene_id: jobSceneBundle.output_scene_id,
+    locked_scene: false,
+    required_assets_present: jobSceneBundle.asset_status.missing_assets.length === 0,
+    fallback_assets_present: jobSceneBundle.completion.cached_predictions.length > 0,
+    quality_gate: jobSceneBundle.quality.quality_gate,
+    cached_completion: jobSceneBundle.quality.cached_completion,
+    viewer_render_mode: jobSceneBundle.asset_status.viewer_render_mode,
+    status: blockers.length > 0 ? "blocked" : warnings.length > 0 ? "degraded" : "ready",
+    blockers,
+    warnings
+  };
+}
+
+function formatReadinessStatus(status: DemoReadiness["status"]): string {
+  if (status === "ready") {
+    return "Ready";
+  }
+
+  if (status === "blocked") {
+    return "Blocked";
+  }
+
+  return "Degraded";
 }
 
 function getStageLabel(stage: JobStatus["failed_stage"]): string | null {

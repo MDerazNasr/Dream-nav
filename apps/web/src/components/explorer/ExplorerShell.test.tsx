@@ -217,6 +217,18 @@ const sceneBundle: ViewerSceneBundle = {
     ]
   },
   completionAssetBaseUrl: "/dreamnav-assets/scenes/warehouse_01/",
+  readiness: {
+    scene_id: "warehouse_01",
+    locked_scene: true,
+    required_assets_present: true,
+    fallback_assets_present: true,
+    quality_gate: "warning",
+    cached_completion: true,
+    viewer_render_mode: "placeholder",
+    status: "degraded",
+    blockers: [],
+    warnings: ["Completion must stay labeled as lower confidence."]
+  },
   assetStatus: {
     scene_id: "warehouse_01",
     splat_url: "/scenes/warehouse_01/splat.ply",

@@ -7,6 +7,7 @@ from .jobs import JobArtifactNameError, JobArtifactNotFoundError, JobDataError, 
 from .repository import SceneDataError, SceneNotFoundError, SceneRepository
 from .schemas import (
     DemoScene,
+    DemoReadiness,
     HealthResponse,
     JobArtifact,
     JobSceneBundle,
@@ -45,6 +46,11 @@ def health() -> HealthResponse:
 @router.get("/demo-scenes", response_model=list[DemoScene])
 def demo_scenes(request: Request) -> list[DemoScene]:
     return _repository(request).list_demo_scenes()
+
+
+@router.get("/demo-readiness/{scene_id}", response_model=DemoReadiness)
+def demo_readiness(scene_id: str, request: Request) -> DemoReadiness:
+    return _repository(request).get_demo_readiness(scene_id)
 
 
 @router.get("/scene/{scene_id}", response_model=SceneAssets)

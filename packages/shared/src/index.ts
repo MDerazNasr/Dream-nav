@@ -1,9 +1,14 @@
 export { SCENE_SCHEMA_VERSION } from "./constants.js";
 export {
+  type DemoReadiness,
+  type DemoReadinessStatus,
   type DemoScene,
   type SceneAssets,
+  demoReadinessSchema,
+  demoReadinessStatusSchema,
   demoSceneSchema,
   demoScenesResponseSchema,
+  parseDemoReadiness,
   parseDemoScenesResponse,
   parseSceneAssets,
   sceneAssetsSchema

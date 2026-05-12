@@ -2,6 +2,7 @@ import type { SceneBundle } from "@dream-nav/scene-registry";
 import {
   parseCameraPath,
   parseCompletionManifest,
+  parseDemoReadiness,
   parseDemoScenesResponse,
   parseJobArtifact,
   parseJobSceneBundle,
@@ -15,12 +16,13 @@ import {
   parseZoneArtifact
 } from "@dream-nav/shared";
 
-import type { DemoScene, JobArtifact, JobSceneBundle, JobStatus, SceneAssetStatus, UploadResponse } from "@dream-nav/shared";
+import type { DemoReadiness, DemoScene, JobArtifact, JobSceneBundle, JobStatus, SceneAssetStatus, UploadResponse } from "@dream-nav/shared";
 import { buildZoneArtifactsFromVisibility, type ConfidenceZoneArtifacts } from "./confidence-zones";
 
 export type ViewerSceneBundle = SceneBundle & {
   assetStatus: SceneAssetStatus;
   completionAssetBaseUrl: string;
+  readiness: DemoReadiness;
   zoneArtifacts: ConfidenceZoneArtifacts;
 };
 
@@ -76,6 +78,7 @@ export async function fetchSceneBundle(
   const assetStatus = parseSceneAssetStatus(
     await fetchJson(apiBaseUrl, `/scene/${sceneId}/asset-status`)
   );
+  const readiness = parseDemoReadiness(await fetchJson(apiBaseUrl, `/demo-readiness/${sceneId}`));
   const resolvedAssetStatus = {
     ...assetStatus,
     splat_url: new URL(assetStatus.splat_url, normalizeBaseUrl(apiBaseUrl)).toString()
@@ -90,6 +93,7 @@ export async function fetchSceneBundle(
     visibility,
     completion,
     completionAssetBaseUrl: resolveBrowserAssetDirectoryUrl(assets.completion_manifest_url),
+    readiness,
     assetStatus: resolvedAssetStatus,
     zoneArtifacts: buildZoneArtifactsFromVisibility(sceneId, visibility)
   };
