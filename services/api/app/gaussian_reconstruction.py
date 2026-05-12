@@ -46,19 +46,23 @@ def build_gaussian_reconstruction_command(
                 "Gaussian backend command selected but DREAMNAV_GAUSSIAN_COMMAND was not found."
             )
 
+        command = [
+            gaussian_command,
+            "--artifacts-root",
+            str(artifacts_root),
+            "--frames-root",
+            str(artifacts_root / "frames"),
+            "--camera-path",
+            str(artifacts_root / "camera_path.json"),
+            "--output-splat",
+            str(artifacts_root / "splat.ply"),
+        ]
+        if settings.pose_command:
+            command.extend(["--colmap-command", settings.pose_command])
+
         return GaussianCommandSpec(
             artifact_name="gaussian_scene_command.json",
-            command=[
-                gaussian_command,
-                "--artifacts-root",
-                str(artifacts_root),
-                "--frames-root",
-                str(artifacts_root / "frames"),
-                "--camera-path",
-                str(artifacts_root / "camera_path.json"),
-                "--output-splat",
-                str(artifacts_root / "splat.ply"),
-            ],
+            command=command,
             timeout_sec=settings.gaussian_timeout_sec,
         )
 

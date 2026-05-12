@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
-from math import log
 from pathlib import Path
-from struct import pack
 from sys import argv, exit
 
-SH_C0 = 0.28209479177387814
 DEFAULT_SCALE = 0.035
 MAX_POINTS = 12000
+
+try:
+    from .point_cloud_to_splat import PointCloudToSplatError, write_splat_from_points
+except ImportError:
+    from point_cloud_to_splat import PointCloudToSplatError, write_splat_from_points
 
 
 class ColmapSparseToSplatError(Exception):
@@ -21,32 +23,10 @@ def build_splat_from_colmap_points(artifacts_root: Path, output_splat: Path, max
     if not points:
         raise ColmapSparseToSplatError("COLMAP points3D.txt did not contain usable sparse points.")
 
-    sampled_points = _sample_points(points, max_points)
-    rows = [_pack_splat_row(point["position"], point["color"], point["scale"]) for point in sampled_points]
-    header = "\n".join(
-        [
-            "ply",
-            "format binary_little_endian 1.0",
-            f"element vertex {len(rows)}",
-            "property float x",
-            "property float y",
-            "property float z",
-            "property float f_dc_0",
-            "property float f_dc_1",
-            "property float f_dc_2",
-            "property float opacity",
-            "property float scale_0",
-            "property float scale_1",
-            "property float scale_2",
-            "property float rot_0",
-            "property float rot_1",
-            "property float rot_2",
-            "property float rot_3",
-            "end_header\n",
-        ]
-    )
-    output_splat.write_bytes(header.encode("utf-8") + b"".join(rows))
-    return len(rows)
+    try:
+        return write_splat_from_points(points, output_splat, max_points=max_points)
+    except PointCloudToSplatError as error:
+        raise ColmapSparseToSplatError(str(error)) from error
 
 
 def _points3d_path(artifacts_root: Path) -> Path:
@@ -94,50 +74,11 @@ def _read_points3d(points_path: Path) -> list[dict[str, object]]:
 
     return points
 
-
-def _sample_points(points: list[dict[str, object]], max_points: int) -> list[dict[str, object]]:
-    if len(points) <= max_points:
-        return points
-
-    stride = max(1, len(points) // max_points)
-    sampled = points[::stride][:max_points]
-    if not sampled:
-        raise ColmapSparseToSplatError("COLMAP sparse points could not be sampled.")
-
-    return sampled
-
-
 def _point_scale(error_value: float) -> float:
     if error_value <= 0:
         return DEFAULT_SCALE
 
     return max(0.015, min(0.08, error_value * 0.025))
-
-
-def _pack_splat_row(position: list[float], color: list[int], scale: float) -> bytes:
-    scale_log = log(scale)
-    values = [
-        float(position[0]),
-        float(position[1]),
-        float(position[2]),
-        _rgb_channel_to_sh(color[0]),
-        _rgb_channel_to_sh(color[1]),
-        _rgb_channel_to_sh(color[2]),
-        4,
-        scale_log,
-        scale_log,
-        scale_log,
-        0,
-        0,
-        0,
-        1,
-    ]
-    return pack("<14f", *values)
-
-
-def _rgb_channel_to_sh(channel: int) -> float:
-    rgb = max(0, min(255, channel)) / 255
-    return (rgb - 0.5) / SH_C0
 
 
 def main(args: list[str]) -> int:
@@ -156,16 +97,17 @@ def main(args: list[str]) -> int:
 
 
 def _parse_args(args: list[str]) -> dict[str, str]:
-    if len(args) != 8:
+    if len(args) not in {8, 10}:
         raise SystemExit(
-            "Usage: colmap_sparse_to_splat.py --artifacts-root <path> --frames-root <path> --camera-path <path> --output-splat <path>"
+            "Usage: colmap_sparse_to_splat.py --artifacts-root <path> --frames-root <path> --camera-path <path> --output-splat <path> [--colmap-command <cmd>]"
         )
 
     parsed = dict(zip(args[::2], args[1::2], strict=True))
     required = {"--artifacts-root", "--frames-root", "--camera-path", "--output-splat"}
-    if set(parsed) != required:
+    allowed = required | {"--colmap-command"}
+    if not required.issubset(parsed) or not set(parsed).issubset(allowed):
         raise SystemExit(
-            "Usage: colmap_sparse_to_splat.py --artifacts-root <path> --frames-root <path> --camera-path <path> --output-splat <path>"
+            "Usage: colmap_sparse_to_splat.py --artifacts-root <path> --frames-root <path> --camera-path <path> --output-splat <path> [--colmap-command <cmd>]"
         )
 
     return {

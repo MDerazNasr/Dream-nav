@@ -17,6 +17,11 @@ export function ReconstructionStatusPanel({ capabilities }: ReconstructionStatus
               ? "This machine is configured for a real reconstruction run."
               : "This machine is not fully configured for a real 3D reconstruction yet."}
           </p>
+          <p>
+            {capabilities.dense_reconstruction_ready
+              ? "Dense reconstruction is available for generated scenes."
+              : capabilities.dense_reconstruction_reason ?? "Dense reconstruction is not available yet."}
+          </p>
         </div>
       </div>
 

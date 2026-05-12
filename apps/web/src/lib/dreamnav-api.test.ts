@@ -180,11 +180,16 @@ const apiPayloads: Record<string, unknown> = {
     gaussian_command: null,
     pipeline_status: "mixed",
     real_reconstruction_ready: false,
+    dense_reconstruction_ready: false,
+    dense_reconstruction_reason: "Dense reconstruction requires a COLMAP pose backend.",
     missing_requirements: [
       "Install COLMAP and set DREAMNAV_POSE_BACKEND=colmap.",
       "Set DREAMNAV_GAUSSIAN_BACKEND=command and DREAMNAV_GAUSSIAN_COMMAND to a real reconstruction wrapper."
     ],
-    warnings: ["The current pipeline still falls back to placeholder geometry."]
+    warnings: [
+      "The current pipeline still falls back to placeholder geometry.",
+      "Dense reconstruction requires a COLMAP pose backend."
+    ]
   }
 };
 

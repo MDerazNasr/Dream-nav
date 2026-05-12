@@ -45,6 +45,8 @@ export const reconstructionCapabilitiesSchema = z.object({
   gaussian_command: z.string().min(1).nullable(),
   pipeline_status: reconstructionPipelineStatusSchema,
   real_reconstruction_ready: z.boolean(),
+  dense_reconstruction_ready: z.boolean(),
+  dense_reconstruction_reason: z.string().min(1).nullable(),
   missing_requirements: z.array(z.string().min(1)),
   warnings: z.array(z.string().min(1))
 });

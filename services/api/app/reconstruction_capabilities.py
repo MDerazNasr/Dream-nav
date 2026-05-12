@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from shutil import which
 
+from .colmap_dense_capability import detect_colmap_dense_stereo_support
 from .config import ProcessingSettings
 from .schemas import ReconstructionCapabilities
 
@@ -15,6 +16,10 @@ def detect_reconstruction_capabilities(settings: ProcessingSettings) -> Reconstr
     frame_command = _resolve_command(settings.frame_command, "ffmpeg") if frame_backend == "ffmpeg" else None
     pose_command = _resolve_command(settings.pose_command, "colmap") if pose_backend == "colmap" else None
     gaussian_command = _resolve_command(settings.gaussian_command, None) if gaussian_backend == "command" else None
+    dense_reconstruction_ready, dense_reconstruction_reason = _dense_reconstruction_support(
+        pose_backend,
+        pose_command,
+    )
 
     missing_requirements = _missing_requirements(
         frame_backend,
@@ -25,7 +30,14 @@ def detect_reconstruction_capabilities(settings: ProcessingSettings) -> Reconstr
         gaussian_command,
     )
     pipeline_status = _pipeline_status(frame_backend, pose_backend, gaussian_backend, missing_requirements)
-    warnings = _warnings(frame_backend, pose_backend, gaussian_backend, pipeline_status)
+    warnings = _warnings(
+        frame_backend,
+        pose_backend,
+        gaussian_backend,
+        pipeline_status,
+        dense_reconstruction_ready,
+        dense_reconstruction_reason,
+    )
 
     return ReconstructionCapabilities(
         frame_backend=frame_backend,
@@ -36,6 +48,8 @@ def detect_reconstruction_capabilities(settings: ProcessingSettings) -> Reconstr
         gaussian_command=gaussian_command,
         pipeline_status=pipeline_status,
         real_reconstruction_ready=pipeline_status == "real",
+        dense_reconstruction_ready=dense_reconstruction_ready,
+        dense_reconstruction_reason=dense_reconstruction_reason,
         missing_requirements=missing_requirements,
         warnings=warnings,
     )
@@ -105,6 +119,8 @@ def _warnings(
     pose_backend: str,
     gaussian_backend: str,
     pipeline_status: str,
+    dense_reconstruction_ready: bool,
+    dense_reconstruction_reason: str | None,
 ) -> list[str]:
     warnings = []
 
@@ -114,4 +130,14 @@ def _warnings(
     if "stub" in {frame_backend, pose_backend, gaussian_backend}:
         warnings.append("Uploads will not produce a measured 3D reconstruction until every backend leaves stub mode.")
 
+    if not dense_reconstruction_ready and dense_reconstruction_reason:
+        warnings.append(dense_reconstruction_reason)
+
     return warnings
+
+
+def _dense_reconstruction_support(pose_backend: str, pose_command: str | None) -> tuple[bool, str | None]:
+    if pose_backend != "colmap" or not pose_command:
+        return False, "Dense reconstruction requires a COLMAP pose backend."
+
+    return detect_colmap_dense_stereo_support(pose_command)

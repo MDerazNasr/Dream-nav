@@ -36,6 +36,8 @@ class ReconstructionCapabilities(StrictModel):
     gaussian_command: str | None
     pipeline_status: Literal["stub", "mixed", "real"]
     real_reconstruction_ready: bool
+    dense_reconstruction_ready: bool
+    dense_reconstruction_reason: str | None
     missing_requirements: list[str]
     warnings: list[str]
 
