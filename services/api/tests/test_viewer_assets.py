@@ -14,15 +14,23 @@ def test_viewer_assets_write_cached_completion_outputs(tmp_path: Path) -> None:
     quality = _read_json(tmp_path / "quality.json")
     metadata = _read_json(tmp_path / "metadata.json")
     assert completion["cache_strategy"] == "planned_path"
+    assert completion["cache_status"] == "ready"
+    assert completion["cache_version"] == "completion_cache_v1"
     assert completion["cached_predictions"][0]["rgb_asset"] == "completion/pred_001.svg"
     assert completion["cached_predictions"][0]["confidence_mask_asset"] == "completion/pred_001_mask.svg"
     assert completion["cached_predictions"][0]["nearest_view_asset"] == "completion/baseline_nearest_001.png"
     assert completion["cached_predictions"][0]["nearest_view_camera_pose_index"] == 0
+    assert completion["cached_predictions"][0]["latency_ms_p95"] == 18
+    assert completion["cached_predictions"][0]["cache_key"] == "planned_path:scene_abc123:pose_0001:v1"
+    assert completion["cached_predictions"][0]["cache_status"] == "hit"
+    assert completion["cached_predictions"][0]["cache_source"] == "planned_path"
+    assert completion["cached_predictions"][0]["runtime_path"] == "cached_output"
     assert quality["cached_completion"] is True
     assert quality["completion_policy"] == "warning_overlay"
     assert quality["warning_threshold_psnr"] == 20
     assert quality["pass_threshold_psnr"] == 22
     assert quality["completion_latency_ms_p50"] == 12
+    assert quality["completion_latency_ms_p95"] == 18
     assert metadata["optimization"]["cached_output_latency_ms_p50"] == 12
     assert (tmp_path / "completion" / "pred_001.svg").is_file()
     assert (tmp_path / "completion" / "pred_001_mask.svg").is_file()
@@ -40,6 +48,7 @@ def test_viewer_assets_disable_cached_completion_on_failed_quality_gate(tmp_path
     quality = _read_json(tmp_path / "quality.json")
     assert completion["model_enabled"] is False
     assert completion["cache_strategy"] == "none"
+    assert completion["cache_status"] == "disabled"
     assert completion["cached_predictions"] == []
     assert quality["cached_completion"] is False
     assert quality["completion_policy"] == "disabled"

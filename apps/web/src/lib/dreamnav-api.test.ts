@@ -145,6 +145,8 @@ const apiPayloads: Record<string, unknown> = {
     quality_gate: "warning",
     heldout_psnr_median: 21.4,
     cache_strategy: "planned_path",
+    cache_version: "completion_cache_v1",
+    cache_status: "empty",
     cached_predictions: []
   },
   "http://api.test/scene/warehouse_01/asset-status": {
@@ -294,6 +296,8 @@ const jobSceneBundlePayload = {
     quality_gate: "warning",
     heldout_psnr_median: 21.4,
     cache_strategy: "none",
+    cache_version: "completion_cache_v1",
+    cache_status: "empty",
     cached_predictions: []
   },
   asset_status: {

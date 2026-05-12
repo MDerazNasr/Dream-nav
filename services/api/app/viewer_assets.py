@@ -10,6 +10,8 @@ from .visibility_assets import VisibilityBuildError, build_visibility_manifest
 from .zone_assets import ZONE_FILE_NAMES, ZoneAssetBuildError, build_zone_artifacts
 
 CACHED_COMPLETION_LATENCY_MS = 12
+CACHED_COMPLETION_LATENCY_P95_MS = 18
+CACHED_COMPLETION_GENERATED_AT = "2026-05-12T00:00:00.000Z"
 CACHED_COMPLETION_BASELINE_ASSET = "completion/baseline_nearest_001.png"
 CACHED_COMPLETION_BASELINE_FALLBACK_ASSET = "completion/baseline_nearest_001.svg"
 CACHED_COMPLETION_RGB_ASSET = "completion/pred_001.svg"
@@ -220,7 +222,7 @@ def _build_quality_report(
         "warning_threshold_psnr": quality_gate_report["warning_threshold_psnr"],
         "pass_threshold_psnr": quality_gate_report["pass_threshold_psnr"],
         "completion_latency_ms_p50": CACHED_COMPLETION_LATENCY_MS if has_cached_completion else None,
-        "completion_latency_ms_p95": CACHED_COMPLETION_LATENCY_MS + 6 if has_cached_completion else None,
+        "completion_latency_ms_p95": CACHED_COMPLETION_LATENCY_P95_MS if has_cached_completion else None,
         "runtime_path": "placeholder" if not splat_path.is_file() else "torch_fp16",
         "cached_completion": has_cached_completion,
     }
@@ -240,6 +242,8 @@ def _build_completion_manifest(
         "quality_gate": quality_gate_status,
         "heldout_psnr_median": heldout_psnr,
         "cache_strategy": "planned_path" if cached_prediction else "none",
+        "cache_version": "completion_cache_v1",
+        "cache_status": "ready" if cached_prediction else "disabled" if quality_gate_status == "fail" else "empty",
         "cached_predictions": [cached_prediction] if cached_prediction else [],
     }
 
@@ -271,7 +275,19 @@ def _build_cached_completion_prediction(
         "nearest_view_asset": baseline_asset,
         "nearest_view_camera_pose_index": nearest_pose_index,
         "latency_ms_p50": CACHED_COMPLETION_LATENCY_MS,
+        "latency_ms_p95": CACHED_COMPLETION_LATENCY_P95_MS,
+        "cache_key": f"planned_path:{_scene_id(camera_path)}:pose_{target_pose_index:04d}:v1",
+        "cache_status": "hit",
+        "cache_source": "planned_path",
+        "cache_reason": "Cached during explorer preparation for the planned walkthrough path.",
+        "generated_at": CACHED_COMPLETION_GENERATED_AT,
+        "runtime_path": "cached_output",
     }
+
+
+def _scene_id(camera_path: dict[str, Any]) -> str:
+    value = camera_path.get("scene_id")
+    return value if isinstance(value, str) and value else "scene"
 
 
 def _cached_prediction_pose_index(camera_path: dict[str, Any]) -> int:

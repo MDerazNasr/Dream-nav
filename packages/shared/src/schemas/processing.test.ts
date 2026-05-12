@@ -186,6 +186,8 @@ const viewerCompletion = {
   quality_gate: "warning",
   heldout_psnr_median: 21.4,
   cache_strategy: "none",
+  cache_version: "completion_cache_v1",
+  cache_status: "empty",
   cached_predictions: []
 };
 

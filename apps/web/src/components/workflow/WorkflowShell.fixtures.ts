@@ -144,6 +144,8 @@ export const processedJobSceneBundle = {
     quality_gate: "warning",
     heldout_psnr_median: 21.4,
     cache_strategy: "none",
+    cache_version: "completion_cache_v1",
+    cache_status: "empty",
     cached_predictions: []
   },
   asset_status: {
@@ -203,6 +205,7 @@ export const sceneBundle = {
     ...processedJobSceneBundle.completion,
     scene_id: "warehouse_01",
     cache_strategy: "planned_path",
+    cache_status: "ready",
     cached_predictions: [
       {
         prediction_id: "pred_001",
@@ -211,7 +214,14 @@ export const sceneBundle = {
         confidence_mask_asset: "completion/pred_001_mask.svg",
         nearest_view_asset: "completion/baseline_nearest_001.png",
         nearest_view_camera_pose_index: null,
-        latency_ms_p50: 12
+        latency_ms_p50: 12,
+        latency_ms_p95: 18,
+        cache_key: "planned_path:warehouse_01:pose_0000:v1",
+        cache_status: "hit",
+        cache_source: "planned_path",
+        cache_reason: "Cached during explorer preparation for the planned walkthrough path.",
+        generated_at: "2026-05-12T00:00:00.000Z",
+        runtime_path: "cached_output"
       }
     ]
   },
