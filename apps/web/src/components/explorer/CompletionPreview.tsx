@@ -26,6 +26,24 @@ export function CompletionPreview({ completion, match }: CompletionPreviewProps)
             <span>{match.prediction.prediction_id}</span>
             <span>{formatPredictionLatency(match.prediction.latency_ms_p50)}</span>
           </div>
+          <dl className="completion-cache-grid" aria-label="Completion cache metadata">
+            <div>
+              <dt>Status</dt>
+              <dd>{formatCacheStatus(match.prediction.cache_status)}</dd>
+            </div>
+            <div>
+              <dt>Runtime</dt>
+              <dd>{match.prediction.runtime_path}</dd>
+            </div>
+            <div>
+              <dt>P95</dt>
+              <dd>{formatPredictionLatency(match.prediction.latency_ms_p95)}</dd>
+            </div>
+            <div>
+              <dt>Source</dt>
+              <dd>{formatCacheSource(match.prediction.cache_source)}</dd>
+            </div>
+          </dl>
         </div>
       ) : (
         <div className="completion-empty" aria-label="No cached completion prediction">
@@ -42,4 +60,12 @@ function formatPredictionLatency(latencyMs: number | null): string {
   }
 
   return `${latencyMs} ms`;
+}
+
+function formatCacheStatus(status: string): string {
+  return status === "hit" ? "Hit" : "Miss";
+}
+
+function formatCacheSource(source: string): string {
+  return source === "planned_path" ? "Planned path" : "Live inference";
 }

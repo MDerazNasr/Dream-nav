@@ -195,6 +195,8 @@ const sceneBundle: ViewerSceneBundle = {
     quality_gate: "warning",
     heldout_psnr_median: 21.4,
     cache_strategy: "planned_path",
+    cache_version: "completion_cache_v1",
+    cache_status: "ready",
     cached_predictions: [
       {
         prediction_id: "pred_001",
@@ -203,7 +205,14 @@ const sceneBundle: ViewerSceneBundle = {
         confidence_mask_asset: "completion/pred_001_mask.svg",
         nearest_view_asset: "completion/baseline_nearest_001.png",
         nearest_view_camera_pose_index: 0,
-        latency_ms_p50: 12
+        latency_ms_p50: 12,
+        latency_ms_p95: 18,
+        cache_key: "planned_path:warehouse_01:pose_0001:v1",
+        cache_status: "hit",
+        cache_source: "planned_path",
+        cache_reason: "Cached during explorer preparation for the planned walkthrough path.",
+        generated_at: "2026-05-12T00:00:00.000Z",
+        runtime_path: "cached_output"
       }
     ]
   },
@@ -257,6 +266,11 @@ describe("ExplorerShell", () => {
     );
     expect(screen.getAllByText(/pred_001/).length).toBeGreaterThan(0);
     expect(screen.getAllByText("12 ms").length).toBeGreaterThan(0);
+    expect(screen.getByLabelText("Completion cache metadata")).not.toBeNull();
+    expect(screen.getByText("Hit")).not.toBeNull();
+    expect(screen.getByText("cached_output")).not.toBeNull();
+    expect(screen.getByText("18 ms")).not.toBeNull();
+    expect(screen.getByText("Planned path")).not.toBeNull();
   });
 
   it("toggles the confidence overlay button state", () => {
