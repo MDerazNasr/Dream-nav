@@ -14,6 +14,9 @@ from .schemas import JobStatus, UploadResponse
 
 SUPPORTED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v"}
 ESTIMATED_PROCESSING_TIME_SEC = 240
+FEATURED_SCENE_MIN_GAUSSIANS = 12000
+FEATURED_SCENE_MIN_OBSERVED_RATIO = 0.05
+FEATURED_SCENE_MAX_COMPLETION_RATIO = 0.8
 
 
 class JobNotFoundError(Exception):
@@ -335,4 +338,23 @@ class JobRepository:
 
         camera_motion = self.read_artifact(job_id, "camera_motion.json")
         gaussian_scene = self.read_artifact(job_id, "gaussian_scene.json")
-        return camera_motion.get("backend") != "stub" and gaussian_scene.get("backend") == "command"
+        visibility_manifest = self.read_artifact(job_id, "visibility_manifest.json")
+        quality_report = self.read_artifact(job_id, "quality.json")
+        return (
+            camera_motion.get("backend") != "stub"
+            and gaussian_scene.get("backend") == "command"
+            and _float_value(gaussian_scene.get("gaussian_count")) >= FEATURED_SCENE_MIN_GAUSSIANS
+            and _float_value(visibility_manifest.get("observed_ratio")) >= FEATURED_SCENE_MIN_OBSERVED_RATIO
+            and _float_value(visibility_manifest.get("completion_candidate_ratio")) <= FEATURED_SCENE_MAX_COMPLETION_RATIO
+            and quality_report.get("quality_gate") != "fail"
+        )
+
+
+def _float_value(value: object) -> float:
+    if isinstance(value, bool):
+        return 0
+
+    if isinstance(value, (int, float)):
+        return float(value)
+
+    return 0

@@ -57,6 +57,29 @@ def test_featured_job_scene_bundle_returns_latest_completed_scene(tmp_path: Path
     assert response.json()["output_scene_id"] == job_id
 
 
+def test_featured_job_scene_bundle_rejects_low_quality_generated_scene(tmp_path: Path) -> None:
+    app = create_app(ApiSettings(repo_root=tmp_path, auto_start_worker=False))
+    client = TestClient(app)
+    upload_response = client.post(
+        "/upload",
+        files={"file": ("walkthrough.mov", b"video-bytes", "video/quicktime")},
+    )
+    job_id = upload_response.json()["job_id"]
+    _write_viewer_assets(
+        app.state.job_repository,
+        job_id,
+        observed_ratio=0.0,
+        completion_candidate_ratio=1.0,
+        gaussian_count=6465,
+    )
+    app.state.job_repository.complete_job(job_id, job_id)
+
+    response = client.get("/featured-job-scene-bundle")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Featured job scene is not available"
+
+
 def test_featured_job_scene_bundle_returns_404_without_completed_scene(tmp_path: Path) -> None:
     client = TestClient(create_app(ApiSettings(repo_root=tmp_path, auto_start_worker=False)))
 
@@ -66,7 +89,13 @@ def test_featured_job_scene_bundle_returns_404_without_completed_scene(tmp_path:
     assert response.json()["detail"] == "Featured job scene is not available"
 
 
-def _write_viewer_assets(job_repository, job_id: str) -> None:
+def _write_viewer_assets(
+    job_repository,
+    job_id: str,
+    observed_ratio: float = 0.62,
+    completion_candidate_ratio: float = 0.11,
+    gaussian_count: int = 24000,
+) -> None:
     camera_path = {
         "scene_id": job_id,
         "coordinate_system": "dreamnav_viewer_v1",
@@ -93,9 +122,9 @@ def _write_viewer_assets(job_repository, job_id: str) -> None:
         "method": "voxel_visibility_v1",
         "observed_threshold": 3,
         "partial_threshold": [1, 2],
-        "observed_ratio": 0.62,
+        "observed_ratio": observed_ratio,
         "partial_ratio": 0.22,
-        "completion_candidate_ratio": 0.11,
+        "completion_candidate_ratio": completion_candidate_ratio,
         "unknown_ratio": 0.05,
         "cells": [
             {
@@ -142,9 +171,9 @@ def _write_viewer_assets(job_repository, job_id: str) -> None:
         "visibility": {
             "observed_threshold": 3,
             "partial_threshold": [1, 2],
-            "observed_ratio": 0.62,
+            "observed_ratio": observed_ratio,
             "partial_ratio": 0.22,
-            "completion_candidate_ratio": 0.11,
+            "completion_candidate_ratio": completion_candidate_ratio,
         },
         "scene_model": {
             "enabled": True,
@@ -203,7 +232,7 @@ def _write_viewer_assets(job_repository, job_id: str) -> None:
             "backend": "command",
             "command_mode": "external",
             "splat_file": "splat.ply",
-            "gaussian_count": 12,
+            "gaussian_count": gaussian_count,
             "splat_source": "existing",
             "splat_file_size_bytes": 32,
         },
