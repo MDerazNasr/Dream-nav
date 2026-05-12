@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { WorkflowShell } from "./WorkflowShell";
 import { reconstructionCapabilities, sceneBundle } from "./WorkflowShell.fixtures";
 import type { ViewerSceneBundle } from "../../lib/dreamnav-api";
-import { fetchJobArtifact, fetchJobSceneBundle, fetchJobStatus } from "../../lib/dreamnav-api";
+import { fetchJobArtifact, fetchJobSceneBundle, fetchJobStatus, importGaussianAsset } from "../../lib/dreamnav-api";
 
 vi.mock("../explorer/ExplorerShell", () => ({
   ExplorerShell: ({ sceneBundle }: { sceneBundle: ViewerSceneBundle }) => (
@@ -38,6 +38,15 @@ vi.mock("../../lib/dreamnav-api", async (importOriginal) => {
       }
     })),
     fetchJobSceneBundle: vi.fn(async () => processedJobSceneBundle),
+    importGaussianAsset: vi.fn(async () => ({
+      job_id: "scene_abc123",
+      source_file: "imports/dense_scene.ply",
+      import_format: "point_cloud_ply",
+      gaussian_count: 24000,
+      file_size_bytes: 128000,
+      viewer_render_mode: "splat",
+      featured_candidate: true
+    })),
     uploadWalkthrough: vi.fn(async () => ({
       job_id: "scene_abc123",
       validation_status: "pass",
@@ -133,6 +142,43 @@ describe("WorkflowShell", () => {
       expect(screen.getByTestId("explorer-shell").textContent).toBe("2 poses");
     });
     expect(fetchJobSceneBundle).toHaveBeenCalledWith("scene_abc123");
+  });
+
+  it("imports an external Gaussian asset for completed jobs", async () => {
+    vi.mocked(fetchJobStatus).mockResolvedValueOnce({
+      job_id: "scene_abc123",
+      state: "completed",
+      stage: "completed",
+      progress: 1,
+      elapsed_sec: 240,
+      message: "Explorer ready",
+      output_scene_id: "warehouse_01",
+      error_message: null,
+      failed_stage: null,
+      failed_artifact: null
+    });
+    render(<WorkflowShell reconstructionCapabilities={reconstructionCapabilities} sceneBundle={sceneBundle} />);
+
+    fireEvent.change(screen.getByLabelText("Walkthrough video"), {
+      target: { files: [new File(["video"], "walkthrough.mp4", { type: "video/mp4" })] }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Start processing" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("External Gaussian import")).not.toBeNull();
+    });
+    fireEvent.change(screen.getByLabelText("Gaussian asset"), {
+      target: { files: [new File(["ply"], "dense_scene.ply", { type: "application/octet-stream" })] }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Import and open scene" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("explorer-shell").textContent).toBe("2 poses");
+    });
+    expect(importGaussianAsset).toHaveBeenCalledWith(
+      "scene_abc123",
+      expect.any(File)
+    );
   });
 
   it("shows failed job guidance and lets the user return to upload", async () => {

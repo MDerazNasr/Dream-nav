@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DreamNavApiError,
   fetchFeaturedSceneBundle,
+  importGaussianAsset,
   fetchReconstructionCapabilities,
   fetchJobArtifact,
   fetchJobSceneBundle,
@@ -190,6 +191,15 @@ const apiPayloads: Record<string, unknown> = {
       "The current pipeline still falls back to placeholder geometry.",
       "Dense reconstruction requires a COLMAP pose backend."
     ]
+  },
+  "http://api.test/jobs/scene_abc123/import-gaussian": {
+    job_id: "scene_abc123",
+    source_file: "imports/dense_scene.ply",
+    import_format: "point_cloud_ply",
+    gaussian_count: 24000,
+    file_size_bytes: 128000,
+    viewer_render_mode: "splat",
+    featured_candidate: true
   }
 };
 
@@ -267,6 +277,28 @@ describe("DreamNav API client", () => {
     expect(response.job_id).toBe("scene_abc123");
     expect(fetchMock).toHaveBeenCalledWith(
       new URL("http://api.test/upload"),
+      expect.objectContaining({
+        body: expect.any(FormData),
+        method: "POST"
+      })
+    );
+  });
+
+  it("imports external Gaussian assets for completed jobs", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json(apiPayloads["http://api.test/jobs/scene_abc123/import-gaussian"])
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await importGaussianAsset(
+      "scene_abc123",
+      new File(["ply"], "dense_scene.ply", { type: "application/octet-stream" }),
+      "http://api.test"
+    );
+
+    expect(response.import_format).toBe("point_cloud_ply");
+    expect(fetchMock).toHaveBeenCalledWith(
+      new URL("http://api.test/jobs/scene_abc123/import-gaussian"),
       expect.objectContaining({
         body: expect.any(FormData),
         method: "POST"

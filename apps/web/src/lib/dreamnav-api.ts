@@ -4,6 +4,7 @@ import {
   parseCompletionManifest,
   parseDemoReadiness,
   parseDemoScenesResponse,
+  parseGaussianImportResponse,
   parseReconstructionCapabilities,
   parseJobArtifact,
   parseJobSceneBundle,
@@ -20,6 +21,7 @@ import {
 import type {
   DemoReadiness,
   DemoScene,
+  GaussianImportResponse,
   JobArtifact,
   JobSceneBundle,
   JobStatus,
@@ -161,6 +163,22 @@ export async function fetchJobSceneBundle(
   apiBaseUrl = getDreamNavApiBaseUrl()
 ): Promise<ProcessedJobSceneBundle> {
   return fetchJobSceneBundleFromPath(`/jobs/${jobId}/scene-bundle`, apiBaseUrl);
+}
+
+export async function importGaussianAsset(
+  jobId: string,
+  file: File,
+  apiBaseUrl = getDreamNavApiBaseUrl()
+): Promise<GaussianImportResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  return parseGaussianImportResponse(
+    await fetchJson(apiBaseUrl, `/jobs/${jobId}/import-gaussian`, {
+      body: formData,
+      method: "POST"
+    })
+  );
 }
 
 async function fetchJson(

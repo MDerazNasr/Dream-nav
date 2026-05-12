@@ -157,6 +157,21 @@ button {
   font-size: 12px;
 }
 
+.upload-target p {
+  margin: 0;
+}
+
+.import-copy {
+  color: #b8c6bd;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.import-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .demo-row {
   padding: 16px 22px 0;
 }
