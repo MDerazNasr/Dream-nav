@@ -35,10 +35,20 @@ export const gaussianImportResponseSchema = z.object({
   job_id: z.string().min(1),
   source_file: z.string().min(1),
   import_format: z.string().min(1),
+  previous_gaussian_count: z.number().min(0).nullable().default(null),
+  previous_observed_ratio: z.number().min(0).max(1).nullable().default(null),
+  previous_completion_candidate_ratio: z.number().min(0).max(1).nullable().default(null),
+  previous_quality_gate: z.string().min(1).nullable().default(null),
   gaussian_count: z.number().min(0),
   file_size_bytes: z.number().min(0),
+  observed_ratio: z.number().min(0).max(1),
+  completion_candidate_ratio: z.number().min(0).max(1),
+  quality_gate: z.string().min(1),
   viewer_render_mode: z.enum(["placeholder", "splat"]),
-  featured_candidate: z.boolean()
+  featured_candidate: z.boolean(),
+  validation_status: z.enum(["pass", "warning", "reject"]),
+  blockers: z.array(z.string().min(1)),
+  warnings: z.array(z.string().min(1))
 });
 
 export const jobStatusSchema = z.object({

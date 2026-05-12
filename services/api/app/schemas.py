@@ -70,10 +70,20 @@ class GaussianImportResponse(StrictModel):
     job_id: str
     source_file: str
     import_format: str
+    previous_gaussian_count: int | None = None
+    previous_observed_ratio: float | None = None
+    previous_completion_candidate_ratio: float | None = None
+    previous_quality_gate: str | None = None
     gaussian_count: int = Field(ge=0)
     file_size_bytes: int = Field(ge=0)
+    observed_ratio: float = Field(ge=0, le=1)
+    completion_candidate_ratio: float = Field(ge=0, le=1)
+    quality_gate: str
     viewer_render_mode: Literal["placeholder", "splat"]
     featured_candidate: bool
+    validation_status: Literal["pass", "warning", "reject"]
+    blockers: list[str]
+    warnings: list[str]
 
 
 class JobStatus(StrictModel):

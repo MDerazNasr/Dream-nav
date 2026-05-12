@@ -116,14 +116,25 @@ describe("processing schemas", () => {
       job_id: "scene_abc123",
       source_file: "imports/dense_scene.ply",
       import_format: "point_cloud_ply",
+      previous_gaussian_count: 6465,
+      previous_observed_ratio: 0,
+      previous_completion_candidate_ratio: 1,
+      previous_quality_gate: "warning",
       gaussian_count: 24000,
       file_size_bytes: 128000,
+      observed_ratio: 0.62,
+      completion_candidate_ratio: 0.11,
+      quality_gate: "warning",
       viewer_render_mode: "splat",
-      featured_candidate: true
+      featured_candidate: true,
+      validation_status: "pass",
+      blockers: [],
+      warnings: []
     });
 
     expect(response.featured_candidate).toBe(true);
     expect(response.viewer_render_mode).toBe("splat");
+    expect(response.previous_gaussian_count).toBe(6465);
   });
 
   it("accepts completed job viewer bundles", () => {

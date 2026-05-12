@@ -34,11 +34,7 @@ export function GaussianImportPanel({ baseSceneBundle, jobId, onImported }: Gaus
       const bundle = toProcessedViewerBundle(baseSceneBundle, jobSceneBundle);
       setGaussianSummary(importSummary);
       setImportedBundle(bundle);
-      setMessage(
-        importSummary.featured_candidate
-          ? "Imported asset passed the featured-scene gate."
-          : "Imported asset loaded, but it does not pass the featured-scene gate yet."
-      );
+      setMessage(null);
     } catch {
       setMessage("Dense asset import failed");
     } finally {
@@ -71,18 +67,37 @@ export function GaussianImportPanel({ baseSceneBundle, jobId, onImported }: Gaus
       {message ? <p className="workflow-error">{message}</p> : null}
       {importedBundle && gaussianSummary ? (
         <section className="import-review" aria-label="Imported scene review">
+          <div className="import-review-header">
+            <span className="readiness-pill" data-status={reviewStatus(gaussianSummary.validation_status)}>
+              {labelForValidation(gaussianSummary.validation_status)}
+            </span>
+            <small>
+              {gaussianSummary.blockers[0] ??
+                gaussianSummary.warnings[0] ??
+                "Imported asset passed the review checks."}
+            </small>
+          </div>
           <div className="import-review-grid">
             <article>
               <span>Gaussians</span>
-              <strong>{gaussianSummary.gaussian_count.toLocaleString()}</strong>
+              <strong>{formatMetricPair(gaussianSummary.previous_gaussian_count, gaussianSummary.gaussian_count)}</strong>
             </article>
             <article>
               <span>Observed</span>
-              <strong>{formatRatio(importedBundle.visibility.observed_ratio)}</strong>
+              <strong>{formatRatioPair(gaussianSummary.previous_observed_ratio, gaussianSummary.observed_ratio)}</strong>
             </article>
             <article>
               <span>Completion</span>
-              <strong>{formatRatio(importedBundle.visibility.completion_candidate_ratio)}</strong>
+              <strong>
+                {formatRatioPair(
+                  gaussianSummary.previous_completion_candidate_ratio,
+                  gaussianSummary.completion_candidate_ratio
+                )}
+              </strong>
+            </article>
+            <article>
+              <span>Quality gate</span>
+              <strong>{formatStringPair(gaussianSummary.previous_quality_gate, gaussianSummary.quality_gate)}</strong>
             </article>
             <article>
               <span>Featured</span>
@@ -90,7 +105,7 @@ export function GaussianImportPanel({ baseSceneBundle, jobId, onImported }: Gaus
             </article>
           </div>
           <small>
-            Quality gate: {importedBundle.quality.quality_gate} · Render mode: {importedBundle.assetStatus.viewer_render_mode}
+            Render mode: {importedBundle.assetStatus.viewer_render_mode}
           </small>
         </section>
       ) : null}
@@ -100,7 +115,7 @@ export function GaussianImportPanel({ baseSceneBundle, jobId, onImported }: Gaus
         </button>
         <button
           className="primary-action"
-          disabled={!importedBundle}
+          disabled={!importedBundle || gaussianSummary?.validation_status === "reject"}
           onClick={() => importedBundle && onImported(importedBundle)}
           type="button"
         >
@@ -111,6 +126,46 @@ export function GaussianImportPanel({ baseSceneBundle, jobId, onImported }: Gaus
   );
 }
 
-function formatRatio(value: number): string {
+function formatRatioPair(previous: number | null, current: number): string {
+  return `${formatRatio(previous)} -> ${formatRatio(current)}`;
+}
+
+function formatMetricPair(previous: number | null, current: number): string {
+  return `${previous?.toLocaleString() ?? "N/A"} -> ${current.toLocaleString()}`;
+}
+
+function formatStringPair(previous: string | null, current: string): string {
+  return `${previous ?? "N/A"} -> ${current}`;
+}
+
+function formatRatio(value: number | null): string {
+  if (typeof value !== "number") {
+    return "N/A";
+  }
+
   return `${Math.round(value * 100)}%`;
+}
+
+function labelForValidation(status: "pass" | "warning" | "reject"): string {
+  if (status === "pass") {
+    return "Approved";
+  }
+
+  if (status === "warning") {
+    return "Needs review";
+  }
+
+  return "Rejected";
+}
+
+function reviewStatus(status: "pass" | "warning" | "reject"): "ready" | "degraded" | "blocked" {
+  if (status === "pass") {
+    return "ready";
+  }
+
+  if (status === "warning") {
+    return "degraded";
+  }
+
+  return "blocked";
 }

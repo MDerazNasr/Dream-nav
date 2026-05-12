@@ -19,6 +19,12 @@ def test_import_gaussian_route_converts_point_cloud_for_completed_job(tmp_path) 
     assert response.json()["gaussian_count"] == 3
     assert response.json()["viewer_render_mode"] == "splat"
     assert response.json()["featured_candidate"] is False
+    assert response.json()["validation_status"] == "reject"
+    assert response.json()["previous_gaussian_count"] == 24000
+    assert response.json()["previous_observed_ratio"] == 0.62
+    assert response.json()["observed_ratio"] > 0.0
+    assert response.json()["completion_candidate_ratio"] < 0.85
+    assert "density is too low" in response.json()["blockers"][0]
     assert (app.state.job_repository.artifact_root(job_id) / "splat.ply").is_file()
     gaussian_scene = app.state.job_repository.read_artifact(job_id, "gaussian_scene.json")
     visibility = app.state.job_repository.read_artifact(job_id, "visibility_manifest.json")
@@ -60,6 +66,9 @@ def test_imported_gaussian_scene_can_become_featured(tmp_path) -> None:
 
     assert import_response.status_code == 200
     assert import_response.json()["featured_candidate"] is True
+    assert import_response.json()["validation_status"] == "pass"
+    assert import_response.json()["previous_gaussian_count"] == 24000
+    assert import_response.json()["observed_ratio"] >= 0.05
     assert featured_response.status_code == 200
     assert featured_response.json()["job_id"] == job_id
 

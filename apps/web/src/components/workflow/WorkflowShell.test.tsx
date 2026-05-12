@@ -42,10 +42,20 @@ vi.mock("../../lib/dreamnav-api", async (importOriginal) => {
       job_id: "scene_abc123",
       source_file: "imports/dense_scene.ply",
       import_format: "point_cloud_ply",
+      previous_gaussian_count: 6465,
+      previous_observed_ratio: 0,
+      previous_completion_candidate_ratio: 1,
+      previous_quality_gate: "warning",
       gaussian_count: 24000,
       file_size_bytes: 128000,
+      observed_ratio: 0.62,
+      completion_candidate_ratio: 0.11,
+      quality_gate: "warning",
       viewer_render_mode: "splat",
-      featured_candidate: true
+      featured_candidate: true,
+      validation_status: "pass",
+      blockers: [],
+      warnings: []
     })),
     uploadWalkthrough: vi.fn(async () => ({
       job_id: "scene_abc123",
@@ -173,9 +183,12 @@ describe("WorkflowShell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Import dense asset" }));
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Imported scene review").textContent).toContain("24,000");
+      expect(screen.getByLabelText("Imported scene review").textContent).toContain("6,465 -> 24,000");
     });
-    expect(screen.getByText("Imported asset passed the featured-scene gate.")).not.toBeNull();
+    expect(screen.getByText("Approved")).not.toBeNull();
+    expect(screen.getByText("Imported asset passed the review checks.")).not.toBeNull();
+    expect(screen.getByText("0% -> 62%")).not.toBeNull();
+    expect(screen.getByText("100% -> 11%")).not.toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Open imported scene" }));
 
@@ -186,6 +199,62 @@ describe("WorkflowShell", () => {
       "scene_abc123",
       expect.any(File)
     );
+  });
+
+  it("blocks opening rejected imported Gaussian assets", async () => {
+    vi.mocked(fetchJobStatus).mockResolvedValueOnce({
+      job_id: "scene_abc123",
+      state: "completed",
+      stage: "completed",
+      progress: 1,
+      elapsed_sec: 240,
+      message: "Explorer ready",
+      output_scene_id: "warehouse_01",
+      error_message: null,
+      failed_stage: null,
+      failed_artifact: null
+    });
+    vi.mocked(importGaussianAsset).mockResolvedValueOnce({
+      job_id: "scene_abc123",
+      source_file: "imports/bad_dense_scene.ply",
+      import_format: "point_cloud_ply",
+      previous_gaussian_count: 24000,
+      previous_observed_ratio: 0.62,
+      previous_completion_candidate_ratio: 0.11,
+      previous_quality_gate: "warning",
+      gaussian_count: 1200,
+      file_size_bytes: 64000,
+      observed_ratio: 0.01,
+      completion_candidate_ratio: 0.92,
+      quality_gate: "warning",
+      viewer_render_mode: "splat",
+      featured_candidate: false,
+      validation_status: "reject",
+      blockers: ["Observed coverage is too low, which strongly suggests a bad alignment."],
+      warnings: []
+    });
+    render(<WorkflowShell reconstructionCapabilities={reconstructionCapabilities} sceneBundle={sceneBundle} />);
+
+    fireEvent.change(screen.getByLabelText("Walkthrough video"), {
+      target: { files: [new File(["video"], "walkthrough.mp4", { type: "video/mp4" })] }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Start processing" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("External Gaussian import")).not.toBeNull();
+    });
+    fireEvent.change(screen.getByLabelText("Gaussian asset"), {
+      target: { files: [new File(["ply"], "bad_dense_scene.ply", { type: "application/octet-stream" })] }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Import dense asset" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Rejected")).not.toBeNull();
+    });
+    expect(
+      screen.getByText("Observed coverage is too low, which strongly suggests a bad alignment.")
+    ).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Open imported scene" }).hasAttribute("disabled")).toBe(true);
   });
 
   it("shows failed job guidance and lets the user return to upload", async () => {

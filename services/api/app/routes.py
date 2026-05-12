@@ -4,6 +4,7 @@ from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 
 from .jobs import JobArtifactNameError, JobArtifactNotFoundError, JobDataError, JobNotFoundError, JobRepository
+from .gaussian_import_validation import evaluate_imported_scene
 from .repository import SceneDataError, SceneNotFoundError, SceneRepository
 from .reconstruction_capabilities import detect_reconstruction_capabilities
 from .schemas import (
@@ -114,6 +115,9 @@ async def import_gaussian_asset(
     if status.state != "completed":
         raise HTTPException(status_code=409, detail="Job scene bundle is not ready for Gaussian import")
 
+    previous_gaussian_scene = _optional_job_artifact(job_repository, job_id, "gaussian_scene.json")
+    previous_visibility = _optional_job_artifact(job_repository, job_id, "visibility_manifest.json")
+    previous_quality = _optional_job_artifact(job_repository, job_id, "quality.json")
     payload = await file.read()
     try:
         imported = import_job_splat_asset(
@@ -161,15 +165,39 @@ async def import_gaussian_asset(
     except ViewerAssetBuildError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     job_repository.write_artifact(job_id, "explorer_bundle.json", explorer_bundle)
+    current_gaussian_scene = job_repository.read_artifact(job_id, "gaussian_scene.json")
+    current_visibility = job_repository.read_artifact(job_id, "visibility_manifest.json")
+    current_quality = job_repository.read_artifact(job_id, "quality.json")
+    featured_candidate = job_repository.featured_scene_ready(job_id)
+    import_review = evaluate_imported_scene(
+        previous_gaussian_scene,
+        previous_visibility,
+        previous_quality,
+        current_gaussian_scene,
+        current_visibility,
+        current_quality,
+        explorer_bundle["viewer_render_mode"],
+        featured_candidate,
+    )
 
     return GaussianImportResponse(
         job_id=job_id,
         source_file=imported.source_file,
         import_format=imported.import_format,
+        previous_gaussian_count=import_review["previous_gaussian_count"],
+        previous_observed_ratio=import_review["previous_observed_ratio"],
+        previous_completion_candidate_ratio=import_review["previous_completion_candidate_ratio"],
+        previous_quality_gate=import_review["previous_quality_gate"],
         gaussian_count=imported.gaussian_count,
         file_size_bytes=imported.file_size_bytes,
-        viewer_render_mode="splat",
-        featured_candidate=job_repository.featured_scene_ready(job_id),
+        observed_ratio=import_review["observed_ratio"],
+        completion_candidate_ratio=import_review["completion_candidate_ratio"],
+        quality_gate=str(import_review["quality_gate"]),
+        viewer_render_mode=explorer_bundle["viewer_render_mode"],
+        featured_candidate=featured_candidate,
+        validation_status=import_review["validation_status"],
+        blockers=import_review["blockers"],
+        warnings=import_review["warnings"],
     )
 
 
@@ -251,6 +279,13 @@ def _job_source_video(job_id: str, job_repository: JobRepository) -> str:
 
     input_video = metadata.get("input_video")
     return input_video if isinstance(input_video, str) and input_video else "imported_gaussian"
+
+
+def _optional_job_artifact(job_repository: JobRepository, job_id: str, artifact_name: str) -> dict[str, object] | None:
+    try:
+        return job_repository.read_artifact(job_id, artifact_name)
+    except JobArtifactNotFoundError:
+        return None
 
 
 def _build_job_scene_bundle(job_id: str, output_scene_id: str, job_repository: JobRepository) -> JobSceneBundle:
