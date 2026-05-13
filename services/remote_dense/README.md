@@ -18,6 +18,10 @@ Backend selection:
 - `DREAMNAV_REMOTE_DENSE_BACKEND=colmap_dense` requires the real COLMAP dense path and returns an error instead of falling back.
 - `DREAMNAV_REMOTE_DENSE_BACKEND=mock` always returns the local mock dense output.
 
+First real adapter executable in this repo:
+
+- `services/remote_dense/remote_dense_app/colmap_command_adapter.py`
+
 Optional environment variables:
 
 - `DREAMNAV_REMOTE_DENSE_COMMAND` points to an external dense engine adapter executable. DreamNav calls it with `--bundle-root`, `--artifacts-root`, `--frames-root`, and `--output-ply`.

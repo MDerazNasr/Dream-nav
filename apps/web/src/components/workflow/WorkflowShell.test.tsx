@@ -251,13 +251,15 @@ describe("WorkflowShell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Submit to remote dense backend" }));
 
     await waitFor(() => {
-    expect(screen.getByLabelText("Remote dense submission review").textContent).toContain("remote_001");
-  });
-  expect(screen.getByLabelText("Remote dense submission review").textContent).toContain("colmap_dense");
-  expect(screen.getByText("Waiting for the remote worker to post the imported dense result back.")).not.toBeNull();
-  expect(submitRemoteDenseJob).toHaveBeenCalledWith("scene_abc123");
-  expect(fetchGaussianImportReview).toHaveBeenCalledWith("scene_abc123");
-  expect(fetchRemoteDenseResultSummary).toHaveBeenCalledWith("scene_abc123");
+      expect(screen.getByLabelText("Remote dense submission review").textContent).toContain("remote_001");
+    });
+    expect(screen.getByLabelText("Remote dense submission review").textContent).toContain("colmap_dense");
+    expect(screen.getByText("Waiting for the remote worker to post the imported dense result back.")).not.toBeNull();
+    expect(submitRemoteDenseJob).toHaveBeenCalledWith("scene_abc123");
+    await waitFor(() => {
+      expect(fetchGaussianImportReview).toHaveBeenCalledWith("scene_abc123");
+      expect(fetchRemoteDenseResultSummary).toHaveBeenCalledWith("scene_abc123");
+    });
   });
 
   it("blocks opening rejected imported Gaussian assets", async () => {
