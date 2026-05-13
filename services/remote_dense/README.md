@@ -1,8 +1,20 @@
 # DreamNav Remote Dense Worker
 
-Local stub provider for the remote dense handoff flow.
+Local remote dense provider for the DreamNav handoff flow.
 
-It accepts the DreamNav bundle zip, generates a dense point cloud `.ply`, and posts the result back to the configured DreamNav callback route.
+It accepts the DreamNav bundle zip, attempts a dense `.ply` build, and posts the result back to the configured DreamNav callback route.
+
+Backend selection:
+
+- `DREAMNAV_REMOTE_DENSE_BACKEND=auto` tries the DreamNav COLMAP dense wrapper when the bundle includes COLMAP artifacts and the configured COLMAP build supports dense stereo. It falls back to the mock generator when that path is unavailable.
+- `DREAMNAV_REMOTE_DENSE_BACKEND=colmap_dense` requires the real COLMAP dense path and returns an error instead of falling back.
+- `DREAMNAV_REMOTE_DENSE_BACKEND=mock` always returns the local mock dense output.
+
+Optional environment variables:
+
+- `DREAMNAV_REMOTE_DENSE_COLMAP_COMMAND` selects the COLMAP binary to use for dense capability checks and wrapper execution.
+- `DREAMNAV_REMOTE_DENSE_ALLOW_MOCK_FALLBACK=0` disables auto fallback when `backend=auto`.
+- `DREAMNAV_REMOTE_DENSE_CALLBACK_TIMEOUT_SEC` controls the callback request timeout.
 
 Run tests:
 
