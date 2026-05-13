@@ -51,6 +51,20 @@ export const gaussianImportResponseSchema = z.object({
   warnings: z.array(z.string().min(1))
 });
 
+export const remoteDenseSubmissionResponseSchema = z.object({
+  job_id: z.string().min(1),
+  provider_url: z.string().min(1),
+  remote_job_id: z.string().min(1).nullable().default(null),
+  submission_status: z.literal("submitted"),
+  bundle_file: z.string().min(1),
+  bundle_size_bytes: z.number().min(0),
+  frame_count: z.number().min(0),
+  source_video: z.string().min(1),
+  callback_url: z.string().min(1),
+  callback_token_configured: z.boolean(),
+  warnings: z.array(z.string().min(1))
+});
+
 export const jobStatusSchema = z.object({
   job_id: z.string().min(1),
   state: jobLifecycleStateSchema,
@@ -91,6 +105,8 @@ export type UploadResponse = z.infer<typeof uploadResponseSchema>;
 
 export type GaussianImportResponse = z.infer<typeof gaussianImportResponseSchema>;
 
+export type RemoteDenseSubmissionResponse = z.infer<typeof remoteDenseSubmissionResponseSchema>;
+
 export type JobStatus = z.infer<typeof jobStatusSchema>;
 
 export type JobArtifact = z.infer<typeof jobArtifactSchema>;
@@ -103,6 +119,10 @@ export function parseUploadResponse(input: unknown): UploadResponse {
 
 export function parseGaussianImportResponse(input: unknown): GaussianImportResponse {
   return gaussianImportResponseSchema.parse(input);
+}
+
+export function parseRemoteDenseSubmissionResponse(input: unknown): RemoteDenseSubmissionResponse {
+  return remoteDenseSubmissionResponseSchema.parse(input);
 }
 
 export function parseJobStatus(input: unknown): JobStatus {

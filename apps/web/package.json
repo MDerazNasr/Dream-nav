@@ -6,7 +6,7 @@
   "scripts": {
     "build": "next build",
     "dev": "next dev",
-    "test": "vitest run",
+    "test": "npm run build -w @dream-nav/shared && npm run build -w @dream-nav/scene-registry && vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "verify:viewer": "node scripts/verify-viewer.mjs"
   },

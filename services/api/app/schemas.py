@@ -86,6 +86,20 @@ class GaussianImportResponse(StrictModel):
     warnings: list[str]
 
 
+class RemoteDenseSubmissionResponse(StrictModel):
+    job_id: str
+    provider_url: str
+    remote_job_id: str | None = None
+    submission_status: Literal["submitted"]
+    bundle_file: str
+    bundle_size_bytes: int = Field(ge=0)
+    frame_count: int = Field(ge=0)
+    source_video: str
+    callback_url: str
+    callback_token_configured: bool
+    warnings: list[str]
+
+
 class JobStatus(StrictModel):
     job_id: str
     state: str

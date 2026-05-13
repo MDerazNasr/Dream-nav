@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DreamNavApiError,
+  fetchGaussianImportReview,
   fetchFeaturedSceneBundle,
   importGaussianAsset,
   fetchReconstructionCapabilities,
@@ -9,6 +10,7 @@ import {
   fetchJobStatus,
   fetchSceneBundle,
   getDreamNavApiBaseUrl,
+  submitRemoteDenseJob,
   uploadWalkthrough
 } from "./dreamnav-api";
 import { jobSceneBundlePayload, jobZonePayloads } from "./dreamnav-api.fixtures";
@@ -210,6 +212,42 @@ const apiPayloads: Record<string, unknown> = {
     validation_status: "pass",
     blockers: [],
     warnings: []
+  },
+  "http://api.test/jobs/scene_abc123/submit-remote-dense": {
+    job_id: "scene_abc123",
+    provider_url: "https://dense.example/jobs",
+    remote_job_id: "remote_001",
+    submission_status: "submitted",
+    bundle_file: "remote_dense_bundle.zip",
+    bundle_size_bytes: 180024,
+    frame_count: 59,
+    source_video: "walkthrough.mov",
+    callback_url: "https://dreamnav.example/jobs/scene_abc123/remote-dense-result",
+    callback_token_configured: true,
+    warnings: []
+  },
+  "http://api.test/jobs/scene_abc123/artifacts/gaussian_import_review.json": {
+    job_id: "scene_abc123",
+    artifact_name: "gaussian_import_review.json",
+    payload: {
+      job_id: "scene_abc123",
+      source_file: "imports/dense_scene.ply",
+      import_format: "point_cloud_ply",
+      previous_gaussian_count: 6465,
+      previous_observed_ratio: 0,
+      previous_completion_candidate_ratio: 1,
+      previous_quality_gate: "warning",
+      gaussian_count: 24000,
+      file_size_bytes: 128000,
+      observed_ratio: 0.62,
+      completion_candidate_ratio: 0.11,
+      quality_gate: "warning",
+      viewer_render_mode: "splat",
+      featured_candidate: true,
+      validation_status: "pass",
+      blockers: [],
+      warnings: []
+    }
   }
 };
 
@@ -316,6 +354,40 @@ describe("DreamNav API client", () => {
         method: "POST"
       })
     );
+  });
+
+  it("submits completed jobs to the remote dense backend", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json(apiPayloads["http://api.test/jobs/scene_abc123/submit-remote-dense"])
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await submitRemoteDenseJob("scene_abc123", "http://api.test");
+
+    expect(response.remote_job_id).toBe("remote_001");
+    expect(fetchMock).toHaveBeenCalledWith(
+      new URL("http://api.test/jobs/scene_abc123/submit-remote-dense"),
+      expect.objectContaining({
+        method: "POST"
+      })
+    );
+  });
+
+  it("loads imported Gaussian review artifacts when available", async () => {
+    mockFetchFromPayloads(apiPayloads);
+
+    const response = await fetchGaussianImportReview("scene_abc123", "http://api.test");
+
+    expect(response?.validation_status).toBe("pass");
+    expect(response?.gaussian_count).toBe(24000);
+  });
+
+  it("returns null when no imported Gaussian review exists yet", async () => {
+    mockFetchFromPayloads({});
+
+    const response = await fetchGaussianImportReview("scene_abc123", "http://api.test");
+
+    expect(response).toBeNull();
   });
 
   it("loads processing job status", async () => {

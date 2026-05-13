@@ -29,6 +29,10 @@ class ApiSettings:
     repo_root: Path
     auto_start_worker: bool = True
     processing: ProcessingSettings = ProcessingSettings()
+    public_api_base_url: str | None = None
+    remote_dense_url: str | None = None
+    remote_dense_token: str | None = None
+    remote_dense_callback_token: str | None = None
 
     @property
     def data_root(self) -> Path:
@@ -83,6 +87,10 @@ def default_settings() -> ApiSettings:
             gaussian_command=resolved_gaussian_command,
             gaussian_timeout_sec=float(environ.get("DREAMNAV_GAUSSIAN_TIMEOUT_SEC", str(DEFAULT_GAUSSIAN_TIMEOUT_SEC))),
         ),
+        public_api_base_url=environ.get("DREAMNAV_PUBLIC_API_BASE_URL"),
+        remote_dense_url=environ.get("DREAMNAV_REMOTE_DENSE_URL"),
+        remote_dense_token=environ.get("DREAMNAV_REMOTE_DENSE_TOKEN"),
+        remote_dense_callback_token=environ.get("DREAMNAV_REMOTE_DENSE_CALLBACK_TOKEN"),
     )
 
 

@@ -1,12 +1,19 @@
 from threading import Thread
 
-from fastapi import APIRouter, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, File, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 
+from .gaussian_imports import GaussianImportError, apply_imported_gaussian_asset
 from .jobs import JobArtifactNameError, JobArtifactNotFoundError, JobDataError, JobNotFoundError, JobRepository
-from .gaussian_import_validation import evaluate_imported_scene
 from .repository import SceneDataError, SceneNotFoundError, SceneRepository
 from .reconstruction_capabilities import detect_reconstruction_capabilities
+from .remote_dense_handoff import (
+    RemoteDenseHandoffError,
+    build_remote_dense_bundle,
+    callback_warnings,
+    remote_submission_payload,
+    submit_remote_dense_job,
+)
 from .schemas import (
     DemoScene,
     DemoReadiness,
@@ -17,12 +24,11 @@ from .schemas import (
     JobStatus,
     QualityReport,
     ReconstructionCapabilities,
+    RemoteDenseSubmissionResponse,
     SceneAssetStatus,
     SceneAssets,
     UploadResponse,
 )
-from .splat_assets import SplatAssetError, import_job_splat_asset
-from .viewer_assets import ViewerAssetBuildError, build_job_viewer_assets
 
 router = APIRouter()
 
@@ -115,90 +121,99 @@ async def import_gaussian_asset(
     if status.state != "completed":
         raise HTTPException(status_code=409, detail="Job scene bundle is not ready for Gaussian import")
 
-    previous_gaussian_scene = _optional_job_artifact(job_repository, job_id, "gaussian_scene.json")
-    previous_visibility = _optional_job_artifact(job_repository, job_id, "visibility_manifest.json")
-    previous_quality = _optional_job_artifact(job_repository, job_id, "quality.json")
     payload = await file.read()
     try:
-        imported = import_job_splat_asset(
-            job_repository.artifact_root(job_id),
+        return apply_imported_gaussian_asset(
+            job_repository,
+            job_id,
             file.filename or "gaussian_input.ply",
             payload,
         )
-    except SplatAssetError as error:
+    except GaussianImportError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
-    source_video = _job_source_video(job_id, job_repository)
-    job_repository.write_artifact(
-        job_id,
-        "gaussian_scene.json",
-        {
-            "job_id": job_id,
-            "source_video": source_video,
-            "backend": "import",
-            "command_mode": "imported",
-            "splat_file": "splat.ply",
-            "gaussian_count": imported.gaussian_count,
-            "splat_source": "imported",
-            "splat_file_size_bytes": (job_repository.artifact_root(job_id) / "splat.ply").stat().st_size,
-            "import_format": imported.import_format,
-            "import_file": imported.source_file,
-        },
-    )
-    job_repository.write_artifact(
-        job_id,
-        "gaussian_import.json",
-        {
-            "job_id": job_id,
-            "source_file": imported.source_file,
-            "import_format": imported.import_format,
-            "gaussian_count": imported.gaussian_count,
-            "file_size_bytes": imported.file_size_bytes,
-        },
-    )
+@router.post("/jobs/{job_id}/submit-remote-dense", response_model=RemoteDenseSubmissionResponse)
+def submit_remote_dense(job_id: str, request: Request) -> RemoteDenseSubmissionResponse:
+    job_repository = _job_repository(request)
+    status = job_repository.get_status(job_id)
+    if status.state != "completed":
+        raise HTTPException(status_code=409, detail="Job scene bundle is not ready for remote dense submission")
+
+    settings = request.app.state.settings
+    if not settings.remote_dense_url:
+        raise HTTPException(status_code=409, detail="Remote dense backend is not configured")
+
+    if not settings.remote_dense_callback_token:
+        raise HTTPException(status_code=409, detail="Remote dense callback token is not configured")
+
+    callback_url = _remote_dense_callback_url(request, job_id)
+    warnings = callback_warnings(settings.public_api_base_url)
     try:
-        explorer_bundle = build_job_viewer_assets(
+        job = job_repository.get_job(job_id)
+        bundle = build_remote_dense_bundle(
             job_id,
-            source_video,
+            job_repository.upload_path(job),
             job_repository.artifact_root(job_id),
+            callback_url,
+            settings.remote_dense_callback_token,
         )
-    except ViewerAssetBuildError as error:
+        submission = submit_remote_dense_job(
+            settings.remote_dense_url,
+            bundle,
+            settings.remote_dense_callback_token,
+            provider_token=settings.remote_dense_token,
+        )
+    except RemoteDenseHandoffError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
-    job_repository.write_artifact(job_id, "explorer_bundle.json", explorer_bundle)
-    current_gaussian_scene = job_repository.read_artifact(job_id, "gaussian_scene.json")
-    current_visibility = job_repository.read_artifact(job_id, "visibility_manifest.json")
-    current_quality = job_repository.read_artifact(job_id, "quality.json")
-    featured_candidate = job_repository.featured_scene_ready(job_id)
-    import_review = evaluate_imported_scene(
-        previous_gaussian_scene,
-        previous_visibility,
-        previous_quality,
-        current_gaussian_scene,
-        current_visibility,
-        current_quality,
-        explorer_bundle["viewer_render_mode"],
-        featured_candidate,
-    )
 
-    return GaussianImportResponse(
-        job_id=job_id,
-        source_file=imported.source_file,
-        import_format=imported.import_format,
-        previous_gaussian_count=import_review["previous_gaussian_count"],
-        previous_observed_ratio=import_review["previous_observed_ratio"],
-        previous_completion_candidate_ratio=import_review["previous_completion_candidate_ratio"],
-        previous_quality_gate=import_review["previous_quality_gate"],
-        gaussian_count=imported.gaussian_count,
-        file_size_bytes=imported.file_size_bytes,
-        observed_ratio=import_review["observed_ratio"],
-        completion_candidate_ratio=import_review["completion_candidate_ratio"],
-        quality_gate=str(import_review["quality_gate"]),
-        viewer_render_mode=explorer_bundle["viewer_render_mode"],
-        featured_candidate=featured_candidate,
-        validation_status=import_review["validation_status"],
-        blockers=import_review["blockers"],
-        warnings=import_review["warnings"],
+    payload = remote_submission_payload(
+        job_id,
+        submission,
+        callback_token_configured=True,
     )
+    payload["warnings"] = [*warnings, *submission.warnings]
+    job_repository.write_artifact(job_id, "remote_dense_submission.json", payload)
+    return RemoteDenseSubmissionResponse(**{key: value for key, value in payload.items() if key != "submitted_at_sec"})
+
+
+@router.post("/jobs/{job_id}/remote-dense-result", response_model=GaussianImportResponse)
+async def remote_dense_result(
+    job_id: str,
+    request: Request,
+    file: UploadFile = File(...),
+    x_dreamnav_callback_token: str | None = Header(default=None),
+) -> GaussianImportResponse:
+    settings = request.app.state.settings
+    if settings.remote_dense_callback_token and x_dreamnav_callback_token != settings.remote_dense_callback_token:
+        raise HTTPException(status_code=403, detail="Remote dense callback token is invalid")
+
+    job_repository = _job_repository(request)
+    status = job_repository.get_status(job_id)
+    if status.state != "completed":
+        raise HTTPException(status_code=409, detail="Job scene bundle is not ready for Gaussian import")
+
+    payload = await file.read()
+    try:
+        response = apply_imported_gaussian_asset(
+            job_repository,
+            job_id,
+            file.filename or "remote_dense_result.ply",
+            payload,
+        )
+    except GaussianImportError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+    job_repository.write_artifact(
+        job_id,
+        "remote_dense_result.json",
+        {
+            "job_id": job_id,
+            "source_file": response.source_file,
+            "validation_status": response.validation_status,
+            "gaussian_count": response.gaussian_count,
+        },
+    )
+    return response
 
 
 @router.get("/status/{job_id}", response_model=JobStatus)
@@ -271,23 +286,6 @@ def _job_asset_status(job_id: str, scene_id: str, job_repository: JobRepository)
     )
 
 
-def _job_source_video(job_id: str, job_repository: JobRepository) -> str:
-    try:
-        metadata = job_repository.read_artifact(job_id, "metadata.json")
-    except JobArtifactNotFoundError:
-        return "imported_gaussian"
-
-    input_video = metadata.get("input_video")
-    return input_video if isinstance(input_video, str) and input_video else "imported_gaussian"
-
-
-def _optional_job_artifact(job_repository: JobRepository, job_id: str, artifact_name: str) -> dict[str, object] | None:
-    try:
-        return job_repository.read_artifact(job_id, artifact_name)
-    except JobArtifactNotFoundError:
-        return None
-
-
 def _build_job_scene_bundle(job_id: str, output_scene_id: str, job_repository: JobRepository) -> JobSceneBundle:
     camera_path_artifact = "camera_path.json"
     metadata = job_repository.read_artifact(job_id, "metadata.json")
@@ -342,3 +340,9 @@ def map_job_errors(error: Exception) -> HTTPException:
         return HTTPException(status_code=500, detail="Job data invalid")
 
     return HTTPException(status_code=500, detail="Unexpected API error")
+
+
+def _remote_dense_callback_url(request: Request, job_id: str) -> str:
+    configured_base_url = request.app.state.settings.public_api_base_url
+    base_url = configured_base_url or str(request.base_url).rstrip("/")
+    return f"{base_url}/jobs/{job_id}/remote-dense-result"

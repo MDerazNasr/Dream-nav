@@ -15,6 +15,10 @@ def test_default_settings_reads_pose_backend_env(monkeypatch) -> None:
     monkeypatch.setenv("DREAMNAV_FRAME_RATE", "3")
     monkeypatch.setenv("DREAMNAV_FRAME_MAX_COUNT", "180")
     monkeypatch.setenv("DREAMNAV_FRAME_MAX_DURATION_SEC", "45")
+    monkeypatch.setenv("DREAMNAV_PUBLIC_API_BASE_URL", "https://dreamnav.example")
+    monkeypatch.setenv("DREAMNAV_REMOTE_DENSE_URL", "https://dense.example/jobs")
+    monkeypatch.setenv("DREAMNAV_REMOTE_DENSE_TOKEN", "provider-secret")
+    monkeypatch.setenv("DREAMNAV_REMOTE_DENSE_CALLBACK_TOKEN", "callback-secret")
 
     settings = default_settings()
 
@@ -30,6 +34,10 @@ def test_default_settings_reads_pose_backend_env(monkeypatch) -> None:
     assert settings.processing.gaussian_backend == "command"
     assert settings.processing.gaussian_command == "/opt/bin/reconstruct"
     assert settings.processing.gaussian_timeout_sec == 90
+    assert settings.public_api_base_url == "https://dreamnav.example"
+    assert settings.remote_dense_url == "https://dense.example/jobs"
+    assert settings.remote_dense_token == "provider-secret"
+    assert settings.remote_dense_callback_token == "callback-secret"
 
 
 def test_default_settings_prefers_ffmpeg_when_available(monkeypatch) -> None:

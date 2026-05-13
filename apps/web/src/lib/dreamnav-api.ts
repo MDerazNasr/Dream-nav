@@ -5,11 +5,12 @@ import {
   parseDemoReadiness,
   parseDemoScenesResponse,
   parseGaussianImportResponse,
-  parseReconstructionCapabilities,
   parseJobArtifact,
   parseJobSceneBundle,
   parseJobStatus,
   parseQualityReport,
+  parseReconstructionCapabilities,
+  parseRemoteDenseSubmissionResponse,
   parseSceneAssetStatus,
   parseSceneAssets,
   parseSceneMetadata,
@@ -26,6 +27,7 @@ import type {
   JobSceneBundle,
   JobStatus,
   ReconstructionCapabilities,
+  RemoteDenseSubmissionResponse,
   SceneAssetStatus,
   UploadResponse
 } from "@dream-nav/shared";
@@ -181,6 +183,22 @@ export async function fetchJobSceneBundle(
   return fetchJobSceneBundleFromPath(`/jobs/${jobId}/scene-bundle`, apiBaseUrl);
 }
 
+export async function fetchGaussianImportReview(
+  jobId: string,
+  apiBaseUrl = getDreamNavApiBaseUrl()
+): Promise<GaussianImportResponse | null> {
+  try {
+    const artifact = await fetchJobArtifact(jobId, "gaussian_import_review.json", apiBaseUrl);
+    return parseGaussianImportResponse(artifact.payload);
+  } catch (error) {
+    if (error instanceof DreamNavApiError && error.status === 404) {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
 export async function importGaussianAsset(
   jobId: string,
   file: File,
@@ -192,6 +210,17 @@ export async function importGaussianAsset(
   return parseGaussianImportResponse(
     await fetchJson(apiBaseUrl, `/jobs/${jobId}/import-gaussian`, {
       body: formData,
+      method: "POST"
+    })
+  );
+}
+
+export async function submitRemoteDenseJob(
+  jobId: string,
+  apiBaseUrl = getDreamNavApiBaseUrl()
+): Promise<RemoteDenseSubmissionResponse> {
+  return parseRemoteDenseSubmissionResponse(
+    await fetchJson(apiBaseUrl, `/jobs/${jobId}/submit-remote-dense`, {
       method: "POST"
     })
   );

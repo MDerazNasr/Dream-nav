@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ExplorerShell } from "../explorer/ExplorerShell";
 import { GaussianImportPanel } from "./GaussianImportPanel";
 import { ReconstructionStatusPanel } from "./ReconstructionStatusPanel";
+import { RemoteDensePanel } from "./RemoteDensePanel";
 import type { ViewerSceneBundle } from "../../lib/dreamnav-api";
 import {
   fetchJobArtifact,
@@ -234,6 +235,9 @@ export function WorkflowShell({ reconstructionCapabilities, sceneBundle }: Workf
               ) : null}
               <p>{failureGuidance.nextStep}</p>
             </section>
+          ) : null}
+          {jobCompleted && jobStatus ? (
+            <RemoteDensePanel jobId={jobStatus.job_id} />
           ) : null}
           {jobCompleted && jobStatus ? (
             <GaussianImportPanel

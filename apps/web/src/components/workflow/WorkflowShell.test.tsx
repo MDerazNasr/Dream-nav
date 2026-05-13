@@ -3,7 +3,14 @@ import { describe, expect, it, vi } from "vitest";
 import { WorkflowShell } from "./WorkflowShell";
 import { reconstructionCapabilities, sceneBundle } from "./WorkflowShell.fixtures";
 import type { ViewerSceneBundle } from "../../lib/dreamnav-api";
-import { fetchJobArtifact, fetchJobSceneBundle, fetchJobStatus, importGaussianAsset } from "../../lib/dreamnav-api";
+import {
+  fetchGaussianImportReview,
+  fetchJobArtifact,
+  fetchJobSceneBundle,
+  fetchJobStatus,
+  importGaussianAsset,
+  submitRemoteDenseJob
+} from "../../lib/dreamnav-api";
 
 vi.mock("../explorer/ExplorerShell", () => ({
   ExplorerShell: ({ sceneBundle }: { sceneBundle: ViewerSceneBundle }) => (
@@ -38,6 +45,7 @@ vi.mock("../../lib/dreamnav-api", async (importOriginal) => {
       }
     })),
     fetchJobSceneBundle: vi.fn(async () => processedJobSceneBundle),
+    fetchGaussianImportReview: vi.fn(async () => null),
     importGaussianAsset: vi.fn(async () => ({
       job_id: "scene_abc123",
       source_file: "imports/dense_scene.ply",
@@ -55,6 +63,19 @@ vi.mock("../../lib/dreamnav-api", async (importOriginal) => {
       featured_candidate: true,
       validation_status: "pass",
       blockers: [],
+      warnings: []
+    })),
+    submitRemoteDenseJob: vi.fn(async () => ({
+      job_id: "scene_abc123",
+      provider_url: "https://dense.example/jobs",
+      remote_job_id: "remote_001",
+      submission_status: "submitted",
+      bundle_file: "remote_dense_bundle.zip",
+      bundle_size_bytes: 180024,
+      frame_count: 59,
+      source_video: "walkthrough.mov",
+      callback_url: "https://dreamnav.example/jobs/scene_abc123/remote-dense-result",
+      callback_token_configured: true,
       warnings: []
     })),
     uploadWalkthrough: vi.fn(async () => ({
@@ -199,6 +220,39 @@ describe("WorkflowShell", () => {
       "scene_abc123",
       expect.any(File)
     );
+  });
+
+  it("submits completed jobs to the remote dense backend", async () => {
+    vi.mocked(fetchJobStatus).mockResolvedValueOnce({
+      job_id: "scene_abc123",
+      state: "completed",
+      stage: "completed",
+      progress: 1,
+      elapsed_sec: 240,
+      message: "Explorer ready",
+      output_scene_id: "warehouse_01",
+      error_message: null,
+      failed_stage: null,
+      failed_artifact: null
+    });
+    render(<WorkflowShell reconstructionCapabilities={reconstructionCapabilities} sceneBundle={sceneBundle} />);
+
+    fireEvent.change(screen.getByLabelText("Walkthrough video"), {
+      target: { files: [new File(["video"], "walkthrough.mp4", { type: "video/mp4" })] }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Start processing" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Remote dense backend")).not.toBeNull();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Submit to remote dense backend" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Remote dense submission review").textContent).toContain("remote_001");
+    });
+    expect(screen.getByText("Waiting for the remote worker to post the imported dense result back.")).not.toBeNull();
+    expect(submitRemoteDenseJob).toHaveBeenCalledWith("scene_abc123");
+    expect(fetchGaussianImportReview).toHaveBeenCalledWith("scene_abc123");
   });
 
   it("blocks opening rejected imported Gaussian assets", async () => {

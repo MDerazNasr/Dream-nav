@@ -130,6 +130,9 @@ class JobRepository:
             failed_artifact=job.failed_artifact,
         )
 
+    def get_job(self, job_id: str) -> StoredJob:
+        return self._read_job(job_id)
+
     def claim_next_queued_job(self) -> StoredJob | None:
         self.jobs_root.mkdir(parents=True, exist_ok=True)
         for path in sorted(self.jobs_root.glob("scene_*.json")):

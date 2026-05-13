@@ -4,6 +4,7 @@ import {
   parseJobArtifact,
   parseJobSceneBundle,
   parseJobStatus,
+  parseRemoteDenseSubmissionResponse,
   parseUploadResponse
 } from "./processing.js";
 
@@ -135,6 +136,25 @@ describe("processing schemas", () => {
     expect(response.featured_candidate).toBe(true);
     expect(response.viewer_render_mode).toBe("splat");
     expect(response.previous_gaussian_count).toBe(6465);
+  });
+
+  it("accepts remote dense submission summaries", () => {
+    const response = parseRemoteDenseSubmissionResponse({
+      job_id: "scene_abc123",
+      provider_url: "https://dense.example/jobs",
+      remote_job_id: "remote_001",
+      submission_status: "submitted",
+      bundle_file: "remote_dense_bundle.zip",
+      bundle_size_bytes: 180024,
+      frame_count: 59,
+      source_video: "walkthrough.mov",
+      callback_url: "https://dreamnav.example/jobs/scene_abc123/remote-dense-result",
+      callback_token_configured: true,
+      warnings: []
+    });
+
+    expect(response.remote_job_id).toBe("remote_001");
+    expect(response.submission_status).toBe("submitted");
   });
 
   it("accepts completed job viewer bundles", () => {
