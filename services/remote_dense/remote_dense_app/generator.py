@@ -120,7 +120,10 @@ def point_cloud_ply(points: list[tuple[float, float, float, int, int, int]]) -> 
 
 
 def write_submission_bundle(root: Path, remote_job_id: str, bundle_bytes: bytes) -> Path:
-    root.mkdir(parents=True, exist_ok=True)
-    bundle_path = root / f"{remote_job_id}.zip"
+    job_root = root / remote_job_id
+    if job_root.exists():
+        rmtree(job_root)
+    job_root.mkdir(parents=True, exist_ok=True)
+    bundle_path = job_root / "bundle.zip"
     bundle_path.write_bytes(bundle_bytes)
     return bundle_path

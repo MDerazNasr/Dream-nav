@@ -91,6 +91,7 @@ class RemoteDenseSubmissionResponse(StrictModel):
     provider_url: str
     remote_job_id: str | None = None
     submission_status: Literal["submitted"]
+    backend: str | None = None
     bundle_file: str
     bundle_size_bytes: int = Field(ge=0)
     frame_count: int = Field(ge=0)

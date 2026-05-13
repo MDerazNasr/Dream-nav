@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from json import dumps
 from os import environ
 from pathlib import Path
 from secrets import token_hex
@@ -82,7 +83,15 @@ def create_app(settings: RemoteDenseSettings | None = None) -> FastAPI:
             callback_token,
             dense_result.dense_ply,
             remote_job_id,
+            dense_result.backend,
             resolved_settings.callback_timeout_sec,
+        )
+
+        _write_job_result_metadata(
+            submission_bundle.parent,
+            manifest,
+            dense_result.backend,
+            dense_result.warnings,
         )
 
         return _submission_response(
@@ -129,15 +138,36 @@ def _post_dense_callback(
     callback_token: str,
     dense_ply: bytes,
     remote_job_id: str,
+    backend: str,
     timeout_sec: float,
 ) -> None:
     with httpx.Client(timeout=timeout_sec) as client:
         response = client.post(
             callback_url,
-            headers={"X-DreamNav-Callback-Token": callback_token},
+            headers={
+                "X-DreamNav-Callback-Token": callback_token,
+                "X-DreamNav-Remote-Backend": backend,
+                "X-DreamNav-Remote-Job-Id": remote_job_id,
+            },
             files={"file": (f"{remote_job_id}.ply", dense_ply, "application/octet-stream")},
         )
         response.raise_for_status()
+
+
+def _write_job_result_metadata(
+    job_root: Path,
+    manifest: dict[str, object],
+    backend: str,
+    warnings: list[str],
+) -> None:
+    payload = {
+        "job_id": manifest.get("job_id"),
+        "source_video": manifest.get("source_video"),
+        "frame_count": manifest.get("frame_count"),
+        "backend": backend,
+        "warnings": warnings,
+    }
+    (job_root / "result.json").write_text(dumps(payload, indent=2), encoding="utf-8")
 
 
 app = create_app()

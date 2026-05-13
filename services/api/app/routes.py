@@ -182,6 +182,8 @@ async def remote_dense_result(
     request: Request,
     file: UploadFile = File(...),
     x_dreamnav_callback_token: str | None = Header(default=None),
+    x_dreamnav_remote_backend: str | None = Header(default=None),
+    x_dreamnav_remote_job_id: str | None = Header(default=None),
 ) -> GaussianImportResponse:
     settings = request.app.state.settings
     if settings.remote_dense_callback_token and x_dreamnav_callback_token != settings.remote_dense_callback_token:
@@ -208,6 +210,8 @@ async def remote_dense_result(
         "remote_dense_result.json",
         {
             "job_id": job_id,
+            "remote_job_id": x_dreamnav_remote_job_id,
+            "backend": x_dreamnav_remote_backend,
             "source_file": response.source_file,
             "validation_status": response.validation_status,
             "gaussian_count": response.gaussian_count,

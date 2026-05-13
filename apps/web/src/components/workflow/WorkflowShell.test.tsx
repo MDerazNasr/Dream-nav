@@ -70,6 +70,7 @@ vi.mock("../../lib/dreamnav-api", async (importOriginal) => {
       provider_url: "https://dense.example/jobs",
       remote_job_id: "remote_001",
       submission_status: "submitted",
+      backend: "colmap_dense",
       bundle_file: "remote_dense_bundle.zip",
       bundle_size_bytes: 180024,
       frame_count: 59,
@@ -250,6 +251,7 @@ describe("WorkflowShell", () => {
     await waitFor(() => {
       expect(screen.getByLabelText("Remote dense submission review").textContent).toContain("remote_001");
     });
+    expect(screen.getByLabelText("Remote dense submission review").textContent).toContain("colmap_dense");
     expect(screen.getByText("Waiting for the remote worker to post the imported dense result back.")).not.toBeNull();
     expect(submitRemoteDenseJob).toHaveBeenCalledWith("scene_abc123");
     expect(fetchGaussianImportReview).toHaveBeenCalledWith("scene_abc123");

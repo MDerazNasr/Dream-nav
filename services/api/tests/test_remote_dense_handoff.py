@@ -65,7 +65,7 @@ def test_submit_remote_dense_job_sends_bundle_and_parses_remote_job_id(tmp_path)
             return False
 
         def read(self) -> bytes:
-            return b'{"remote_job_id":"remote_001"}'
+            return b'{"remote_job_id":"remote_001","backend":"mock","warnings":["using fallback"]}'
 
     def fake_sender(request):
         captured["url"] = request.full_url
@@ -83,6 +83,8 @@ def test_submit_remote_dense_job_sends_bundle_and_parses_remote_job_id(tmp_path)
     )
 
     assert result.remote_job_id == "remote_001"
+    assert result.backend == "mock"
+    assert result.warnings == ["using fallback"]
     assert captured["url"] == "https://dense.example/jobs"
     assert captured["authorization"] == "Bearer provider-secret"
     assert b'name="callback_token"' in captured["body"]
@@ -153,4 +155,4 @@ class FakeSubmissionResponse:
         return False
 
     def read(self) -> bytes:
-        return b'{"remote_job_id":"remote_001"}'
+        return b'{"remote_job_id":"remote_001","backend":"colmap_dense"}'

@@ -89,6 +89,10 @@ export function RemoteDensePanel({ jobId }: RemoteDensePanelProps) {
               <strong>{submission.remote_job_id ?? "Queued"}</strong>
             </article>
             <article>
+              <span>Backend</span>
+              <strong>{submission.backend ?? "Unknown"}</strong>
+            </article>
+            <article>
               <span>Frames</span>
               <strong>{submission.frame_count.toLocaleString()}</strong>
             </article>

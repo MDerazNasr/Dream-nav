@@ -27,6 +27,7 @@ def build_dense_result(
     colmap_command: str | None,
     allow_mock_fallback: bool,
 ) -> DenseBuildResult:
+    workspace_root.mkdir(parents=True, exist_ok=True)
     extracted_root = workspace_root / "bundle"
     extract_bundle(bundle_path, extracted_root)
     warnings: list[str] = []

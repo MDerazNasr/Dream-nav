@@ -31,6 +31,7 @@ def test_submit_remote_dense_route_packages_completed_job(tmp_path, monkeypatch)
             provider_url=provider_url,
             remote_job_id="remote_001",
             submission_status="submitted",
+            backend="colmap_dense",
             warnings=[],
         )
 
@@ -40,6 +41,7 @@ def test_submit_remote_dense_route_packages_completed_job(tmp_path, monkeypatch)
 
     assert response.status_code == 200
     assert response.json()["remote_job_id"] == "remote_001"
+    assert response.json()["backend"] == "colmap_dense"
     assert response.json()["frame_count"] == 3
     assert response.json()["callback_url"] == f"https://dreamnav.example/jobs/{job_id}/remote-dense-result"
     submission_artifact = app.state.job_repository.read_artifact(job_id, "remote_dense_submission.json")
@@ -90,7 +92,11 @@ def test_remote_dense_result_route_imports_dense_asset(tmp_path) -> None:
 
     response = client.post(
         f"/jobs/{job_id}/remote-dense-result",
-        headers={"X-DreamNav-Callback-Token": "callback-secret"},
+        headers={
+            "X-DreamNav-Callback-Token": "callback-secret",
+            "X-DreamNav-Remote-Backend": "mock",
+            "X-DreamNav-Remote-Job-Id": "remote_001",
+        },
         files={"file": ("dense_scene.ply", _point_cloud_ply(12001), "application/octet-stream")},
     )
 
@@ -99,6 +105,8 @@ def test_remote_dense_result_route_imports_dense_asset(tmp_path) -> None:
     review_artifact = app.state.job_repository.read_artifact(job_id, "gaussian_import_review.json")
     result_artifact = app.state.job_repository.read_artifact(job_id, "remote_dense_result.json")
     assert review_artifact["gaussian_count"] == 12001
+    assert result_artifact["backend"] == "mock"
+    assert result_artifact["remote_job_id"] == "remote_001"
     assert result_artifact["validation_status"] == "pass"
 
 

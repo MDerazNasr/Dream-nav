@@ -30,6 +30,7 @@ class RemoteDenseSubmissionResult:
     provider_url: str
     remote_job_id: str | None
     submission_status: str
+    backend: str | None
     warnings: list[str]
 
 
@@ -126,7 +127,8 @@ def submit_remote_dense_job(
         provider_url=provider_url,
         remote_job_id=remote_job_id,
         submission_status="submitted",
-        warnings=[],
+        backend=_string_field(response_payload(payload), "backend"),
+        warnings=_string_list_field(response_payload(payload), "warnings"),
     )
 
 
@@ -147,6 +149,7 @@ def remote_submission_payload(
         "provider_url": result.provider_url,
         "remote_job_id": result.remote_job_id,
         "submission_status": result.submission_status,
+        "backend": result.backend,
         "bundle_file": result.bundle.bundle_file,
         "bundle_size_bytes": result.bundle.bundle_size_bytes,
         "frame_count": result.bundle.frame_count,
@@ -180,6 +183,19 @@ def _multipart_body(fields: dict[str, str], bundle_path: Path) -> tuple[bytes, s
 
 
 def _remote_job_id(payload: bytes) -> str | None:
+    data = response_payload(payload)
+    if data is None:
+        return None
+
+    for field_name in ("remote_job_id", "job_id", "submission_id"):
+        value = data.get(field_name)
+        if isinstance(value, str) and value:
+            return value
+
+    return None
+
+
+def response_payload(payload: bytes) -> dict[str, object] | None:
     if not payload:
         return None
 
@@ -191,9 +207,23 @@ def _remote_job_id(payload: bytes) -> str | None:
     if not isinstance(data, dict):
         return None
 
-    for field_name in ("remote_job_id", "job_id", "submission_id"):
-        value = data.get(field_name)
-        if isinstance(value, str) and value:
-            return value
+    return data
 
-    return None
+
+def _string_field(payload: dict[str, object] | None, field_name: str) -> str | None:
+    if payload is None:
+        return None
+
+    value = payload.get(field_name)
+    return value if isinstance(value, str) and value else None
+
+
+def _string_list_field(payload: dict[str, object] | None, field_name: str) -> list[str]:
+    if payload is None:
+        return []
+
+    value = payload.get(field_name)
+    if not isinstance(value, list):
+        return []
+
+    return [entry for entry in value if isinstance(entry, str) and entry]

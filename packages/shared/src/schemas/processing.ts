@@ -56,6 +56,7 @@ export const remoteDenseSubmissionResponseSchema = z.object({
   provider_url: z.string().min(1),
   remote_job_id: z.string().min(1).nullable().default(null),
   submission_status: z.literal("submitted"),
+  backend: z.string().min(1).nullable().default(null),
   bundle_file: z.string().min(1),
   bundle_size_bytes: z.number().min(0),
   frame_count: z.number().min(0),

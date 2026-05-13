@@ -144,6 +144,7 @@ describe("processing schemas", () => {
       provider_url: "https://dense.example/jobs",
       remote_job_id: "remote_001",
       submission_status: "submitted",
+      backend: "colmap_dense",
       bundle_file: "remote_dense_bundle.zip",
       bundle_size_bytes: 180024,
       frame_count: 59,
@@ -154,6 +155,7 @@ describe("processing schemas", () => {
     });
 
     expect(response.remote_job_id).toBe("remote_001");
+    expect(response.backend).toBe("colmap_dense");
     expect(response.submission_status).toBe("submitted");
   });
 
