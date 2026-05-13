@@ -13,12 +13,14 @@ Retention:
 
 Backend selection:
 
-- `DREAMNAV_REMOTE_DENSE_BACKEND=auto` tries the DreamNav COLMAP dense wrapper when the bundle includes COLMAP artifacts and the configured COLMAP build supports dense stereo. It falls back to the mock generator when that path is unavailable.
+- `DREAMNAV_REMOTE_DENSE_BACKEND=auto` tries a configured command backend first, then the DreamNav COLMAP dense wrapper, and falls back to the mock generator when those real paths are unavailable.
+- `DREAMNAV_REMOTE_DENSE_BACKEND=command` runs the configured external dense engine command and requires it to write the output `.ply`.
 - `DREAMNAV_REMOTE_DENSE_BACKEND=colmap_dense` requires the real COLMAP dense path and returns an error instead of falling back.
 - `DREAMNAV_REMOTE_DENSE_BACKEND=mock` always returns the local mock dense output.
 
 Optional environment variables:
 
+- `DREAMNAV_REMOTE_DENSE_COMMAND` points to an external dense engine adapter executable. DreamNav calls it with `--bundle-root`, `--artifacts-root`, `--frames-root`, and `--output-ply`.
 - `DREAMNAV_REMOTE_DENSE_COLMAP_COMMAND` selects the COLMAP binary to use for dense capability checks and wrapper execution.
 - `DREAMNAV_REMOTE_DENSE_ALLOW_MOCK_FALLBACK=0` disables auto fallback when `backend=auto`.
 - `DREAMNAV_REMOTE_DENSE_CALLBACK_TIMEOUT_SEC` controls the callback request timeout.
