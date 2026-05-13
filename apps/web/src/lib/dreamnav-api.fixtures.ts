@@ -140,6 +140,14 @@ export const jobSceneBundlePayload = {
     cache_status: "empty",
     cached_predictions: []
   },
+  remote_dense_result: {
+    job_id: "scene_abc123",
+    remote_job_id: "remote_001",
+    backend: "mock",
+    source_file: "imports/remote_001.ply",
+    validation_status: "pass",
+    gaussian_count: 24000
+  },
   asset_status: {
     scene_id: "scene_abc123",
     splat_url: "/jobs/scene_abc123/viewer-assets/splat.ply",

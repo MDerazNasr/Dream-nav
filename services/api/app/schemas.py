@@ -101,6 +101,15 @@ class RemoteDenseSubmissionResponse(StrictModel):
     warnings: list[str]
 
 
+class RemoteDenseResultSummary(StrictModel):
+    job_id: str
+    remote_job_id: str | None = None
+    backend: str | None = None
+    source_file: str
+    validation_status: Literal["pass", "warning", "reject"]
+    gaussian_count: int = Field(ge=0)
+
+
 class JobStatus(StrictModel):
     job_id: str
     state: str
@@ -217,6 +226,7 @@ class JobSceneBundle(StrictModel):
     visibility: dict[str, Any]
     completion: dict[str, Any]
     asset_status: SceneAssetStatus
+    remote_dense_result: RemoteDenseResultSummary | None = None
 
 
 class HealthResponse(StrictModel):

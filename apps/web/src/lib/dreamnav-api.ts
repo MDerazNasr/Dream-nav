@@ -39,6 +39,7 @@ export type ViewerSceneBundle = SceneBundle & {
   assetStatus: SceneAssetStatus;
   completionAssetBaseUrl: string;
   readiness: DemoReadiness;
+  remoteDenseResult: RemoteDenseResultSummary | null;
   zoneArtifacts: ConfidenceZoneArtifacts;
 };
 
@@ -140,6 +141,7 @@ export async function fetchSceneBundle(
     completionAssetBaseUrl: resolveBrowserAssetDirectoryUrl(assets.completion_manifest_url),
     readiness,
     assetStatus: resolvedAssetStatus,
+    remoteDenseResult: null,
     zoneArtifacts: buildZoneArtifactsFromVisibility(sceneId, visibility)
   };
 }
@@ -324,6 +326,7 @@ function toViewerSceneBundleFromJob(jobSceneBundle: ProcessedJobSceneBundle): Vi
     visibility: jobSceneBundle.visibility,
     completion: jobSceneBundle.completion,
     completionAssetBaseUrl: resolveBrowserAssetDirectoryUrl(jobSceneBundle.assets.completion_manifest_url),
+    remoteDenseResult: jobSceneBundle.remote_dense_result,
     readiness: {
       scene_id: jobSceneBundle.output_scene_id,
       locked_scene: false,

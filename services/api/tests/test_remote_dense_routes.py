@@ -111,6 +111,33 @@ def test_remote_dense_result_route_imports_dense_asset(tmp_path) -> None:
     assert result_artifact["validation_status"] == "pass"
 
 
+def test_job_scene_bundle_includes_remote_dense_result_artifact(tmp_path) -> None:
+    app = create_app(
+        ApiSettings(
+            repo_root=tmp_path,
+            auto_start_worker=False,
+            remote_dense_callback_token="callback-secret",
+        )
+    )
+    client = TestClient(app)
+    job_id = _completed_job(client, app)
+    client.post(
+        f"/jobs/{job_id}/remote-dense-result",
+        headers={
+            "X-DreamNav-Callback-Token": "callback-secret",
+            "X-DreamNav-Remote-Backend": "mock",
+            "X-DreamNav-Remote-Job-Id": "remote_001",
+        },
+        files={"file": ("dense_scene.ply", _point_cloud_ply(12001), "application/octet-stream")},
+    )
+
+    response = client.get(f"/jobs/{job_id}/scene-bundle")
+
+    assert response.status_code == 200
+    assert response.json()["remote_dense_result"]["backend"] == "mock"
+    assert response.json()["remote_dense_result"]["remote_job_id"] == "remote_001"
+
+
 def _write_remote_frames(job_repository, job_id: str) -> None:
     frames_root = job_repository.artifact_root(job_id) / "frames"
     frames_root.mkdir(parents=True, exist_ok=True)

@@ -1,6 +1,12 @@
 "use client";
 
-import type { CompletionManifest, QualityReport, SceneMetadata, VisibilityManifest } from "@dream-nav/shared";
+import type {
+  CompletionManifest,
+  QualityReport,
+  RemoteDenseResultSummary,
+  SceneMetadata,
+  VisibilityManifest
+} from "@dream-nav/shared";
 import { Check, Copy } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { CachedCompletionMatch } from "./completion-preview";
@@ -12,6 +18,7 @@ type QualityReportPanelProps = {
   match: CachedCompletionMatch | null;
   metadata: SceneMetadata;
   quality: QualityReport;
+  remoteDenseResult: RemoteDenseResultSummary | null;
   visibility: VisibilityManifest;
 };
 
@@ -23,12 +30,13 @@ export function QualityReportPanel({
   match,
   metadata,
   quality,
+  remoteDenseResult,
   visibility
 }: QualityReportPanelProps) {
   const [copyStatus, setCopyStatus] = useState<CopyStatus>("idle");
   const reportText = useMemo(
     () => buildQualityReportText({ completion, currentPose, match, metadata, quality, visibility }),
-    [completion, currentPose, match, metadata, quality, visibility]
+    [completion, currentPose, match, metadata, quality, remoteDenseResult, visibility]
   );
 
   const handleCopyReport = async () => {
@@ -66,6 +74,10 @@ export function QualityReportPanel({
           <dt>Lens</dt>
           <dd>{currentPose.lensMode}</dd>
         </div>
+        <div>
+          <dt>Dense source</dt>
+          <dd>{remoteDenseResult?.backend ?? "Local / none"}</dd>
+        </div>
       </dl>
       <pre className="report-output" aria-label="Quality report text">
         {reportText}
@@ -80,6 +92,7 @@ export function buildQualityReportText({
   match,
   metadata,
   quality,
+  remoteDenseResult,
   visibility
 }: QualityReportPanelProps): string {
   const prediction = match?.prediction;
@@ -93,6 +106,8 @@ export function buildQualityReportText({
     `Policy: ${quality.completion_policy}`,
     `Reason: ${quality.quality_gate_reason}`,
     `Runtime: ${quality.runtime_path}`,
+    `Dense source: ${remoteDenseResult?.backend ?? "local_or_none"}`,
+    `Remote dense job: ${remoteDenseResult?.remote_job_id ?? "none"}`,
     `Completion latency P50/P95: ${formatNullableNumber(quality.completion_latency_ms_p50, " ms")} / ${formatNullableNumber(quality.completion_latency_ms_p95, " ms")}`,
     `Cache: ${formatCacheStatus(completion.cache_status)}`,
     `Prediction: ${prediction?.prediction_id ?? "none"}`,

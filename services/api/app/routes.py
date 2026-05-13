@@ -298,6 +298,10 @@ def _build_job_scene_bundle(job_id: str, output_scene_id: str, job_repository: J
     visibility = job_repository.read_artifact(job_id, "visibility_manifest.json")
     completion = job_repository.read_artifact(job_id, "completion_manifest.json")
     asset_status = _job_asset_status(job_id, output_scene_id, job_repository)
+    try:
+        remote_dense_result = job_repository.read_artifact(job_id, "remote_dense_result.json")
+    except (JobArtifactNameError, JobArtifactNotFoundError):
+        remote_dense_result = None
 
     return JobSceneBundle(
         job_id=job_id,
@@ -317,6 +321,7 @@ def _build_job_scene_bundle(job_id: str, output_scene_id: str, job_repository: J
         visibility=visibility,
         completion=completion,
         asset_status=asset_status,
+        remote_dense_result=remote_dense_result,
     )
 
 

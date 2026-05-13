@@ -193,6 +193,14 @@ describe("processing schemas", () => {
       camera_path: viewerCameraPath,
       visibility: viewerVisibility,
       completion: viewerCompletion,
+      remote_dense_result: {
+        job_id: "scene_abc123",
+        remote_job_id: "remote_001",
+        backend: "mock",
+        source_file: "imports/remote_001.ply",
+        validation_status: "pass",
+        gaussian_count: 12001
+      },
       asset_status: {
         scene_id: "scene_abc123",
         splat_url: "/jobs/scene_abc123/viewer-assets/splat.ply",
@@ -204,6 +212,7 @@ describe("processing schemas", () => {
 
     expect(bundle.metadata.scene_id).toBe("scene_abc123");
     expect(bundle.asset_status.viewer_render_mode).toBe("placeholder");
+    expect(bundle.remote_dense_result?.remote_job_id).toBe("remote_001");
   });
 });
 

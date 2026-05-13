@@ -134,14 +134,32 @@ const match = {
   rgbUrl: "/dreamnav-assets/scenes/warehouse_01/completion/pred_001.svg"
 } satisfies CachedCompletionMatch;
 
+const remoteDenseResult = {
+  job_id: "scene_abc123",
+  remote_job_id: "remote_001",
+  backend: "colmap_dense",
+  source_file: "imports/remote_001.ply",
+  validation_status: "pass",
+  gaussian_count: 24000
+} as const;
+
 describe("QualityReportPanel", () => {
   it("builds a copyable quality report summary", () => {
-    const report = buildQualityReportText({ completion, currentPose, match, metadata, quality, visibility });
+    const report = buildQualityReportText({
+      completion,
+      currentPose,
+      match,
+      metadata,
+      quality,
+      remoteDenseResult,
+      visibility
+    });
 
     expect(report).toContain("DreamNav quality report: Warehouse Scout");
     expect(report).toContain("Held-out PSNR: 21.4 dB");
     expect(report).toContain("Prediction cache: hit · cached_output");
     expect(report).toContain("Current lens/FOV: 35mm / 54 deg");
+    expect(report).toContain("Dense source: colmap_dense");
   });
 
   it("copies the quality report to the clipboard", async () => {
@@ -158,6 +176,7 @@ describe("QualityReportPanel", () => {
         match={match}
         metadata={metadata}
         quality={quality}
+        remoteDenseResult={remoteDenseResult}
         visibility={visibility}
       />
     );

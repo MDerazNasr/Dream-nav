@@ -172,6 +172,7 @@ export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
           match={cachedCompletionMatch}
           metadata={sceneBundle.metadata}
           quality={sceneBundle.quality}
+          remoteDenseResult={sceneBundle.remoteDenseResult}
           visibility={sceneBundle.visibility}
         />
 

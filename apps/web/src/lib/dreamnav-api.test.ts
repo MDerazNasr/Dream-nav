@@ -466,6 +466,7 @@ describe("DreamNav API client", () => {
     expect(response.camera_path.poses).toHaveLength(2);
     expect(response.asset_status.splat_url).toBe("http://api.test/jobs/scene_abc123/viewer-assets/splat.ply");
     expect(response.zoneArtifacts.completion.zone).toBe("completion");
+    expect(response.remote_dense_result?.backend).toBe("mock");
   });
 
   it("loads the featured completed scene bundle", async () => {

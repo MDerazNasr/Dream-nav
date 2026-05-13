@@ -40,6 +40,7 @@ export function toProcessedViewerBundle(
     visibility: jobSceneBundle.visibility,
     completion: jobSceneBundle.completion,
     completionAssetBaseUrl: resolveBrowserAssetDirectoryUrl(jobSceneBundle.assets.completion_manifest_url),
+    remoteDenseResult: jobSceneBundle.remote_dense_result,
     readiness: buildProcessedReadiness(jobSceneBundle),
     assetStatus: jobSceneBundle.asset_status,
     zoneArtifacts: jobSceneBundle.zoneArtifacts

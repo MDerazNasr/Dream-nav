@@ -104,7 +104,8 @@ export const jobSceneBundleSchema = z.object({
   camera_path: cameraPathSchema,
   visibility: visibilityManifestSchema,
   completion: completionManifestSchema,
-  asset_status: sceneAssetStatusSchema
+  asset_status: sceneAssetStatusSchema,
+  remote_dense_result: remoteDenseResultSummarySchema.nullable().default(null)
 });
 
 export type JobLifecycleState = z.infer<typeof jobLifecycleStateSchema>;
