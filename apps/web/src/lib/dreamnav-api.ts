@@ -8,6 +8,7 @@ import {
   parseJobArtifact,
   parseJobSceneBundle,
   parseJobStatus,
+  parseRemoteDenseResultSummary,
   parseQualityReport,
   parseReconstructionCapabilities,
   parseRemoteDenseSubmissionResponse,
@@ -27,6 +28,7 @@ import type {
   JobSceneBundle,
   JobStatus,
   ReconstructionCapabilities,
+  RemoteDenseResultSummary,
   RemoteDenseSubmissionResponse,
   SceneAssetStatus,
   UploadResponse
@@ -190,6 +192,22 @@ export async function fetchGaussianImportReview(
   try {
     const artifact = await fetchJobArtifact(jobId, "gaussian_import_review.json", apiBaseUrl);
     return parseGaussianImportResponse(artifact.payload);
+  } catch (error) {
+    if (error instanceof DreamNavApiError && error.status === 404) {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
+export async function fetchRemoteDenseResultSummary(
+  jobId: string,
+  apiBaseUrl = getDreamNavApiBaseUrl()
+): Promise<RemoteDenseResultSummary | null> {
+  try {
+    const artifact = await fetchJobArtifact(jobId, "remote_dense_result.json", apiBaseUrl);
+    return parseRemoteDenseResultSummary(artifact.payload);
   } catch (error) {
     if (error instanceof DreamNavApiError && error.status === 404) {
       return null;

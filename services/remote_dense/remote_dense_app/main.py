@@ -20,6 +20,7 @@ class RemoteDenseSettings:
     backend: str = "auto"
     colmap_command: str | None = None
     allow_mock_fallback: bool = True
+    retained_job_count: int = 8
 
     @property
     def submissions_root(self) -> Path:
@@ -33,6 +34,7 @@ def default_settings() -> RemoteDenseSettings:
         backend=environ.get("DREAMNAV_REMOTE_DENSE_BACKEND", "auto"),
         colmap_command=environ.get("DREAMNAV_REMOTE_DENSE_COLMAP_COMMAND"),
         allow_mock_fallback=environ.get("DREAMNAV_REMOTE_DENSE_ALLOW_MOCK_FALLBACK", "1") != "0",
+        retained_job_count=max(1, int(environ.get("DREAMNAV_REMOTE_DENSE_RETAINED_JOBS", "8"))),
     )
 
 
@@ -64,6 +66,7 @@ def create_app(settings: RemoteDenseSettings | None = None) -> FastAPI:
                 resolved_settings.submissions_root,
                 remote_job_id,
                 bundle_bytes,
+                resolved_settings.retained_job_count,
             )
             dense_result = build_dense_result(
                 submission_bundle,

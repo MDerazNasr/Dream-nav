@@ -4,6 +4,7 @@ import {
   parseJobArtifact,
   parseJobSceneBundle,
   parseJobStatus,
+  parseRemoteDenseResultSummary,
   parseRemoteDenseSubmissionResponse,
   parseUploadResponse
 } from "./processing.js";
@@ -157,6 +158,21 @@ describe("processing schemas", () => {
     expect(response.remote_job_id).toBe("remote_001");
     expect(response.backend).toBe("colmap_dense");
     expect(response.submission_status).toBe("submitted");
+  });
+
+  it("accepts remote dense result summaries", () => {
+    const response = parseRemoteDenseResultSummary({
+      job_id: "scene_abc123",
+      remote_job_id: "remote_001",
+      backend: "mock",
+      source_file: "imports/remote_001.ply",
+      validation_status: "pass",
+      gaussian_count: 12001
+    });
+
+    expect(response.remote_job_id).toBe("remote_001");
+    expect(response.backend).toBe("mock");
+    expect(response.validation_status).toBe("pass");
   });
 
   it("accepts completed job viewer bundles", () => {

@@ -45,6 +45,7 @@ def test_submit_remote_dense_route_packages_completed_job(tmp_path, monkeypatch)
     assert response.json()["frame_count"] == 3
     assert response.json()["callback_url"] == f"https://dreamnav.example/jobs/{job_id}/remote-dense-result"
     submission_artifact = app.state.job_repository.read_artifact(job_id, "remote_dense_submission.json")
+    assert submission_artifact["backend"] == "colmap_dense"
     assert submission_artifact["bundle_file"] == "remote_dense_bundle.zip"
 
 

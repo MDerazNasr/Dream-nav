@@ -1,3 +1,5 @@
+from os import utime
+
 from fastapi.testclient import TestClient
 
 from remote_dense_app.main import RemoteDenseSettings, create_app
@@ -42,3 +44,30 @@ def test_submit_job_returns_remote_job_id_and_posts_callback(tmp_path) -> None:
     assert captured["remote_job_id"] == response.json()["remote_job_id"]
     assert (tmp_path / ".context" / "remote-dense-submissions" / response.json()["remote_job_id"] / "bundle.zip").is_file()
     assert (tmp_path / ".context" / "remote-dense-submissions" / response.json()["remote_job_id"] / "result.json").is_file()
+
+
+def test_submit_job_prunes_old_remote_workspaces(tmp_path) -> None:
+    app = create_app(RemoteDenseSettings(repo_root=tmp_path, backend="mock", retained_job_count=2))
+    client = TestClient(app)
+    app.state.callback_sender = lambda *args: None
+    root = tmp_path / ".context" / "remote-dense-submissions"
+    stale_jobs = [root / "remote_old_a", root / "remote_old_b"]
+    for index, stale_job in enumerate(stale_jobs, start=1):
+        stale_job.mkdir(parents=True, exist_ok=True)
+        (stale_job / "bundle.zip").write_bytes(b"zip")
+        utime(stale_job, (index, index))
+
+    response = client.post(
+        "/jobs",
+        data={
+            "job_id": "scene_abc123",
+            "callback_url": "https://dreamnav.example/jobs/scene_abc123/remote-dense-result",
+            "callback_token": "callback-secret",
+            "source_video": "walkthrough.mov",
+        },
+        files={"bundle": ("remote_dense_bundle.zip", build_bundle_bytes(), "application/zip")},
+    )
+
+    assert response.status_code == 200
+    assert not stale_jobs[0].exists()
+    assert stale_jobs[1].exists()

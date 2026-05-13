@@ -119,11 +119,29 @@ def point_cloud_ply(points: list[tuple[float, float, float, int, int, int]]) -> 
     ).encode("utf-8")
 
 
-def write_submission_bundle(root: Path, remote_job_id: str, bundle_bytes: bytes) -> Path:
+def write_submission_bundle(root: Path, remote_job_id: str, bundle_bytes: bytes, retained_job_count: int = 8) -> Path:
     job_root = root / remote_job_id
     if job_root.exists():
         rmtree(job_root)
     job_root.mkdir(parents=True, exist_ok=True)
     bundle_path = job_root / "bundle.zip"
     bundle_path.write_bytes(bundle_bytes)
+    _prune_old_job_workspaces(root, retained_job_count, remote_job_id)
     return bundle_path
+
+
+def _prune_old_job_workspaces(root: Path, retained_job_count: int, current_job_id: str) -> None:
+    job_roots = sorted(
+        (
+            path
+            for path in root.iterdir()
+            if path.is_dir() and path.name.startswith("remote_")
+        ),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    keep_count = max(1, retained_job_count)
+    for job_root in job_roots[keep_count:]:
+        if job_root.name == current_job_id:
+            continue
+        rmtree(job_root)

@@ -1,8 +1,8 @@
 "use client";
 
-import type { GaussianImportResponse, RemoteDenseSubmissionResponse } from "@dream-nav/shared";
+import type { GaussianImportResponse, RemoteDenseResultSummary, RemoteDenseSubmissionResponse } from "@dream-nav/shared";
 import { useEffect, useState } from "react";
-import { fetchGaussianImportReview, submitRemoteDenseJob } from "../../lib/dreamnav-api";
+import { fetchGaussianImportReview, fetchRemoteDenseResultSummary, submitRemoteDenseJob } from "../../lib/dreamnav-api";
 
 type RemoteDensePanelProps = {
   jobId: string;
@@ -13,11 +13,12 @@ const POLL_INTERVAL_MS = 4000;
 export function RemoteDensePanel({ jobId }: RemoteDensePanelProps) {
   const [message, setMessage] = useState<string | null>(null);
   const [review, setReview] = useState<GaussianImportResponse | null>(null);
+  const [resultSummary, setResultSummary] = useState<RemoteDenseResultSummary | null>(null);
   const [submission, setSubmission] = useState<RemoteDenseSubmissionResponse | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!submission || review) {
+    if (!submission || (review && resultSummary)) {
       return;
     }
 
@@ -25,9 +26,17 @@ export function RemoteDensePanel({ jobId }: RemoteDensePanelProps) {
 
     const poll = async () => {
       try {
-        const nextReview = await fetchGaussianImportReview(jobId);
-        if (!cancelled && nextReview) {
-          setReview(nextReview);
+        const [nextReview, nextResultSummary] = await Promise.all([
+          fetchGaussianImportReview(jobId),
+          fetchRemoteDenseResultSummary(jobId)
+        ]);
+        if (!cancelled) {
+          if (nextReview) {
+            setReview(nextReview);
+          }
+          if (nextResultSummary) {
+            setResultSummary(nextResultSummary);
+          }
         }
       } catch {
         if (!cancelled) {
@@ -43,12 +52,13 @@ export function RemoteDensePanel({ jobId }: RemoteDensePanelProps) {
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [jobId, review, submission]);
+  }, [jobId, resultSummary, review, submission]);
 
   const submitJob = async () => {
     setIsSubmitting(true);
     setMessage(null);
     setReview(null);
+    setResultSummary(null);
 
     try {
       const nextSubmission = await submitRemoteDenseJob(jobId);
@@ -104,10 +114,23 @@ export function RemoteDensePanel({ jobId }: RemoteDensePanelProps) {
               <span>Callback</span>
               <strong>{review ? "Imported" : "Waiting"}</strong>
             </article>
+            <article>
+              <span>Result backend</span>
+              <strong>{resultSummary?.backend ?? "Waiting"}</strong>
+            </article>
+            <article>
+              <span>Result job</span>
+              <strong>{resultSummary?.remote_job_id ?? "Waiting"}</strong>
+            </article>
           </div>
           {submission.warnings.map((warning) => (
             <small key={warning}>{warning}</small>
           ))}
+          {resultSummary ? (
+            <small>
+              Imported `{resultSummary.source_file}` via {resultSummary.backend ?? "unknown"} backend.
+            </small>
+          ) : null}
           {review ? <small>Open processed scene to inspect the imported dense result.</small> : null}
         </section>
       ) : null}

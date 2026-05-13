@@ -3,6 +3,7 @@ import {
   DreamNavApiError,
   fetchGaussianImportReview,
   fetchFeaturedSceneBundle,
+  fetchRemoteDenseResultSummary,
   importGaussianAsset,
   fetchReconstructionCapabilities,
   fetchJobArtifact,
@@ -249,6 +250,18 @@ const apiPayloads: Record<string, unknown> = {
       blockers: [],
       warnings: []
     }
+  },
+  "http://api.test/jobs/scene_abc123/artifacts/remote_dense_result.json": {
+    job_id: "scene_abc123",
+    artifact_name: "remote_dense_result.json",
+    payload: {
+      job_id: "scene_abc123",
+      remote_job_id: "remote_001",
+      backend: "mock",
+      source_file: "imports/remote_001.ply",
+      validation_status: "pass",
+      gaussian_count: 24000
+    }
   }
 };
 
@@ -382,6 +395,15 @@ describe("DreamNav API client", () => {
 
     expect(response?.validation_status).toBe("pass");
     expect(response?.gaussian_count).toBe(24000);
+  });
+
+  it("loads remote dense result summaries when available", async () => {
+    mockFetchFromPayloads(apiPayloads);
+
+    const response = await fetchRemoteDenseResultSummary("scene_abc123", "http://api.test");
+
+    expect(response?.remote_job_id).toBe("remote_001");
+    expect(response?.backend).toBe("mock");
   });
 
   it("returns null when no imported Gaussian review exists yet", async () => {

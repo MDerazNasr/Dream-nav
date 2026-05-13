@@ -8,6 +8,7 @@ import {
   fetchJobArtifact,
   fetchJobSceneBundle,
   fetchJobStatus,
+  fetchRemoteDenseResultSummary,
   importGaussianAsset,
   submitRemoteDenseJob
 } from "../../lib/dreamnav-api";
@@ -46,6 +47,7 @@ vi.mock("../../lib/dreamnav-api", async (importOriginal) => {
     })),
     fetchJobSceneBundle: vi.fn(async () => processedJobSceneBundle),
     fetchGaussianImportReview: vi.fn(async () => null),
+    fetchRemoteDenseResultSummary: vi.fn(async () => null),
     importGaussianAsset: vi.fn(async () => ({
       job_id: "scene_abc123",
       source_file: "imports/dense_scene.ply",
@@ -249,12 +251,13 @@ describe("WorkflowShell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Submit to remote dense backend" }));
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Remote dense submission review").textContent).toContain("remote_001");
-    });
-    expect(screen.getByLabelText("Remote dense submission review").textContent).toContain("colmap_dense");
-    expect(screen.getByText("Waiting for the remote worker to post the imported dense result back.")).not.toBeNull();
-    expect(submitRemoteDenseJob).toHaveBeenCalledWith("scene_abc123");
-    expect(fetchGaussianImportReview).toHaveBeenCalledWith("scene_abc123");
+    expect(screen.getByLabelText("Remote dense submission review").textContent).toContain("remote_001");
+  });
+  expect(screen.getByLabelText("Remote dense submission review").textContent).toContain("colmap_dense");
+  expect(screen.getByText("Waiting for the remote worker to post the imported dense result back.")).not.toBeNull();
+  expect(submitRemoteDenseJob).toHaveBeenCalledWith("scene_abc123");
+  expect(fetchGaussianImportReview).toHaveBeenCalledWith("scene_abc123");
+  expect(fetchRemoteDenseResultSummary).toHaveBeenCalledWith("scene_abc123");
   });
 
   it("blocks opening rejected imported Gaussian assets", async () => {

@@ -54,6 +54,7 @@ export {
   type JobLifecycleState,
   type ProcessingStage,
   type RemoteDenseSubmissionResponse,
+  type RemoteDenseResultSummary,
   type UploadResponse,
   gaussianImportResponseSchema,
   jobArtifactSchema,
@@ -64,9 +65,11 @@ export {
   parseJobArtifact,
   parseJobSceneBundle,
   parseJobStatus,
+  parseRemoteDenseResultSummary,
   parseRemoteDenseSubmissionResponse,
   parseUploadResponse,
   processingStageSchema,
+  remoteDenseResultSummarySchema,
   remoteDenseSubmissionResponseSchema,
   uploadResponseSchema
 } from "./schemas/processing.js";

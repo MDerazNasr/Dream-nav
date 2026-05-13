@@ -66,6 +66,15 @@ export const remoteDenseSubmissionResponseSchema = z.object({
   warnings: z.array(z.string().min(1))
 });
 
+export const remoteDenseResultSummarySchema = z.object({
+  job_id: z.string().min(1),
+  remote_job_id: z.string().min(1).nullable().default(null),
+  backend: z.string().min(1).nullable().default(null),
+  source_file: z.string().min(1),
+  validation_status: z.enum(["pass", "warning", "reject"]),
+  gaussian_count: z.number().min(0)
+});
+
 export const jobStatusSchema = z.object({
   job_id: z.string().min(1),
   state: jobLifecycleStateSchema,
@@ -108,6 +117,8 @@ export type GaussianImportResponse = z.infer<typeof gaussianImportResponseSchema
 
 export type RemoteDenseSubmissionResponse = z.infer<typeof remoteDenseSubmissionResponseSchema>;
 
+export type RemoteDenseResultSummary = z.infer<typeof remoteDenseResultSummarySchema>;
+
 export type JobStatus = z.infer<typeof jobStatusSchema>;
 
 export type JobArtifact = z.infer<typeof jobArtifactSchema>;
@@ -124,6 +135,10 @@ export function parseGaussianImportResponse(input: unknown): GaussianImportRespo
 
 export function parseRemoteDenseSubmissionResponse(input: unknown): RemoteDenseSubmissionResponse {
   return remoteDenseSubmissionResponseSchema.parse(input);
+}
+
+export function parseRemoteDenseResultSummary(input: unknown): RemoteDenseResultSummary {
+  return remoteDenseResultSummarySchema.parse(input);
 }
 
 export function parseJobStatus(input: unknown): JobStatus {
