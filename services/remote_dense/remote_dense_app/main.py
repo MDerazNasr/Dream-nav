@@ -34,7 +34,7 @@ def default_settings() -> RemoteDenseSettings:
         callback_timeout_sec=float(environ.get("DREAMNAV_REMOTE_DENSE_CALLBACK_TIMEOUT_SEC", "30")),
         backend=environ.get("DREAMNAV_REMOTE_DENSE_BACKEND", "auto"),
         colmap_command=environ.get("DREAMNAV_REMOTE_DENSE_COLMAP_COMMAND"),
-        dense_command=environ.get("DREAMNAV_REMOTE_DENSE_COMMAND"),
+        dense_command=environ.get("DREAMNAV_REMOTE_DENSE_COMMAND") or _default_dense_command(),
         allow_mock_fallback=environ.get("DREAMNAV_REMOTE_DENSE_ALLOW_MOCK_FALLBACK", "1") != "0",
         retained_job_count=max(1, int(environ.get("DREAMNAV_REMOTE_DENSE_RETAINED_JOBS", "8"))),
     )
@@ -174,6 +174,11 @@ def _write_job_result_metadata(
         "warnings": warnings,
     }
     (job_root / "result.json").write_text(dumps(payload, indent=2), encoding="utf-8")
+
+
+def _default_dense_command() -> str | None:
+    adapter_path = Path(__file__).with_name("colmap_command_adapter.py")
+    return str(adapter_path) if adapter_path.is_file() else None
 
 
 app = create_app()

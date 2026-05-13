@@ -21,6 +21,7 @@ Backend selection:
 First real adapter executable in this repo:
 
 - `services/remote_dense/remote_dense_app/colmap_command_adapter.py`
+- the worker now uses this bundled adapter by default when `DREAMNAV_REMOTE_DENSE_COMMAND` is not set
 
 Optional environment variables:
 

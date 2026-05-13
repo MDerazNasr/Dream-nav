@@ -1,8 +1,10 @@
 from os import utime
 
+from os import utime
+
 from fastapi.testclient import TestClient
 
-from remote_dense_app.main import RemoteDenseSettings, create_app
+from remote_dense_app.main import RemoteDenseSettings, create_app, default_settings
 from test_helpers import build_bundle_bytes
 
 
@@ -71,3 +73,19 @@ def test_submit_job_prunes_old_remote_workspaces(tmp_path) -> None:
     assert response.status_code == 200
     assert not stale_jobs[0].exists()
     assert stale_jobs[1].exists()
+
+
+def test_default_settings_prefers_bundled_command_adapter(monkeypatch) -> None:
+    for name in (
+        "DREAMNAV_REMOTE_DENSE_COMMAND",
+        "DREAMNAV_REMOTE_DENSE_BACKEND",
+        "DREAMNAV_REMOTE_DENSE_COLMAP_COMMAND",
+        "DREAMNAV_REMOTE_DENSE_ALLOW_MOCK_FALLBACK",
+        "DREAMNAV_REMOTE_DENSE_RETAINED_JOBS",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    settings = default_settings()
+
+    assert settings.dense_command is not None
+    assert settings.dense_command.endswith("remote_dense_app/colmap_command_adapter.py")
