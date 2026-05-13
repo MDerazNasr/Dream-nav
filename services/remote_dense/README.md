@@ -4,6 +4,8 @@ Local remote dense provider for the DreamNav handoff flow.
 
 It accepts the DreamNav bundle zip, attempts a dense `.ply` build, and posts the result back to the configured DreamNav callback route.
 
+Each remote job is unpacked into its own workspace under `.context/remote-dense-submissions/<remote_job_id>/`. The worker writes `bundle.zip`, extracted bundle contents, and a small `result.json` file with the backend that was actually used.
+
 Backend selection:
 
 - `DREAMNAV_REMOTE_DENSE_BACKEND=auto` tries the DreamNav COLMAP dense wrapper when the bundle includes COLMAP artifacts and the configured COLMAP build supports dense stereo. It falls back to the mock generator when that path is unavailable.
