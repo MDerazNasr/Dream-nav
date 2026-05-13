@@ -1,4 +1,5 @@
 from pathlib import Path
+from zipfile import ZipFile
 
 from app.remote_dense_handoff import (
     RemoteDenseHandoffError,
@@ -11,7 +12,9 @@ from app.remote_dense_handoff import (
 def test_build_remote_dense_bundle_packages_frames_and_camera_artifacts(tmp_path) -> None:
     artifacts_root = tmp_path / "jobs" / "scene_abc123" / "artifacts"
     frames_root = artifacts_root / "frames"
+    colmap_sparse_root = artifacts_root / "colmap" / "sparse" / "0"
     frames_root.mkdir(parents=True, exist_ok=True)
+    colmap_sparse_root.mkdir(parents=True, exist_ok=True)
     upload_path = tmp_path / "uploads" / "scene_abc123" / "walkthrough.mov"
     upload_path.parent.mkdir(parents=True, exist_ok=True)
     upload_path.write_bytes(b"video")
@@ -21,6 +24,9 @@ def test_build_remote_dense_bundle_packages_frames_and_camera_artifacts(tmp_path
 
     for frame_index in range(2):
         (frames_root / f"frame_{frame_index:04d}.jpg").write_bytes(b"\xff\xd8\xff")
+    (colmap_sparse_root / "cameras.txt").write_text("# cameras\n", encoding="utf-8")
+    (colmap_sparse_root / "images.txt").write_text("# images\n", encoding="utf-8")
+    (colmap_sparse_root / "points3D.txt").write_text("# points\n", encoding="utf-8")
 
     bundle = build_remote_dense_bundle(
         "scene_abc123",
@@ -34,6 +40,13 @@ def test_build_remote_dense_bundle_packages_frames_and_camera_artifacts(tmp_path
     assert bundle.frame_count == 2
     assert bundle.bundle_size_bytes > 0
     assert bundle.path.is_file()
+    with ZipFile(bundle.path) as archive:
+        archive_names = set(archive.namelist())
+    assert "frames/frame_0000.jpg" in archive_names
+    assert "artifacts/camera_path.json" in archive_names
+    assert "artifacts/colmap/sparse/0/cameras.txt" in archive_names
+    assert "artifacts/colmap/sparse/0/images.txt" in archive_names
+    assert "artifacts/colmap/sparse/0/points3D.txt" in archive_names
 
 
 def test_submit_remote_dense_job_sends_bundle_and_parses_remote_job_id(tmp_path) -> None:

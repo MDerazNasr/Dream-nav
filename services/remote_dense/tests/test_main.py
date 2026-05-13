@@ -1,10 +1,11 @@
 from fastapi.testclient import TestClient
 
 from remote_dense_app.main import RemoteDenseSettings, create_app
+from test_helpers import build_bundle_bytes
 
 
 def test_submit_job_returns_remote_job_id_and_posts_callback(tmp_path) -> None:
-    app = create_app(RemoteDenseSettings(repo_root=tmp_path))
+    app = create_app(RemoteDenseSettings(repo_root=tmp_path, backend="mock"))
     client = TestClient(app)
     captured = {}
 
@@ -30,46 +31,8 @@ def test_submit_job_returns_remote_job_id_and_posts_callback(tmp_path) -> None:
 
     assert response.status_code == 200
     assert response.json()["remote_job_id"].startswith("remote_")
+    assert response.json()["backend"] == "mock"
+    assert response.json()["warnings"] == []
     assert captured["callback_token"] == "callback-secret"
     assert captured["callback_url"].endswith("/remote-dense-result")
     assert captured["dense_ply"].startswith(b"ply\nformat ascii 1.0\n")
-
-
-def build_bundle_bytes() -> bytes:
-    from io import BytesIO
-    from json import dumps
-    from zipfile import ZipFile
-
-    buffer = BytesIO()
-    with ZipFile(buffer, "w") as archive:
-        archive.writestr(
-            "manifest.json",
-            dumps(
-                {
-                    "job_id": "scene_abc123",
-                    "source_video": "walkthrough.mov",
-                    "frame_count": 3,
-                    "callback_url": "https://dreamnav.example/jobs/scene_abc123/remote-dense-result",
-                    "callback_token": "callback-secret",
-                }
-            ),
-        )
-        archive.writestr(
-            "artifacts/camera_path.json",
-            dumps(
-                {
-                    "scene_id": "scene_abc123",
-                    "poses": [
-                        {"position": [0, 1.55, 0]},
-                        {"position": [0.2, 1.55, -0.8]},
-                    ]
-                }
-            ),
-        )
-        archive.writestr("artifacts/camera_motion.json", "{}")
-        archive.writestr("artifacts/frame_extraction.json", "{}")
-        archive.writestr("artifacts/metadata.json", "{}")
-        archive.writestr("frames/frame_0000.jpg", b"\xff\xd8\xff")
-        archive.writestr("frames/frame_0001.jpg", b"\xff\xd8\xff")
-        archive.writestr("frames/frame_0002.jpg", b"\xff\xd8\xff")
-    return buffer.getvalue()

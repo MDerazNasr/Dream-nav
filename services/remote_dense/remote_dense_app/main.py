@@ -8,18 +8,17 @@ from secrets import token_hex
 import httpx
 from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
 
-from .generator import (
-    RemoteDenseGenerationError,
-    bundle_manifest,
-    generate_mock_dense_ply,
-    write_submission_bundle,
-)
+from .backend import RemoteDenseBackendError, build_dense_result
+from .generator import RemoteDenseGenerationError, bundle_manifest, write_submission_bundle
 
 
 @dataclass(frozen=True)
 class RemoteDenseSettings:
     repo_root: Path
     callback_timeout_sec: float = 30
+    backend: str = "auto"
+    colmap_command: str | None = None
+    allow_mock_fallback: bool = True
 
     @property
     def submissions_root(self) -> Path:
@@ -30,6 +29,9 @@ def default_settings() -> RemoteDenseSettings:
     return RemoteDenseSettings(
         repo_root=Path(__file__).resolve().parents[3],
         callback_timeout_sec=float(environ.get("DREAMNAV_REMOTE_DENSE_CALLBACK_TIMEOUT_SEC", "30")),
+        backend=environ.get("DREAMNAV_REMOTE_DENSE_BACKEND", "auto"),
+        colmap_command=environ.get("DREAMNAV_REMOTE_DENSE_COLMAP_COMMAND"),
+        allow_mock_fallback=environ.get("DREAMNAV_REMOTE_DENSE_ALLOW_MOCK_FALLBACK", "1") != "0",
     )
 
 
@@ -57,35 +59,69 @@ def create_app(settings: RemoteDenseSettings | None = None) -> FastAPI:
 
         try:
             manifest = bundle_manifest(bundle_bytes)
-            dense_ply = generate_mock_dense_ply(bundle_bytes)
             submission_bundle = write_submission_bundle(
                 resolved_settings.submissions_root,
                 remote_job_id,
                 bundle_bytes,
             )
+            dense_result = build_dense_result(
+                submission_bundle,
+                submission_bundle.parent,
+                resolved_settings.backend,
+                resolved_settings.colmap_command,
+                resolved_settings.allow_mock_fallback,
+            )
         except RemoteDenseGenerationError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        except RemoteDenseBackendError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
 
         background_tasks.add_task(
             app.state.callback_sender,
             callback_url,
             callback_token,
-            dense_ply,
+            dense_result.dense_ply,
             remote_job_id,
             resolved_settings.callback_timeout_sec,
         )
 
-        return {
-            "job_id": job_id,
-            "remote_job_id": remote_job_id,
-            "submission_status": "submitted",
-            "source_video": source_video,
-            "bundle_file": submission_bundle.name,
-            "bundle_size_bytes": submission_bundle.stat().st_size,
-            "frame_count": manifest.get("frame_count", 0),
-        }
+        return _submission_response(
+            job_id=job_id,
+            remote_job_id=remote_job_id,
+            submission_status="submitted",
+            source_video=source_video,
+            bundle_file=submission_bundle.name,
+            bundle_size_bytes=submission_bundle.stat().st_size,
+            frame_count=manifest.get("frame_count", 0),
+            backend=dense_result.backend,
+            warnings=dense_result.warnings,
+        )
 
     return app
+
+
+def _submission_response(
+    job_id: str,
+    remote_job_id: str,
+    submission_status: str,
+    source_video: str,
+    bundle_file: str,
+    bundle_size_bytes: int,
+    frame_count: int,
+    backend: str,
+    warnings: list[str],
+) -> dict[str, object]:
+    return {
+        "job_id": job_id,
+        "remote_job_id": remote_job_id,
+        "submission_status": submission_status,
+        "source_video": source_video,
+        "bundle_file": bundle_file,
+        "bundle_size_bytes": bundle_size_bytes,
+        "frame_count": frame_count,
+        "backend": backend,
+        "warnings": warnings,
+    }
 
 
 def _post_dense_callback(

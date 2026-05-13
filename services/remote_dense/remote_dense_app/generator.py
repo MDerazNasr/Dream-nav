@@ -4,6 +4,7 @@ from io import BytesIO
 from json import loads
 from math import cos, sin, tau
 from pathlib import Path
+from shutil import rmtree
 from zipfile import ZipFile
 
 
@@ -19,6 +20,17 @@ def bundle_manifest(bundle_bytes: bytes) -> dict[str, object]:
         raise RemoteDenseGenerationError("Remote dense bundle is invalid.") from error
 
 
+def extract_bundle(bundle_path: Path, extracted_root: Path) -> None:
+    if extracted_root.exists():
+        rmtree(extracted_root)
+    extracted_root.mkdir(parents=True, exist_ok=True)
+    try:
+        with ZipFile(bundle_path) as archive:
+            archive.extractall(extracted_root)
+    except Exception as error:
+        raise RemoteDenseGenerationError("Remote dense bundle could not be extracted.") from error
+
+
 def generate_mock_dense_ply(bundle_bytes: bytes) -> bytes:
     try:
         with ZipFile(BytesIO(bundle_bytes)) as archive:
@@ -27,11 +39,25 @@ def generate_mock_dense_ply(bundle_bytes: bytes) -> bytes:
     except Exception as error:
         raise RemoteDenseGenerationError("Remote dense bundle is missing camera artifacts.") from error
 
+    return _mock_dense_ply_from_camera_path(camera_path, len(frame_names))
+
+
+def generate_mock_dense_ply_from_extracted(extracted_root: Path) -> bytes:
+    try:
+        camera_path = loads((extracted_root / "artifacts" / "camera_path.json").read_text(encoding="utf-8"))
+        frame_names = list((extracted_root / "frames").glob("*.jpg"))
+    except Exception as error:
+        raise RemoteDenseGenerationError("Extracted remote dense bundle is missing camera artifacts.") from error
+
+    return _mock_dense_ply_from_camera_path(camera_path, len(frame_names))
+
+
+def _mock_dense_ply_from_camera_path(camera_path: dict[str, object], frame_count: int) -> bytes:
     poses = camera_path.get("poses")
     if not isinstance(poses, list) or not poses:
         raise RemoteDenseGenerationError("Remote dense bundle did not include camera poses.")
 
-    frame_count = max(1, len(frame_names))
+    frame_count = max(1, frame_count)
     points = []
     ring_samples = max(64, min(192, frame_count * 8))
     floor_extent = min(4.5, 2.2 + (frame_count * 0.05))

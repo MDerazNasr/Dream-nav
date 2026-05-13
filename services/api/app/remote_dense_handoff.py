@@ -72,6 +72,11 @@ def build_remote_dense_bundle(
             archive.write(artifacts_root / artifact_name, arcname=f"artifacts/{artifact_name}")
         for frame_path in frame_paths:
             archive.write(frame_path, arcname=f"frames/{frame_path.name}")
+        colmap_root = artifacts_root / "colmap"
+        if colmap_root.is_dir():
+            for path in sorted(colmap_root.rglob("*")):
+                if path.is_file():
+                    archive.write(path, arcname=f"artifacts/colmap/{path.relative_to(colmap_root)}")
 
     return RemoteDenseBundle(
         bundle_file=bundle_path.name,
