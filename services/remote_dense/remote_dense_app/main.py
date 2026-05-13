@@ -19,6 +19,7 @@ class RemoteDenseSettings:
     callback_timeout_sec: float = 30
     backend: str = "auto"
     colmap_command: str | None = None
+    dense_command: str | None = None
     allow_mock_fallback: bool = True
     retained_job_count: int = 8
 
@@ -33,6 +34,7 @@ def default_settings() -> RemoteDenseSettings:
         callback_timeout_sec=float(environ.get("DREAMNAV_REMOTE_DENSE_CALLBACK_TIMEOUT_SEC", "30")),
         backend=environ.get("DREAMNAV_REMOTE_DENSE_BACKEND", "auto"),
         colmap_command=environ.get("DREAMNAV_REMOTE_DENSE_COLMAP_COMMAND"),
+        dense_command=environ.get("DREAMNAV_REMOTE_DENSE_COMMAND"),
         allow_mock_fallback=environ.get("DREAMNAV_REMOTE_DENSE_ALLOW_MOCK_FALLBACK", "1") != "0",
         retained_job_count=max(1, int(environ.get("DREAMNAV_REMOTE_DENSE_RETAINED_JOBS", "8"))),
     )
@@ -73,6 +75,7 @@ def create_app(settings: RemoteDenseSettings | None = None) -> FastAPI:
                 submission_bundle.parent,
                 resolved_settings.backend,
                 resolved_settings.colmap_command,
+                resolved_settings.dense_command,
                 resolved_settings.allow_mock_fallback,
             )
         except RemoteDenseGenerationError as error:
