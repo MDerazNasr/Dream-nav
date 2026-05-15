@@ -30,6 +30,13 @@ Optional environment variables:
 - `DREAMNAV_REMOTE_DENSE_ALLOW_MOCK_FALLBACK=0` disables auto fallback when `backend=auto`.
 - `DREAMNAV_REMOTE_DENSE_CALLBACK_TIMEOUT_SEC` controls the callback request timeout.
 
+Capability probe:
+
+- `GET /capabilities` reports whether the worker is actually ready to run a real dense backend.
+- `real_dense_ready=true` means the worker can use either a valid command adapter or a supported COLMAP dense path.
+- `missing_requirements` lists hard blockers such as a missing command executable or no real dense backend on the machine.
+- `warnings` reports softer issues such as a COLMAP build that cannot run dense stereo while a command adapter is still available.
+
 Run tests:
 
 ```bash
