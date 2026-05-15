@@ -26,6 +26,7 @@ First real adapter executable in this repo:
 Optional environment variables:
 
 - `DREAMNAV_REMOTE_DENSE_COMMAND` points to an external dense engine adapter executable. DreamNav calls it with `--bundle-root`, `--artifacts-root`, `--frames-root`, and `--output-ply`.
+- Command backends can now emit either a DreamNav-ready splat PLY or a standard dense point-cloud PLY. The worker normalizes point-cloud output into the viewer splat format before callback import.
 - `DREAMNAV_REMOTE_DENSE_COLMAP_COMMAND` selects the COLMAP binary to use for dense capability checks and wrapper execution.
 - `DREAMNAV_REMOTE_DENSE_ALLOW_MOCK_FALLBACK=0` disables auto fallback when `backend=auto`.
 - `DREAMNAV_REMOTE_DENSE_CALLBACK_TIMEOUT_SEC` controls the callback request timeout.
