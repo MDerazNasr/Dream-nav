@@ -10,6 +10,7 @@ import httpx
 from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
 
 from .backend import RemoteDenseBackendError, build_dense_result
+from .capabilities import remote_dense_capabilities
 from .generator import RemoteDenseGenerationError, bundle_manifest, write_submission_bundle
 
 
@@ -49,6 +50,10 @@ def create_app(settings: RemoteDenseSettings | None = None) -> FastAPI:
     @app.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok", "service": "dreamnav-remote-dense"}
+
+    @app.get("/capabilities")
+    def capabilities() -> dict[str, object]:
+        return remote_dense_capabilities(resolved_settings)
 
     @app.post("/jobs")
     async def submit_job(
