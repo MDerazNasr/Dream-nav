@@ -98,6 +98,7 @@ class RemoteDenseSubmissionResponse(StrictModel):
     source_video: str
     callback_url: str
     callback_token_configured: bool
+    worker_capabilities: "RemoteDenseCapabilities"
     warnings: list[str]
 
 
@@ -108,6 +109,24 @@ class RemoteDenseResultSummary(StrictModel):
     source_file: str
     validation_status: Literal["pass", "warning", "reject"]
     gaussian_count: int = Field(ge=0)
+
+
+class RemoteDenseCapabilities(StrictModel):
+    provider_url: str | None = None
+    configured: bool
+    callback_token_configured: bool
+    backend: str | None = None
+    dense_command: str | None = None
+    bundled_adapter_available: bool
+    colmap_command: str | None = None
+    colmap_dense_supported: bool
+    colmap_dense_reason: str | None = None
+    allow_mock_fallback: bool
+    retained_job_count: int = Field(ge=0)
+    real_dense_ready: bool
+    submission_allowed: bool
+    missing_requirements: list[str]
+    warnings: list[str]
 
 
 class JobStatus(StrictModel):

@@ -3,6 +3,7 @@ import {
   DreamNavApiError,
   fetchGaussianImportReview,
   fetchFeaturedSceneBundle,
+  fetchRemoteDenseCapabilities,
   fetchRemoteDenseResultSummary,
   importGaussianAsset,
   fetchReconstructionCapabilities,
@@ -214,6 +215,23 @@ const apiPayloads: Record<string, unknown> = {
     blockers: [],
     warnings: []
   },
+  "http://api.test/remote-dense-capabilities": {
+    provider_url: "https://dense.example/jobs",
+    configured: true,
+    callback_token_configured: true,
+    backend: "auto",
+    dense_command: "/opt/dreamnav/dense-adapter",
+    bundled_adapter_available: false,
+    colmap_command: "/opt/homebrew/bin/colmap",
+    colmap_dense_supported: true,
+    colmap_dense_reason: null,
+    allow_mock_fallback: true,
+    retained_job_count: 8,
+    real_dense_ready: true,
+    submission_allowed: true,
+    missing_requirements: [],
+    warnings: []
+  },
   "http://api.test/jobs/scene_abc123/submit-remote-dense": {
     job_id: "scene_abc123",
     provider_url: "https://dense.example/jobs",
@@ -226,6 +244,23 @@ const apiPayloads: Record<string, unknown> = {
     source_video: "walkthrough.mov",
     callback_url: "https://dreamnav.example/jobs/scene_abc123/remote-dense-result",
     callback_token_configured: true,
+    worker_capabilities: {
+      provider_url: "https://dense.example/jobs",
+      configured: true,
+      callback_token_configured: true,
+      backend: "auto",
+      dense_command: "/opt/dreamnav/dense-adapter",
+      bundled_adapter_available: false,
+      colmap_command: "/opt/homebrew/bin/colmap",
+      colmap_dense_supported: true,
+      colmap_dense_reason: null,
+      allow_mock_fallback: true,
+      retained_job_count: 8,
+      real_dense_ready: true,
+      submission_allowed: true,
+      missing_requirements: [],
+      warnings: []
+    },
     warnings: []
   },
   "http://api.test/jobs/scene_abc123/artifacts/gaussian_import_review.json": {
@@ -380,12 +415,23 @@ describe("DreamNav API client", () => {
 
     expect(response.remote_job_id).toBe("remote_001");
     expect(response.backend).toBe("colmap_dense");
+    expect(response.worker_capabilities.submission_allowed).toBe(true);
     expect(fetchMock).toHaveBeenCalledWith(
       new URL("http://api.test/jobs/scene_abc123/submit-remote-dense"),
       expect.objectContaining({
         method: "POST"
       })
     );
+  });
+
+  it("loads remote dense worker capability summaries", async () => {
+    mockFetchFromPayloads(apiPayloads);
+
+    const response = await fetchRemoteDenseCapabilities("http://api.test");
+
+    expect(response.provider_url).toBe("https://dense.example/jobs");
+    expect(response.real_dense_ready).toBe(true);
+    expect(response.submission_allowed).toBe(true);
   });
 
   it("loads imported Gaussian review artifacts when available", async () => {

@@ -4,6 +4,7 @@ from zipfile import ZipFile
 from app.remote_dense_handoff import (
     RemoteDenseHandoffError,
     build_remote_dense_bundle,
+    remote_dense_capabilities_summary,
     remote_submission_payload,
     submit_remote_dense_job,
 )
@@ -127,10 +128,38 @@ def test_remote_submission_payload_marks_callback_token_configuration(tmp_path) 
             sender=lambda request: FakeSubmissionResponse(),
         ),
         callback_token_configured=True,
+        worker_capabilities=remote_dense_capabilities_summary(
+            "https://dense.example/jobs",
+            "callback-secret",
+            sender=lambda request: FakeCapabilityResponse(),
+        ),
     )
 
     assert payload["job_id"] == "scene_abc123"
     assert payload["callback_token_configured"] is True
+    assert payload["worker_capabilities"]["submission_allowed"] is True
+
+
+def test_remote_dense_capabilities_summary_reads_worker_probe() -> None:
+    summary = remote_dense_capabilities_summary(
+        "https://dense.example/jobs",
+        "callback-secret",
+        sender=lambda request: FakeCapabilityResponse(),
+    )
+
+    assert summary.provider_url == "https://dense.example/jobs"
+    assert summary.submission_allowed is True
+    assert summary.real_dense_ready is True
+    assert summary.backend == "auto"
+
+
+def test_remote_dense_capabilities_summary_marks_missing_configuration() -> None:
+    summary = remote_dense_capabilities_summary(None, None)
+
+    assert summary.configured is False
+    assert summary.submission_allowed is False
+    assert "Set DREAMNAV_REMOTE_DENSE_URL to the remote worker jobs endpoint." in summary.missing_requirements
+    assert "Set DREAMNAV_REMOTE_DENSE_CALLBACK_TOKEN so the worker can post results back." in summary.missing_requirements
 
 
 def build_bundle_stub(bundle_path: Path):
@@ -156,3 +185,22 @@ class FakeSubmissionResponse:
 
     def read(self) -> bytes:
         return b'{"remote_job_id":"remote_001","backend":"colmap_dense"}'
+
+
+class FakeCapabilityResponse:
+    status = 200
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def read(self) -> bytes:
+        return (
+            b'{"backend":"auto","dense_command":"/opt/dreamnav/dense-adapter",'
+            b'"bundled_adapter_available":false,"colmap_command":"/opt/homebrew/bin/colmap",'
+            b'"colmap_dense_supported":true,"colmap_dense_reason":null,'
+            b'"allow_mock_fallback":true,"retained_job_count":8,'
+            b'"real_dense_ready":true,"missing_requirements":[],"warnings":[]}'
+        )

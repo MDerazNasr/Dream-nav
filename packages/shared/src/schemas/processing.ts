@@ -63,6 +63,7 @@ export const remoteDenseSubmissionResponseSchema = z.object({
   source_video: z.string().min(1),
   callback_url: z.string().min(1),
   callback_token_configured: z.boolean(),
+  worker_capabilities: z.lazy(() => remoteDenseCapabilitiesSchema),
   warnings: z.array(z.string().min(1))
 });
 
@@ -73,6 +74,24 @@ export const remoteDenseResultSummarySchema = z.object({
   source_file: z.string().min(1),
   validation_status: z.enum(["pass", "warning", "reject"]),
   gaussian_count: z.number().min(0)
+});
+
+export const remoteDenseCapabilitiesSchema = z.object({
+  provider_url: z.string().min(1).nullable().default(null),
+  configured: z.boolean(),
+  callback_token_configured: z.boolean(),
+  backend: z.string().min(1).nullable().default(null),
+  dense_command: z.string().min(1).nullable().default(null),
+  bundled_adapter_available: z.boolean(),
+  colmap_command: z.string().min(1).nullable().default(null),
+  colmap_dense_supported: z.boolean(),
+  colmap_dense_reason: z.string().min(1).nullable().default(null),
+  allow_mock_fallback: z.boolean(),
+  retained_job_count: z.number().min(0),
+  real_dense_ready: z.boolean(),
+  submission_allowed: z.boolean(),
+  missing_requirements: z.array(z.string().min(1)),
+  warnings: z.array(z.string().min(1))
 });
 
 export const jobStatusSchema = z.object({
@@ -120,6 +139,8 @@ export type RemoteDenseSubmissionResponse = z.infer<typeof remoteDenseSubmission
 
 export type RemoteDenseResultSummary = z.infer<typeof remoteDenseResultSummarySchema>;
 
+export type RemoteDenseCapabilities = z.infer<typeof remoteDenseCapabilitiesSchema>;
+
 export type JobStatus = z.infer<typeof jobStatusSchema>;
 
 export type JobArtifact = z.infer<typeof jobArtifactSchema>;
@@ -140,6 +161,10 @@ export function parseRemoteDenseSubmissionResponse(input: unknown): RemoteDenseS
 
 export function parseRemoteDenseResultSummary(input: unknown): RemoteDenseResultSummary {
   return remoteDenseResultSummarySchema.parse(input);
+}
+
+export function parseRemoteDenseCapabilities(input: unknown): RemoteDenseCapabilities {
+  return remoteDenseCapabilitiesSchema.parse(input);
 }
 
 export function parseJobStatus(input: unknown): JobStatus {

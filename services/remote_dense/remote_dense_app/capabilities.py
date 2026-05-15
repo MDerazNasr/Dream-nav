@@ -10,9 +10,12 @@ if TYPE_CHECKING:
 
 
 def remote_dense_capabilities(settings: RemoteDenseSettings) -> dict[str, object]:
-    bundled_adapter = Path(settings.dense_command).is_file() if settings.dense_command else False
+    bundled_adapter_path = Path(__file__).with_name("colmap_command_adapter.py").resolve()
+    dense_command_path = Path(settings.dense_command).resolve() if settings.dense_command else None
+    bundled_adapter = dense_command_path is not None and dense_command_path.is_file()
+    uses_bundled_adapter = dense_command_path == bundled_adapter_path if dense_command_path else False
     colmap_supported, colmap_reason = detect_colmap_dense_support(settings.colmap_command)
-    command_backend_ready = bundled_adapter
+    command_backend_ready = bundled_adapter and (colmap_supported if uses_bundled_adapter else True)
 
     missing_requirements: list[str] = []
     warnings: list[str] = []

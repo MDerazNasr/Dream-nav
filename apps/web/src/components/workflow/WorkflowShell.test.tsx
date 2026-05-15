@@ -8,6 +8,7 @@ import {
   fetchJobArtifact,
   fetchJobSceneBundle,
   fetchJobStatus,
+  fetchRemoteDenseCapabilities,
   fetchRemoteDenseResultSummary,
   importGaussianAsset,
   submitRemoteDenseJob
@@ -47,6 +48,23 @@ vi.mock("../../lib/dreamnav-api", async (importOriginal) => {
     })),
     fetchJobSceneBundle: vi.fn(async () => processedJobSceneBundle),
     fetchGaussianImportReview: vi.fn(async () => null),
+    fetchRemoteDenseCapabilities: vi.fn(async () => ({
+      provider_url: "https://dense.example/jobs",
+      configured: true,
+      callback_token_configured: true,
+      backend: "auto",
+      dense_command: "/opt/dreamnav/dense-adapter",
+      bundled_adapter_available: false,
+      colmap_command: "/opt/homebrew/bin/colmap",
+      colmap_dense_supported: true,
+      colmap_dense_reason: null,
+      allow_mock_fallback: true,
+      retained_job_count: 8,
+      real_dense_ready: true,
+      submission_allowed: true,
+      missing_requirements: [],
+      warnings: []
+    })),
     fetchRemoteDenseResultSummary: vi.fn(async () => null),
     importGaussianAsset: vi.fn(async () => ({
       job_id: "scene_abc123",
@@ -79,6 +97,23 @@ vi.mock("../../lib/dreamnav-api", async (importOriginal) => {
       source_video: "walkthrough.mov",
       callback_url: "https://dreamnav.example/jobs/scene_abc123/remote-dense-result",
       callback_token_configured: true,
+      worker_capabilities: {
+        provider_url: "https://dense.example/jobs",
+        configured: true,
+        callback_token_configured: true,
+        backend: "auto",
+        dense_command: "/opt/dreamnav/dense-adapter",
+        bundled_adapter_available: false,
+        colmap_command: "/opt/homebrew/bin/colmap",
+        colmap_dense_supported: true,
+        colmap_dense_reason: null,
+        allow_mock_fallback: true,
+        retained_job_count: 8,
+        real_dense_ready: true,
+        submission_allowed: true,
+        missing_requirements: [],
+        warnings: []
+      },
       warnings: []
     })),
     uploadWalkthrough: vi.fn(async () => ({
@@ -248,6 +283,7 @@ describe("WorkflowShell", () => {
     await waitFor(() => {
       expect(screen.getByLabelText("Remote dense backend")).not.toBeNull();
     });
+    expect(screen.getByLabelText("Remote dense readiness").textContent).toContain("Worker ready");
     fireEvent.click(screen.getByRole("button", { name: "Submit to remote dense backend" }));
 
     await waitFor(() => {
@@ -260,6 +296,52 @@ describe("WorkflowShell", () => {
       expect(fetchGaussianImportReview).toHaveBeenCalledWith("scene_abc123");
       expect(fetchRemoteDenseResultSummary).toHaveBeenCalledWith("scene_abc123");
     });
+  });
+
+  it("blocks remote submission when the worker is not real-dense ready", async () => {
+    vi.mocked(fetchJobStatus).mockResolvedValueOnce({
+      job_id: "scene_abc123",
+      state: "completed",
+      stage: "completed",
+      progress: 1,
+      elapsed_sec: 240,
+      message: "Explorer ready",
+      output_scene_id: "warehouse_01",
+      error_message: null,
+      failed_stage: null,
+      failed_artifact: null
+    });
+    vi.mocked(fetchRemoteDenseCapabilities).mockResolvedValueOnce({
+      provider_url: "https://dense.example/jobs",
+      configured: true,
+      callback_token_configured: true,
+      backend: "auto",
+      dense_command: "/Users/mderaznasr/dreamnav/colmap_command_adapter.py",
+      bundled_adapter_available: true,
+      colmap_command: "/opt/homebrew/bin/colmap",
+      colmap_dense_supported: false,
+      colmap_dense_reason: "The configured COLMAP build does not support dense stereo.",
+      allow_mock_fallback: true,
+      retained_job_count: 8,
+      real_dense_ready: false,
+      submission_allowed: false,
+      missing_requirements: ["Run the worker on a machine that can execute a real dense reconstruction backend."],
+      warnings: ["The configured COLMAP build does not support dense stereo."]
+    });
+    render(<WorkflowShell reconstructionCapabilities={reconstructionCapabilities} sceneBundle={sceneBundle} />);
+
+    fireEvent.change(screen.getByLabelText("Walkthrough video"), {
+      target: { files: [new File(["video"], "walkthrough.mp4", { type: "video/mp4" })] }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Start processing" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Remote dense readiness").textContent).toContain("Worker blocked");
+    });
+    expect(screen.getByLabelText("Remote dense readiness").textContent).toContain(
+      "Run the worker on a machine that can execute a real dense reconstruction backend."
+    );
+    expect(screen.getByRole("button", { name: "Submit to remote dense backend" }).hasAttribute("disabled")).toBe(true);
   });
 
   it("blocks opening rejected imported Gaussian assets", async () => {

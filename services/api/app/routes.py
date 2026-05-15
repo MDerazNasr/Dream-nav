@@ -11,6 +11,8 @@ from .remote_dense_handoff import (
     RemoteDenseHandoffError,
     build_remote_dense_bundle,
     callback_warnings,
+    remote_dense_capabilities_payload,
+    remote_dense_capabilities_summary,
     remote_submission_payload,
     submit_remote_dense_job,
 )
@@ -24,6 +26,7 @@ from .schemas import (
     JobStatus,
     QualityReport,
     ReconstructionCapabilities,
+    RemoteDenseCapabilities,
     RemoteDenseSubmissionResponse,
     SceneAssetStatus,
     SceneAssets,
@@ -132,6 +135,22 @@ async def import_gaussian_asset(
     except GaussianImportError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
+
+@router.get("/remote-dense-capabilities", response_model=RemoteDenseCapabilities)
+def remote_dense_capabilities(request: Request) -> RemoteDenseCapabilities:
+    settings = request.app.state.settings
+    try:
+        summary = remote_dense_capabilities_summary(
+            settings.remote_dense_url,
+            settings.remote_dense_callback_token,
+            provider_token=settings.remote_dense_token,
+        )
+    except RemoteDenseHandoffError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+    return RemoteDenseCapabilities(**remote_dense_capabilities_payload(summary))
+
+
 @router.post("/jobs/{job_id}/submit-remote-dense", response_model=RemoteDenseSubmissionResponse)
 def submit_remote_dense(job_id: str, request: Request) -> RemoteDenseSubmissionResponse:
     job_repository = _job_repository(request)
@@ -140,11 +159,21 @@ def submit_remote_dense(job_id: str, request: Request) -> RemoteDenseSubmissionR
         raise HTTPException(status_code=409, detail="Job scene bundle is not ready for remote dense submission")
 
     settings = request.app.state.settings
-    if not settings.remote_dense_url:
-        raise HTTPException(status_code=409, detail="Remote dense backend is not configured")
-
-    if not settings.remote_dense_callback_token:
-        raise HTTPException(status_code=409, detail="Remote dense callback token is not configured")
+    try:
+        capabilities = remote_dense_capabilities_summary(
+            settings.remote_dense_url,
+            settings.remote_dense_callback_token,
+            provider_token=settings.remote_dense_token,
+        )
+    except RemoteDenseHandoffError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    if not capabilities.submission_allowed:
+        raise HTTPException(
+            status_code=409,
+            detail=capabilities.missing_requirements[0]
+            if capabilities.missing_requirements
+            else "Remote dense worker is not ready for real dense submission",
+        )
 
     callback_url = _remote_dense_callback_url(request, job_id)
     warnings = callback_warnings(settings.public_api_base_url)
@@ -170,8 +199,9 @@ def submit_remote_dense(job_id: str, request: Request) -> RemoteDenseSubmissionR
         job_id,
         submission,
         callback_token_configured=True,
+        worker_capabilities=capabilities,
     )
-    payload["warnings"] = [*warnings, *submission.warnings]
+    payload["warnings"] = [*warnings, *capabilities.warnings, *submission.warnings]
     job_repository.write_artifact(job_id, "remote_dense_submission.json", payload)
     return RemoteDenseSubmissionResponse(**{key: value for key, value in payload.items() if key != "submitted_at_sec"})
 

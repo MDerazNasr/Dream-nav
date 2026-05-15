@@ -9,6 +9,7 @@ import {
   parseJobSceneBundle,
   parseJobStatus,
   parseRemoteDenseResultSummary,
+  parseRemoteDenseCapabilities,
   parseQualityReport,
   parseReconstructionCapabilities,
   parseRemoteDenseSubmissionResponse,
@@ -29,6 +30,7 @@ import type {
   JobStatus,
   ReconstructionCapabilities,
   RemoteDenseResultSummary,
+  RemoteDenseCapabilities,
   RemoteDenseSubmissionResponse,
   SceneAssetStatus,
   UploadResponse
@@ -217,6 +219,12 @@ export async function fetchRemoteDenseResultSummary(
 
     throw error;
   }
+}
+
+export async function fetchRemoteDenseCapabilities(
+  apiBaseUrl = getDreamNavApiBaseUrl()
+): Promise<RemoteDenseCapabilities> {
+  return parseRemoteDenseCapabilities(await fetchJson(apiBaseUrl, "/remote-dense-capabilities"));
 }
 
 export async function importGaussianAsset(
