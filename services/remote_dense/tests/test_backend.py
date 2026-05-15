@@ -82,7 +82,39 @@ def test_build_dense_result_uses_command_backend_when_configured(tmp_path) -> No
 
     assert result.backend == "command"
     assert result.warnings == []
-    assert result.dense_ply.startswith(b"ply\nformat ascii 1.0\n")
+    assert b"property float f_dc_0" in result.dense_ply
+    assert b"property float opacity" in result.dense_ply
+
+
+def test_build_dense_result_passes_through_splat_output_from_command_backend(tmp_path) -> None:
+    bundle_path = tmp_path / "bundle.zip"
+    bundle_path.write_bytes(build_bundle_bytes(include_colmap_sparse=True))
+    command_path = tmp_path / "fake_dense_command.py"
+    command_path.write_text(
+        "#!/usr/bin/env python3\n"
+        "from pathlib import Path\n"
+        "from sys import argv\n"
+        "parsed = dict(zip(argv[1::2], argv[2::2], strict=True))\n"
+        "Path(parsed['--output-ply']).write_text(\n"
+        "    'ply\\nformat binary_little_endian 1.0\\nelement vertex 1\\nproperty float x\\nproperty float y\\nproperty float z\\nproperty float f_dc_0\\nproperty float f_dc_1\\nproperty float f_dc_2\\nproperty float opacity\\nproperty float scale_0\\nproperty float scale_1\\nproperty float scale_2\\nproperty float rot_0\\nproperty float rot_1\\nproperty float rot_2\\nproperty float rot_3\\nend_header\\n',\n"
+        "    encoding='utf-8',\n"
+        ")\n",
+        encoding="utf-8",
+    )
+    command_path.chmod(0o755)
+
+    result = build_dense_result(
+        bundle_path,
+        tmp_path / "workspace",
+        "command",
+        None,
+        str(command_path),
+        allow_mock_fallback=True,
+    )
+
+    assert result.backend == "command"
+    assert b"property float f_dc_0" in result.dense_ply
+    assert b"property float opacity" in result.dense_ply
 
 
 def test_detect_colmap_dense_support_rejects_cuda_less_build(tmp_path) -> None:

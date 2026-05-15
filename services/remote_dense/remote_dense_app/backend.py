@@ -9,6 +9,14 @@ from typing import Callable
 
 from .generator import RemoteDenseGenerationError, extract_bundle, generate_mock_dense_ply_from_extracted
 
+try:
+    from app.point_cloud_to_splat import PointCloudToSplatError, read_ply_points, write_splat_from_points
+except ImportError:
+    api_root = Path(__file__).resolve().parents[3] / "services" / "api"
+    if str(api_root) not in __import__("sys").path:
+        __import__("sys").path.insert(0, str(api_root))
+    from app.point_cloud_to_splat import PointCloudToSplatError, read_ply_points, write_splat_from_points
+
 
 class RemoteDenseBackendError(Exception):
     pass
@@ -154,7 +162,7 @@ def build_dense_command_ply(extracted_root: Path, workspace_root: Path, dense_co
         details = completed.stderr.strip() or completed.stdout.strip() or "Remote dense command backend failed."
         raise RemoteDenseBackendError(details)
 
-    return output_ply.read_bytes()
+    return _normalize_dense_output(output_ply)
 
 
 def _auto_builders(
@@ -194,3 +202,43 @@ def _resolve_dense_command(configured_command: str | None) -> str | None:
         return str(configured_path) if configured_path.is_file() else None
 
     return which(configured_command)
+
+
+def _normalize_dense_output(output_ply: Path) -> bytes:
+    header = _ply_header(output_ply)
+    if _is_splat_ply_header(header):
+        return output_ply.read_bytes()
+
+    try:
+        points = read_ply_points(output_ply)
+        write_splat_from_points(points, output_ply, max_points=40000)
+    except PointCloudToSplatError as error:
+        raise RemoteDenseBackendError(f"Remote dense command output could not be normalized: {error}") from error
+
+    return output_ply.read_bytes()
+
+
+def _ply_header(output_ply: Path) -> str:
+    payload = output_ply.read_bytes()
+    marker = b"end_header"
+    header_end = payload.find(marker)
+    if header_end == -1:
+        raise RemoteDenseBackendError("Remote dense command output was not a valid PLY file.")
+
+    newline_index = payload.find(b"\n", header_end)
+    if newline_index == -1:
+        newline_index = header_end + len(marker)
+
+    return payload[:newline_index].decode("utf-8", errors="replace")
+
+
+def _is_splat_ply_header(header: str) -> bool:
+    return all(
+        token in header
+        for token in (
+            "property float f_dc_0",
+            "property float opacity",
+            "property float scale_0",
+            "property float rot_0",
+        )
+    )
