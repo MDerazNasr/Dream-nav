@@ -20,6 +20,8 @@ def run_adapter(
     output_ply: Path,
     docker_image: str | None = None,
     docker_runtime: str | None = None,
+    docker_gpus: str | None = None,
+    docker_platform: str | None = None,
 ) -> None:
     try:
         bundle_root = bundle_root.resolve(strict=True)
@@ -30,6 +32,8 @@ def run_adapter(
 
     resolved_runtime = _resolve_runtime(docker_runtime)
     resolved_image = _resolve_image(docker_image)
+    resolved_gpus = _resolve_gpus(docker_gpus)
+    resolved_platform = _resolve_platform(docker_platform)
     output_ply = output_ply.resolve()
     output_ply.parent.mkdir(parents=True, exist_ok=True)
 
@@ -37,6 +41,7 @@ def run_adapter(
         resolved_runtime,
         "run",
         "--rm",
+        *_docker_runtime_flags(resolved_gpus, resolved_platform),
         "--mount",
         f"type=bind,src={bundle_root},dst=/dreamnav/bundle,ro",
         "--mount",
@@ -63,11 +68,25 @@ def run_adapter(
     print(f"remote_dense_docker_adapter image={resolved_image}")
 
 
-def probe_engine(docker_image: str | None = None, docker_runtime: str | None = None) -> tuple[bool, str | None]:
+def probe_engine(
+    docker_image: str | None = None,
+    docker_runtime: str | None = None,
+    docker_gpus: str | None = None,
+    docker_platform: str | None = None,
+) -> tuple[bool, str | None]:
     resolved_runtime = _resolve_runtime(docker_runtime)
     resolved_image = _resolve_image(docker_image)
+    resolved_gpus = _resolve_gpus(docker_gpus)
+    resolved_platform = _resolve_platform(docker_platform)
     completed = run(
-        [resolved_runtime, "run", "--rm", resolved_image, "--health-check"],
+        [
+            resolved_runtime,
+            "run",
+            "--rm",
+            *_docker_runtime_flags(resolved_gpus, resolved_platform),
+            resolved_image,
+            "--health-check",
+        ],
         capture_output=True,
         check=False,
         text=True,
@@ -89,6 +108,8 @@ def main(args: list[str]) -> int:
             output_ply=Path(parsed["output_ply"]),
             docker_image=parsed.get("docker_image"),
             docker_runtime=parsed.get("docker_runtime"),
+            docker_gpus=parsed.get("docker_gpus"),
+            docker_platform=parsed.get("docker_platform"),
         )
     except RemoteDenseDockerAdapterError as error:
         print(str(error))
@@ -98,17 +119,17 @@ def main(args: list[str]) -> int:
 
 
 def _parse_args(args: list[str]) -> dict[str, str]:
-    if len(args) not in {8, 10, 12}:
+    if len(args) not in {8, 10, 12, 14, 16}:
         raise SystemExit(
-            "Usage: docker_command_adapter.py --bundle-root <path> --artifacts-root <path> --frames-root <path> --output-ply <path> [--docker-image <image>] [--docker-runtime <cmd>]"
+            "Usage: docker_command_adapter.py --bundle-root <path> --artifacts-root <path> --frames-root <path> --output-ply <path> [--docker-image <image>] [--docker-runtime <cmd>] [--docker-gpus <value>] [--docker-platform <value>]"
         )
 
     parsed = dict(zip(args[::2], args[1::2], strict=True))
     required = {"--bundle-root", "--artifacts-root", "--frames-root", "--output-ply"}
-    allowed = required | {"--docker-image", "--docker-runtime"}
+    allowed = required | {"--docker-image", "--docker-runtime", "--docker-gpus", "--docker-platform"}
     if not required.issubset(parsed) or not set(parsed).issubset(allowed):
         raise SystemExit(
-            "Usage: docker_command_adapter.py --bundle-root <path> --artifacts-root <path> --frames-root <path> --output-ply <path> [--docker-image <image>] [--docker-runtime <cmd>]"
+            "Usage: docker_command_adapter.py --bundle-root <path> --artifacts-root <path> --frames-root <path> --output-ply <path> [--docker-image <image>] [--docker-runtime <cmd>] [--docker-gpus <value>] [--docker-platform <value>]"
         )
 
     return {
@@ -118,6 +139,8 @@ def _parse_args(args: list[str]) -> dict[str, str]:
         "output_ply": parsed["--output-ply"],
         **({"docker_image": parsed["--docker-image"]} if "--docker-image" in parsed else {}),
         **({"docker_runtime": parsed["--docker-runtime"]} if "--docker-runtime" in parsed else {}),
+        **({"docker_gpus": parsed["--docker-gpus"]} if "--docker-gpus" in parsed else {}),
+        **({"docker_platform": parsed["--docker-platform"]} if "--docker-platform" in parsed else {}),
     }
 
 
@@ -140,6 +163,33 @@ def _resolve_runtime(configured_runtime: str | None) -> str:
     raise RemoteDenseDockerAdapterError(
         "Install Docker or set DREAMNAV_REMOTE_DENSE_DOCKER_RUNTIME to a compatible container runtime."
     )
+
+
+def _resolve_gpus(configured_gpus: str | None) -> str | None:
+    value = configured_gpus if configured_gpus is not None else environ.get("DREAMNAV_REMOTE_DENSE_DOCKER_GPUS")
+    if value is None:
+        return None
+
+    normalized = value.strip()
+    return normalized or None
+
+
+def _resolve_platform(configured_platform: str | None) -> str | None:
+    value = configured_platform if configured_platform is not None else environ.get("DREAMNAV_REMOTE_DENSE_DOCKER_PLATFORM")
+    if value is None:
+        return None
+
+    normalized = value.strip()
+    return normalized or None
+
+
+def _docker_runtime_flags(docker_gpus: str | None, docker_platform: str | None) -> list[str]:
+    flags: list[str] = []
+    if docker_platform:
+        flags.extend(["--platform", docker_platform])
+    if docker_gpus:
+        flags.extend(["--gpus", docker_gpus])
+    return flags
 
 
 if __name__ == "__main__":

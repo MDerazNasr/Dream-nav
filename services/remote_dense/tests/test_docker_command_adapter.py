@@ -36,10 +36,16 @@ def test_run_adapter_executes_containerized_dense_command(tmp_path, monkeypatch)
         artifacts_root=artifacts_root,
         frames_root=frames_root,
         output_ply=output_ply,
+        docker_gpus="all",
+        docker_platform="linux/amd64",
     )
 
     assert captured["command"][0] == "/usr/local/bin/docker"
     assert "dreamnav/dense-engine:latest" in captured["command"]
+    assert "--gpus" in captured["command"]
+    assert "all" in captured["command"]
+    assert "--platform" in captured["command"]
+    assert "linux/amd64" in captured["command"]
     assert "--output-ply" in captured["command"]
     assert "/dreamnav/output/dense_result.ply" in captured["command"]
 
@@ -64,6 +70,10 @@ def test_main_accepts_optional_docker_overrides(tmp_path, monkeypatch) -> None:
             str(output_ply),
             "--docker-image",
             "dreamnav/dense-engine:latest",
+            "--docker-gpus",
+            "all",
+            "--docker-platform",
+            "linux/amd64",
         ]
     )
 
@@ -96,3 +106,33 @@ def test_probe_engine_reports_failed_image_health_check(monkeypatch) -> None:
 
     assert supported is False
     assert reason == "The dense engine image COLMAP build does not support dense stereo."
+
+
+def test_probe_engine_passes_gpu_and_platform_flags(monkeypatch) -> None:
+    captured = {}
+    monkeypatch.setattr(docker_command_adapter, "_resolve_runtime", lambda runtime: "/usr/local/bin/docker")
+    monkeypatch.setattr(docker_command_adapter, "_resolve_image", lambda image: "dreamnav/dense-engine:cuda")
+
+    class Completed:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    def fake_run(command, capture_output, check, text):
+        del capture_output, check, text
+        captured["command"] = command
+        return Completed()
+
+    monkeypatch.setattr(docker_command_adapter, "run", fake_run)
+
+    supported, reason = docker_command_adapter.probe_engine(
+        docker_gpus="all",
+        docker_platform="linux/amd64",
+    )
+
+    assert supported is True
+    assert reason is None
+    assert "--gpus" in captured["command"]
+    assert "all" in captured["command"]
+    assert "--platform" in captured["command"]
+    assert "linux/amd64" in captured["command"]
