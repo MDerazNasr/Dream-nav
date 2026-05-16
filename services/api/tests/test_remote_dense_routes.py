@@ -2,7 +2,11 @@ from fastapi.testclient import TestClient
 
 from app.config import ApiSettings
 from app.main import create_app
-from app.remote_dense_handoff import RemoteDenseCapabilitiesSummary, RemoteDenseSubmissionResult
+from app.remote_dense_handoff import (
+    RemoteDenseCapabilitiesSummary,
+    RemoteDenseJobStatusSummary,
+    RemoteDenseSubmissionResult,
+)
 from tests.test_gaussian_import_routes import _completed_job, _point_cloud_ply
 
 
@@ -118,6 +122,77 @@ def test_submit_remote_dense_route_blocks_when_worker_is_not_real_dense_ready(tm
 
     assert response.status_code == 409
     assert response.json()["detail"] == "Run the worker on a machine that can execute a real dense reconstruction backend."
+
+
+def test_remote_dense_status_route_reads_worker_status(tmp_path, monkeypatch) -> None:
+    app = create_app(
+        ApiSettings(
+            repo_root=tmp_path,
+            auto_start_worker=False,
+            public_api_base_url="https://dreamnav.example",
+            remote_dense_url="https://dense.example/jobs",
+            remote_dense_callback_token="callback-secret",
+        )
+    )
+    client = TestClient(app)
+    job_id = _completed_job(client, app)
+    _write_remote_frames(app.state.job_repository, job_id)
+    app.state.job_repository.write_artifact(
+        job_id,
+        "remote_dense_submission.json",
+        {
+            "job_id": job_id,
+            "provider_url": "https://dense.example/jobs",
+            "remote_job_id": "remote_001",
+            "submission_status": "submitted",
+            "backend": "colmap_dense",
+            "bundle_file": "remote_dense_bundle.zip",
+            "bundle_size_bytes": 180024,
+            "frame_count": 59,
+            "source_video": "walkthrough.mov",
+            "callback_url": f"https://dreamnav.example/jobs/{job_id}/remote-dense-result",
+            "callback_token_configured": True,
+            "worker_capabilities": {
+                "provider_url": "https://dense.example/jobs",
+                "configured": True,
+                "callback_token_configured": True,
+                "backend": "auto",
+                "dense_command": "/opt/dreamnav/dense-adapter",
+                "bundled_adapter_available": False,
+                "colmap_command": "/opt/homebrew/bin/colmap",
+                "colmap_dense_supported": True,
+                "colmap_dense_reason": None,
+                "allow_mock_fallback": True,
+                "retained_job_count": 8,
+                "real_dense_ready": True,
+                "submission_allowed": True,
+                "missing_requirements": [],
+                "warnings": [],
+            },
+            "warnings": [],
+            "submitted_at_sec": 1,
+        },
+    )
+
+    monkeypatch.setattr(
+        "app.routes.remote_dense_job_status",
+        lambda provider_url, remote_job_id, provider_token=None: RemoteDenseJobStatusSummary(
+            job_id=job_id,
+            remote_job_id=remote_job_id,
+            status="running",
+            backend="colmap_dense",
+            source_video="walkthrough.mov",
+            frame_count=59,
+            warnings=[],
+            error=None,
+        ),
+    )
+
+    response = client.get(f"/jobs/{job_id}/remote-dense-status")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "running"
+    assert response.json()["remote_job_id"] == "remote_001"
 
 
 def test_remote_dense_result_route_requires_callback_token(tmp_path) -> None:

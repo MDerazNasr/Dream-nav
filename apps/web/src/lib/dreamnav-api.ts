@@ -9,6 +9,7 @@ import {
   parseJobSceneBundle,
   parseJobStatus,
   parseRemoteDenseResultSummary,
+  parseRemoteDenseJobStatusResponse,
   parseRemoteDenseCapabilities,
   parseQualityReport,
   parseReconstructionCapabilities,
@@ -30,6 +31,7 @@ import type {
   JobStatus,
   ReconstructionCapabilities,
   RemoteDenseResultSummary,
+  RemoteDenseJobStatusResponse,
   RemoteDenseCapabilities,
   RemoteDenseSubmissionResponse,
   SceneAssetStatus,
@@ -212,6 +214,37 @@ export async function fetchRemoteDenseResultSummary(
   try {
     const artifact = await fetchJobArtifact(jobId, "remote_dense_result.json", apiBaseUrl);
     return parseRemoteDenseResultSummary(artifact.payload);
+  } catch (error) {
+    if (error instanceof DreamNavApiError && error.status === 404) {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
+export async function fetchRemoteDenseSubmission(
+  jobId: string,
+  apiBaseUrl = getDreamNavApiBaseUrl()
+): Promise<RemoteDenseSubmissionResponse | null> {
+  try {
+    const artifact = await fetchJobArtifact(jobId, "remote_dense_submission.json", apiBaseUrl);
+    return parseRemoteDenseSubmissionResponse(artifact.payload);
+  } catch (error) {
+    if (error instanceof DreamNavApiError && error.status === 404) {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
+export async function fetchRemoteDenseJobStatus(
+  jobId: string,
+  apiBaseUrl = getDreamNavApiBaseUrl()
+): Promise<RemoteDenseJobStatusResponse | null> {
+  try {
+    return parseRemoteDenseJobStatusResponse(await fetchJson(apiBaseUrl, `/jobs/${jobId}/remote-dense-status`));
   } catch (error) {
     if (error instanceof DreamNavApiError && error.status === 404) {
       return null;

@@ -80,6 +80,30 @@ def test_submit_job_records_failed_status_when_callback_fails(tmp_path) -> None:
     assert result["error"] == "callback failed"
 
 
+def test_job_status_route_returns_recorded_remote_result(tmp_path) -> None:
+    app = create_app(RemoteDenseSettings(repo_root=tmp_path, backend="mock"))
+    client = TestClient(app)
+    app.state.callback_sender = lambda *args: None
+
+    response = client.post(
+        "/jobs",
+        data={
+            "job_id": "scene_abc123",
+            "callback_url": "https://dreamnav.example/jobs/scene_abc123/remote-dense-result",
+            "callback_token": "callback-secret",
+            "source_video": "walkthrough.mov",
+        },
+        files={"bundle": ("remote_dense_bundle.zip", build_bundle_bytes(), "application/zip")},
+    )
+
+    remote_job_id = response.json()["remote_job_id"]
+    status_response = client.get(f"/jobs/{remote_job_id}")
+
+    assert status_response.status_code == 200
+    assert status_response.json()["status"] == "completed"
+    assert status_response.json()["backend"] == "mock"
+
+
 def test_submit_job_prunes_old_remote_workspaces(tmp_path) -> None:
     app = create_app(RemoteDenseSettings(repo_root=tmp_path, backend="mock", retained_job_count=2))
     client = TestClient(app)

@@ -9,7 +9,9 @@ import {
   fetchJobSceneBundle,
   fetchJobStatus,
   fetchRemoteDenseCapabilities,
+  fetchRemoteDenseJobStatus,
   fetchRemoteDenseResultSummary,
+  fetchRemoteDenseSubmission,
   importGaussianAsset,
   submitRemoteDenseJob
 } from "../../lib/dreamnav-api";
@@ -48,6 +50,8 @@ vi.mock("../../lib/dreamnav-api", async (importOriginal) => {
     })),
     fetchJobSceneBundle: vi.fn(async () => processedJobSceneBundle),
     fetchGaussianImportReview: vi.fn(async () => null),
+    fetchRemoteDenseSubmission: vi.fn(async () => null),
+    fetchRemoteDenseJobStatus: vi.fn(async () => null),
     fetchRemoteDenseCapabilities: vi.fn(async () => ({
       provider_url: "https://dense.example/jobs",
       configured: true,
@@ -287,6 +291,74 @@ describe("WorkflowShell", () => {
       "scene_abc123",
       expect.any(File)
     );
+  });
+
+  it("resumes remote dense submission state after reload and shows worker progress", async () => {
+    vi.mocked(fetchJobStatus).mockResolvedValueOnce({
+      job_id: "scene_abc123",
+      state: "completed",
+      stage: "completed",
+      progress: 1,
+      elapsed_sec: 240,
+      message: "Explorer ready",
+      output_scene_id: "warehouse_01",
+      error_message: null,
+      failed_stage: null,
+      failed_artifact: null
+    });
+    vi.mocked(fetchRemoteDenseSubmission).mockResolvedValueOnce({
+      job_id: "scene_abc123",
+      provider_url: "https://dense.example/jobs",
+      remote_job_id: "remote_001",
+      submission_status: "submitted",
+      backend: "colmap_dense",
+      bundle_file: "remote_dense_bundle.zip",
+      bundle_size_bytes: 180024,
+      frame_count: 59,
+      source_video: "walkthrough.mov",
+      callback_url: "https://dreamnav.example/jobs/scene_abc123/remote-dense-result",
+      callback_token_configured: true,
+      worker_capabilities: {
+        provider_url: "https://dense.example/jobs",
+        configured: true,
+        callback_token_configured: true,
+        backend: "auto",
+        dense_command: "/opt/dreamnav/dense-adapter",
+        bundled_adapter_available: false,
+        colmap_command: "/opt/homebrew/bin/colmap",
+        colmap_dense_supported: true,
+        colmap_dense_reason: null,
+        allow_mock_fallback: true,
+        retained_job_count: 8,
+        real_dense_ready: true,
+        submission_allowed: true,
+        missing_requirements: [],
+        warnings: []
+      },
+      warnings: []
+    });
+    vi.mocked(fetchRemoteDenseJobStatus).mockResolvedValueOnce({
+      job_id: "scene_abc123",
+      remote_job_id: "remote_001",
+      status: "running",
+      backend: "colmap_dense",
+      source_video: "walkthrough.mov",
+      frame_count: 59,
+      warnings: [],
+      error: null
+    });
+
+    render(<WorkflowShell reconstructionCapabilities={reconstructionCapabilities} sceneBundle={sceneBundle} />);
+
+    fireEvent.change(screen.getByLabelText("Walkthrough video"), {
+      target: { files: [new File(["video"], "walkthrough.mp4", { type: "video/mp4" })] }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Start processing" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Remote dense submission review").textContent).toContain("Running");
+    });
+    expect(screen.getByLabelText("Remote dense submission review").textContent).toContain("remote_001");
   });
 
   it("submits completed jobs to the remote dense backend", async () => {

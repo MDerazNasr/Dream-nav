@@ -129,6 +129,17 @@ class RemoteDenseCapabilities(StrictModel):
     warnings: list[str]
 
 
+class RemoteDenseJobStatusResponse(StrictModel):
+    job_id: str
+    remote_job_id: str | None = None
+    status: Literal["submitted", "running", "completed", "failed"]
+    backend: str | None = None
+    source_video: str | None = None
+    frame_count: int | None = Field(default=None, ge=0)
+    warnings: list[str]
+    error: str | None = None
+
+
 class JobStatus(StrictModel):
     job_id: str
     state: str

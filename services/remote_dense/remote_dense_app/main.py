@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from json import dumps
+from json import dumps, loads
 from os import environ
 from pathlib import Path
 from secrets import token_hex
@@ -54,6 +54,14 @@ def create_app(settings: RemoteDenseSettings | None = None) -> FastAPI:
     @app.get("/capabilities")
     def capabilities() -> dict[str, object]:
         return remote_dense_capabilities(resolved_settings)
+
+    @app.get("/jobs/{remote_job_id}")
+    def job_status(remote_job_id: str) -> dict[str, object]:
+        result_path = resolved_settings.submissions_root / remote_job_id / "result.json"
+        if not result_path.is_file():
+            raise HTTPException(status_code=404, detail="Remote dense job not found")
+
+        return loads(result_path.read_text(encoding="utf-8"))
 
     @app.post("/jobs")
     async def submit_job(

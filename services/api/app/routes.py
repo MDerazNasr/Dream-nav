@@ -13,6 +13,8 @@ from .remote_dense_handoff import (
     callback_warnings,
     remote_dense_capabilities_payload,
     remote_dense_capabilities_summary,
+    remote_dense_job_status,
+    remote_dense_job_status_payload,
     remote_submission_payload,
     submit_remote_dense_job,
 )
@@ -27,6 +29,7 @@ from .schemas import (
     QualityReport,
     ReconstructionCapabilities,
     RemoteDenseCapabilities,
+    RemoteDenseJobStatusResponse,
     RemoteDenseSubmissionResponse,
     SceneAssetStatus,
     SceneAssets,
@@ -204,6 +207,44 @@ def submit_remote_dense(job_id: str, request: Request) -> RemoteDenseSubmissionR
     payload["warnings"] = [*warnings, *capabilities.warnings, *submission.warnings]
     job_repository.write_artifact(job_id, "remote_dense_submission.json", payload)
     return RemoteDenseSubmissionResponse(**{key: value for key, value in payload.items() if key != "submitted_at_sec"})
+
+
+@router.get("/jobs/{job_id}/remote-dense-status", response_model=RemoteDenseJobStatusResponse)
+def get_remote_dense_status(job_id: str, request: Request) -> RemoteDenseJobStatusResponse:
+    job_repository = _job_repository(request)
+    submission = job_repository.read_artifact(job_id, "remote_dense_submission.json")
+    provider_url = submission.get("provider_url")
+    remote_job_id = submission.get("remote_job_id")
+    if not isinstance(provider_url, str) or not provider_url:
+        raise HTTPException(status_code=409, detail="Remote dense provider URL is unavailable for this job")
+    if not isinstance(remote_job_id, str) or not remote_job_id:
+        raise HTTPException(status_code=409, detail="Remote dense job has not been assigned yet")
+
+    settings = request.app.state.settings
+    try:
+        summary = remote_dense_job_status(
+            provider_url,
+            remote_job_id,
+            provider_token=settings.remote_dense_token,
+        )
+    except JobArtifactNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Remote dense submission not found") from error
+    except RemoteDenseHandoffError as error:
+        payload = {
+            "job_id": job_id,
+            "remote_job_id": remote_job_id,
+            "status": "submitted",
+            "backend": submission.get("backend"),
+            "source_video": submission.get("source_video"),
+            "frame_count": submission.get("frame_count"),
+            "warnings": [str(error)],
+            "error": None,
+        }
+        return RemoteDenseJobStatusResponse(**payload)
+
+    payload = remote_dense_job_status_payload(summary)
+    payload["job_id"] = job_id
+    return RemoteDenseJobStatusResponse(**payload)
 
 
 @router.post("/jobs/{job_id}/remote-dense-result", response_model=GaussianImportResponse)

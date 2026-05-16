@@ -76,6 +76,17 @@ export const remoteDenseResultSummarySchema = z.object({
   gaussian_count: z.number().min(0)
 });
 
+export const remoteDenseJobStatusResponseSchema = z.object({
+  job_id: z.string().min(1),
+  remote_job_id: z.string().min(1).nullable().default(null),
+  status: z.enum(["submitted", "running", "completed", "failed"]),
+  backend: z.string().min(1).nullable().default(null),
+  source_video: z.string().min(1).nullable().default(null),
+  frame_count: z.number().min(0).nullable().default(null),
+  warnings: z.array(z.string().min(1)),
+  error: z.string().min(1).nullable().default(null)
+});
+
 export const remoteDenseCapabilitiesSchema = z.object({
   provider_url: z.string().min(1).nullable().default(null),
   configured: z.boolean(),
@@ -139,6 +150,8 @@ export type RemoteDenseSubmissionResponse = z.infer<typeof remoteDenseSubmission
 
 export type RemoteDenseResultSummary = z.infer<typeof remoteDenseResultSummarySchema>;
 
+export type RemoteDenseJobStatusResponse = z.infer<typeof remoteDenseJobStatusResponseSchema>;
+
 export type RemoteDenseCapabilities = z.infer<typeof remoteDenseCapabilitiesSchema>;
 
 export type JobStatus = z.infer<typeof jobStatusSchema>;
@@ -161,6 +174,10 @@ export function parseRemoteDenseSubmissionResponse(input: unknown): RemoteDenseS
 
 export function parseRemoteDenseResultSummary(input: unknown): RemoteDenseResultSummary {
   return remoteDenseResultSummarySchema.parse(input);
+}
+
+export function parseRemoteDenseJobStatusResponse(input: unknown): RemoteDenseJobStatusResponse {
+  return remoteDenseJobStatusResponseSchema.parse(input);
 }
 
 export function parseRemoteDenseCapabilities(input: unknown): RemoteDenseCapabilities {

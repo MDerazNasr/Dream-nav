@@ -55,6 +55,18 @@ class RemoteDenseCapabilitiesSummary:
     warnings: list[str]
 
 
+@dataclass(frozen=True)
+class RemoteDenseJobStatusSummary:
+    job_id: str
+    remote_job_id: str | None
+    status: str
+    backend: str | None
+    source_video: str | None
+    frame_count: int | None
+    warnings: list[str]
+    error: str | None
+
+
 def build_remote_dense_bundle(
     job_id: str,
     upload_path: Path,
@@ -316,6 +328,52 @@ def remote_dense_capabilities_payload(summary: RemoteDenseCapabilitiesSummary) -
     }
 
 
+def remote_dense_job_status(
+    provider_url: str,
+    remote_job_id: str,
+    provider_token: str | None = None,
+) -> RemoteDenseJobStatusSummary:
+    status_code, payload = _httpx_request(
+        "GET",
+        _remote_job_status_url(provider_url, remote_job_id),
+        headers={"Authorization": f"Bearer {provider_token}"} if provider_token else None,
+        error_prefix="Remote dense worker status probe",
+        timeout_sec=30.0,
+    )
+
+    if status_code < 200 or status_code >= 300:
+        raise RemoteDenseHandoffError(f"Remote dense worker status probe returned HTTP {status_code}.")
+
+    data = response_payload(payload)
+    if data is None:
+        raise RemoteDenseHandoffError("Remote dense worker status probe returned an invalid response.")
+
+    frame_count = data.get("frame_count")
+    return RemoteDenseJobStatusSummary(
+        job_id=_string_field(data, "job_id") or remote_job_id,
+        remote_job_id=remote_job_id,
+        status=_string_field(data, "status") or "submitted",
+        backend=_string_field(data, "backend"),
+        source_video=_string_field(data, "source_video"),
+        frame_count=frame_count if isinstance(frame_count, int) and frame_count >= 0 else None,
+        warnings=_string_list_field(data, "warnings"),
+        error=_string_field(data, "error"),
+    )
+
+
+def remote_dense_job_status_payload(summary: RemoteDenseJobStatusSummary) -> dict[str, object]:
+    return {
+        "job_id": summary.job_id,
+        "remote_job_id": summary.remote_job_id,
+        "status": summary.status,
+        "backend": summary.backend,
+        "source_video": summary.source_video,
+        "frame_count": summary.frame_count,
+        "warnings": summary.warnings,
+        "error": summary.error,
+    }
+
+
 def _multipart_body(fields: dict[str, str], bundle_path: Path) -> tuple[bytes, str]:
     boundary = f"dreamnav-{uuid4().hex}"
     body = bytearray()
@@ -399,6 +457,13 @@ def _capabilities_url(provider_url: str) -> str:
     path = split_url.path.rstrip("/")
     capability_path = f"{path.rsplit('/', 1)[0] if path.endswith('/jobs') else path}/capabilities"
     return urlunsplit((split_url.scheme, split_url.netloc, capability_path, "", ""))
+
+
+def _remote_job_status_url(provider_url: str, remote_job_id: str) -> str:
+    split_url = urlsplit(provider_url)
+    path = split_url.path.rstrip("/")
+    jobs_path = path if path.endswith("/jobs") else f"{path}/jobs"
+    return urlunsplit((split_url.scheme, split_url.netloc, f"{jobs_path}/{remote_job_id}", "", ""))
 
 
 def _httpx_request(

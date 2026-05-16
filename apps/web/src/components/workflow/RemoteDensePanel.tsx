@@ -3,6 +3,7 @@
 import type {
   GaussianImportResponse,
   RemoteDenseCapabilities,
+  RemoteDenseJobStatusResponse,
   RemoteDenseResultSummary,
   RemoteDenseSubmissionResponse
 } from "@dream-nav/shared";
@@ -10,7 +11,9 @@ import { useEffect, useState } from "react";
 import {
   fetchGaussianImportReview,
   fetchRemoteDenseCapabilities,
+  fetchRemoteDenseJobStatus,
   fetchRemoteDenseResultSummary,
+  fetchRemoteDenseSubmission,
   submitRemoteDenseJob
 } from "../../lib/dreamnav-api";
 
@@ -25,6 +28,7 @@ export function RemoteDensePanel({ jobId }: RemoteDensePanelProps) {
   const [message, setMessage] = useState<string | null>(null);
   const [review, setReview] = useState<GaussianImportResponse | null>(null);
   const [resultSummary, setResultSummary] = useState<RemoteDenseResultSummary | null>(null);
+  const [remoteJobStatus, setRemoteJobStatus] = useState<RemoteDenseJobStatusResponse | null>(null);
   const [submission, setSubmission] = useState<RemoteDenseSubmissionResponse | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -33,9 +37,19 @@ export function RemoteDensePanel({ jobId }: RemoteDensePanelProps) {
 
     const loadCapabilities = async () => {
       try {
-        const nextCapabilities = await fetchRemoteDenseCapabilities();
+        const [nextCapabilities, nextSubmission, nextReview, nextResultSummary, nextRemoteJobStatus] = await Promise.all([
+          fetchRemoteDenseCapabilities(),
+          fetchRemoteDenseSubmission(jobId),
+          fetchGaussianImportReview(jobId),
+          fetchRemoteDenseResultSummary(jobId),
+          fetchRemoteDenseJobStatus(jobId).catch(() => null)
+        ]);
         if (!cancelled) {
           setCapabilities(nextCapabilities);
+          setSubmission(nextSubmission);
+          setReview(nextReview);
+          setResultSummary(nextResultSummary);
+          setRemoteJobStatus(nextRemoteJobStatus);
           if (!nextCapabilities.submission_allowed && nextCapabilities.missing_requirements.length > 0) {
             setMessage(nextCapabilities.missing_requirements[0] ?? "Remote dense worker is not ready");
           }
@@ -63,9 +77,10 @@ export function RemoteDensePanel({ jobId }: RemoteDensePanelProps) {
 
     const poll = async () => {
       try {
-        const [nextReview, nextResultSummary] = await Promise.all([
+        const [nextReview, nextResultSummary, nextRemoteJobStatus] = await Promise.all([
           fetchGaussianImportReview(jobId),
-          fetchRemoteDenseResultSummary(jobId)
+          fetchRemoteDenseResultSummary(jobId),
+          fetchRemoteDenseJobStatus(jobId).catch(() => null)
         ]);
         if (!cancelled) {
           if (nextReview) {
@@ -73,6 +88,12 @@ export function RemoteDensePanel({ jobId }: RemoteDensePanelProps) {
           }
           if (nextResultSummary) {
             setResultSummary(nextResultSummary);
+          }
+          if (nextRemoteJobStatus) {
+            setRemoteJobStatus(nextRemoteJobStatus);
+            if (nextRemoteJobStatus.status === "failed") {
+              setMessage(nextRemoteJobStatus.error ?? "Remote dense worker failed");
+            }
           }
         }
       } catch {
@@ -105,6 +126,16 @@ export function RemoteDensePanel({ jobId }: RemoteDensePanelProps) {
     try {
       const nextSubmission = await submitRemoteDenseJob(jobId);
       setSubmission(nextSubmission);
+      setRemoteJobStatus({
+        job_id: jobId,
+        remote_job_id: nextSubmission.remote_job_id,
+        status: "submitted",
+        backend: nextSubmission.backend,
+        source_video: nextSubmission.source_video,
+        frame_count: nextSubmission.frame_count,
+        warnings: nextSubmission.warnings,
+        error: null
+      });
     } catch {
       setMessage("Remote dense submission failed");
     } finally {
@@ -197,7 +228,7 @@ export function RemoteDensePanel({ jobId }: RemoteDensePanelProps) {
             </article>
             <article>
               <span>Callback</span>
-              <strong>{review ? "Imported" : "Waiting"}</strong>
+              <strong>{review ? "Imported" : remoteJobStatus?.status === "failed" ? "Failed" : "Waiting"}</strong>
             </article>
             <article>
               <span>Result backend</span>
@@ -207,10 +238,15 @@ export function RemoteDensePanel({ jobId }: RemoteDensePanelProps) {
               <span>Result job</span>
               <strong>{resultSummary?.remote_job_id ?? "Waiting"}</strong>
             </article>
+            <article>
+              <span>Worker status</span>
+              <strong>{formatRemoteJobStatus(remoteJobStatus?.status)}</strong>
+            </article>
           </div>
           {submission.warnings.map((warning) => (
             <small key={warning}>{warning}</small>
           ))}
+          {remoteJobStatus?.error ? <small>{remoteJobStatus.error}</small> : null}
           {resultSummary ? (
             <small>
               Imported `{resultSummary.source_file}` via {resultSummary.backend ?? "unknown"} backend.
@@ -226,6 +262,26 @@ export function RemoteDensePanel({ jobId }: RemoteDensePanelProps) {
       </div>
     </section>
   );
+}
+
+function formatRemoteJobStatus(status: RemoteDenseJobStatusResponse["status"] | undefined): string {
+  if (!status) {
+    return "Waiting";
+  }
+
+  if (status === "submitted") {
+    return "Queued";
+  }
+
+  if (status === "running") {
+    return "Running";
+  }
+
+  if (status === "completed") {
+    return "Completed";
+  }
+
+  return "Failed";
 }
 
 function labelForValidation(status: GaussianImportResponse["validation_status"]): string {
