@@ -36,6 +36,8 @@ Optional environment variables:
 - Command backends can now emit either a DreamNav-ready splat PLY or a standard dense point-cloud PLY. The worker normalizes point-cloud output into the viewer splat format before callback import.
 - `DREAMNAV_REMOTE_DENSE_DOCKER_IMAGE` selects a container image for the bundled Docker adapter.
 - `DREAMNAV_REMOTE_DENSE_DOCKER_RUNTIME` overrides the container runtime binary and defaults to `docker`.
+- `DREAMNAV_REMOTE_DENSE_DOCKER_GPUS` passes a value to `docker run --gpus`. Set this to `all` on a GPU worker when using the CUDA image.
+- `DREAMNAV_REMOTE_DENSE_DOCKER_PLATFORM` passes a value to `docker run --platform`. This is useful when the worker host and image architecture differ.
 - `DREAMNAV_REMOTE_DENSE_COLMAP_COMMAND` selects the COLMAP binary to use for dense capability checks and wrapper execution.
 - `DREAMNAV_REMOTE_DENSE_ALLOW_MOCK_FALLBACK=0` disables auto fallback when `backend=auto`.
 - `DREAMNAV_REMOTE_DENSE_CALLBACK_TIMEOUT_SEC` controls the callback request timeout.
