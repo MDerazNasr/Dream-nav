@@ -23,10 +23,18 @@ First real adapter executable in this repo:
 - `services/remote_dense/remote_dense_app/colmap_command_adapter.py`
 - the worker now uses this bundled adapter by default when `DREAMNAV_REMOTE_DENSE_COMMAND` is not set
 
+Containerized engine adapter:
+
+- `services/remote_dense/remote_dense_app/docker_command_adapter.py`
+- if `DREAMNAV_REMOTE_DENSE_DOCKER_IMAGE` is set, the worker now prefers this bundled Docker adapter by default
+- the container image must implement the same DreamNav dense command contract and accept `--bundle-root`, `--artifacts-root`, `--frames-root`, and `--output-ply`
+
 Optional environment variables:
 
 - `DREAMNAV_REMOTE_DENSE_COMMAND` points to an external dense engine adapter executable. DreamNav calls it with `--bundle-root`, `--artifacts-root`, `--frames-root`, and `--output-ply`.
 - Command backends can now emit either a DreamNav-ready splat PLY or a standard dense point-cloud PLY. The worker normalizes point-cloud output into the viewer splat format before callback import.
+- `DREAMNAV_REMOTE_DENSE_DOCKER_IMAGE` selects a container image for the bundled Docker adapter.
+- `DREAMNAV_REMOTE_DENSE_DOCKER_RUNTIME` overrides the container runtime binary and defaults to `docker`.
 - `DREAMNAV_REMOTE_DENSE_COLMAP_COMMAND` selects the COLMAP binary to use for dense capability checks and wrapper execution.
 - `DREAMNAV_REMOTE_DENSE_ALLOW_MOCK_FALLBACK=0` disables auto fallback when `backend=auto`.
 - `DREAMNAV_REMOTE_DENSE_CALLBACK_TIMEOUT_SEC` controls the callback request timeout.
