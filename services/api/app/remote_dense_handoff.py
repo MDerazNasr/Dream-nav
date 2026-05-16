@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from json import dumps, loads
 from pathlib import Path
 from time import time
+import httpx
 from urllib.parse import urlsplit, urlunsplit
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -114,7 +115,7 @@ def submit_remote_dense_job(
     bundle: RemoteDenseBundle,
     callback_token: str | None,
     provider_token: str | None = None,
-    sender=urlopen,
+    sender=None,
 ) -> RemoteDenseSubmissionResult:
     fields = {
         "job_id": bundle.path.parent.parent.name,
@@ -127,16 +128,26 @@ def submit_remote_dense_job(
     if provider_token:
         headers["Authorization"] = f"Bearer {provider_token}"
 
-    request = Request(provider_url, data=body, headers=headers, method="POST")
-    try:
-        with sender(request) as response:
-            status_code = getattr(response, "status", None) or response.getcode()
-            payload = response.read()
-    except HTTPError as error:
-        detail = error.read().decode("utf-8", errors="replace")
-        raise RemoteDenseHandoffError(f"Remote dense provider rejected the submission: {detail or error.reason}") from error
-    except URLError as error:
-        raise RemoteDenseHandoffError(f"Remote dense provider is unavailable: {error.reason}") from error
+    if sender is None:
+        status_code, payload = _httpx_request(
+            "POST",
+            provider_url,
+            headers=headers,
+            content=body,
+            error_prefix="Remote dense provider",
+            timeout_sec=95.0,
+        )
+    else:
+        request = Request(provider_url, data=body, headers=headers, method="POST")
+        try:
+            with sender(request) as response:
+                status_code = getattr(response, "status", None) or response.getcode()
+                payload = response.read()
+        except HTTPError as error:
+            detail = error.read().decode("utf-8", errors="replace")
+            raise RemoteDenseHandoffError(f"Remote dense provider rejected the submission: {detail or error.reason}") from error
+        except URLError as error:
+            raise RemoteDenseHandoffError(f"Remote dense provider is unavailable: {error.reason}") from error
 
     if status_code < 200 or status_code >= 300:
         raise RemoteDenseHandoffError(f"Remote dense provider returned HTTP {status_code}.")
@@ -163,7 +174,7 @@ def remote_dense_capabilities_summary(
     provider_url: str | None,
     callback_token: str | None,
     provider_token: str | None = None,
-    sender=urlopen,
+    sender=None,
 ) -> RemoteDenseCapabilitiesSummary:
     missing_requirements: list[str] = []
     warnings: list[str] = []
@@ -194,21 +205,31 @@ def remote_dense_capabilities_summary(
             warnings=warnings,
         )
 
-    request = Request(_capabilities_url(provider_url), method="GET")
-    if provider_token:
-        request.add_header("Authorization", f"Bearer {provider_token}")
+    capability_headers = {"Authorization": f"Bearer {provider_token}"} if provider_token else None
+    if sender is None:
+        status_code, payload = _httpx_request(
+            "GET",
+            _capabilities_url(provider_url),
+            headers=capability_headers,
+            error_prefix="Remote dense worker capability probe",
+            timeout_sec=30.0,
+        )
+    else:
+        request = Request(_capabilities_url(provider_url), method="GET")
+        if provider_token:
+            request.add_header("Authorization", f"Bearer {provider_token}")
 
-    try:
-        with sender(request) as response:
-            status_code = getattr(response, "status", None) or response.getcode()
-            payload = response.read()
-    except HTTPError as error:
-        detail = error.read().decode("utf-8", errors="replace")
-        raise RemoteDenseHandoffError(
-            f"Remote dense worker capability probe failed: {detail or error.reason}"
-        ) from error
-    except URLError as error:
-        raise RemoteDenseHandoffError(f"Remote dense worker capability probe failed: {error.reason}") from error
+        try:
+            with sender(request) as response:
+                status_code = getattr(response, "status", None) or response.getcode()
+                payload = response.read()
+        except HTTPError as error:
+            detail = error.read().decode("utf-8", errors="replace")
+            raise RemoteDenseHandoffError(
+                f"Remote dense worker capability probe failed: {detail or error.reason}"
+            ) from error
+        except URLError as error:
+            raise RemoteDenseHandoffError(f"Remote dense worker capability probe failed: {error.reason}") from error
 
     if status_code < 200 or status_code >= 300:
         raise RemoteDenseHandoffError(f"Remote dense worker capability probe returned HTTP {status_code}.")
@@ -378,3 +399,25 @@ def _capabilities_url(provider_url: str) -> str:
     path = split_url.path.rstrip("/")
     capability_path = f"{path.rsplit('/', 1)[0] if path.endswith('/jobs') else path}/capabilities"
     return urlunsplit((split_url.scheme, split_url.netloc, capability_path, "", ""))
+
+
+def _httpx_request(
+    method: str,
+    url: str,
+    headers: dict[str, str] | None,
+    error_prefix: str,
+    content: bytes | None = None,
+    timeout_sec: float = 30.0,
+) -> tuple[int, bytes]:
+    try:
+        response = httpx.request(method, url, headers=headers, content=content, timeout=timeout_sec)
+    except httpx.HTTPError as error:
+        raise RemoteDenseHandoffError(f"{error_prefix} is unavailable: {error}") from error
+
+    if response.status_code < 200 or response.status_code >= 300:
+        detail = response.text.strip()
+        raise RemoteDenseHandoffError(
+            f"{error_prefix} rejected the request: {detail or f'HTTP {response.status_code}'}"
+        )
+
+    return response.status_code, response.content
