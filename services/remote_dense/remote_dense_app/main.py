@@ -182,6 +182,11 @@ def _write_job_result_metadata(
 
 
 def _default_dense_command() -> str | None:
+    if environ.get("DREAMNAV_REMOTE_DENSE_DOCKER_IMAGE"):
+        docker_adapter = Path(__file__).with_name("docker_command_adapter.py")
+        if docker_adapter.is_file():
+            return str(docker_adapter)
+
     adapter_path = Path(__file__).with_name("colmap_command_adapter.py")
     return str(adapter_path) if adapter_path.is_file() else None
 

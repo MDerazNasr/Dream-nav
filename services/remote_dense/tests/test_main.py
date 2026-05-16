@@ -89,3 +89,20 @@ def test_default_settings_prefers_bundled_command_adapter(monkeypatch) -> None:
 
     assert settings.dense_command is not None
     assert settings.dense_command.endswith("remote_dense_app/colmap_command_adapter.py")
+
+
+def test_default_settings_prefers_bundled_docker_adapter_when_image_is_configured(monkeypatch) -> None:
+    monkeypatch.setenv("DREAMNAV_REMOTE_DENSE_DOCKER_IMAGE", "dreamnav/dense-engine:latest")
+    for name in (
+        "DREAMNAV_REMOTE_DENSE_COMMAND",
+        "DREAMNAV_REMOTE_DENSE_BACKEND",
+        "DREAMNAV_REMOTE_DENSE_COLMAP_COMMAND",
+        "DREAMNAV_REMOTE_DENSE_ALLOW_MOCK_FALLBACK",
+        "DREAMNAV_REMOTE_DENSE_RETAINED_JOBS",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    settings = default_settings()
+
+    assert settings.dense_command is not None
+    assert settings.dense_command.endswith("remote_dense_app/docker_command_adapter.py")

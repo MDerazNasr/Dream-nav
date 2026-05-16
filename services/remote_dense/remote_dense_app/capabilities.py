@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from os import environ
 from pathlib import Path
+from shutil import which
 from typing import TYPE_CHECKING
 
 from .backend import detect_colmap_dense_support
@@ -11,16 +13,32 @@ if TYPE_CHECKING:
 
 def remote_dense_capabilities(settings: RemoteDenseSettings) -> dict[str, object]:
     bundled_adapter_path = Path(__file__).with_name("colmap_command_adapter.py").resolve()
+    docker_adapter_path = Path(__file__).with_name("docker_command_adapter.py").resolve()
     dense_command_path = Path(settings.dense_command).resolve() if settings.dense_command else None
     bundled_adapter = dense_command_path is not None and dense_command_path.is_file()
     uses_bundled_adapter = dense_command_path == bundled_adapter_path if dense_command_path else False
+    uses_docker_adapter = dense_command_path == docker_adapter_path if dense_command_path else False
     colmap_supported, colmap_reason = detect_colmap_dense_support(settings.colmap_command)
-    command_backend_ready = bundled_adapter and (colmap_supported if uses_bundled_adapter else True)
+    docker_runtime = environ.get("DREAMNAV_REMOTE_DENSE_DOCKER_RUNTIME") or "docker"
+    docker_available = which(docker_runtime) is not None
+    docker_image = environ.get("DREAMNAV_REMOTE_DENSE_DOCKER_IMAGE")
+    if uses_docker_adapter:
+        command_backend_ready = bundled_adapter and docker_available and bool(docker_image)
+    else:
+        command_backend_ready = bundled_adapter and (colmap_supported if uses_bundled_adapter else True)
 
     missing_requirements: list[str] = []
     warnings: list[str] = []
-    if settings.backend == "command" and not command_backend_ready:
+    if settings.backend == "command" and not command_backend_ready and not uses_docker_adapter:
         missing_requirements.append("Set DREAMNAV_REMOTE_DENSE_COMMAND to a valid executable.")
+    if uses_docker_adapter and not docker_image:
+        missing_requirements.append(
+            "Set DREAMNAV_REMOTE_DENSE_DOCKER_IMAGE to a container image that implements the DreamNav dense command contract."
+        )
+    if uses_docker_adapter and not docker_available:
+        missing_requirements.append(
+            "Install Docker or set DREAMNAV_REMOTE_DENSE_DOCKER_RUNTIME to a compatible container runtime."
+        )
     if settings.backend in {"auto", "colmap_dense"} and not colmap_supported:
         warnings.append(colmap_reason or "COLMAP dense support is unavailable.")
 

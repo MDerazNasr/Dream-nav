@@ -283,7 +283,9 @@ describe("WorkflowShell", () => {
     await waitFor(() => {
       expect(screen.getByLabelText("Remote dense backend")).not.toBeNull();
     });
-    expect(screen.getByLabelText("Remote dense readiness").textContent).toContain("Worker ready");
+    await waitFor(() => {
+      expect(screen.getByLabelText("Remote dense readiness").textContent).toContain("Worker ready");
+    });
     fireEvent.click(screen.getByRole("button", { name: "Submit to remote dense backend" }));
 
     await waitFor(() => {
