@@ -11,6 +11,9 @@ from .pose_normalization import PoseNormalizationError, normalize_camera_path, s
 from .processing_command_utils import placeholder_command, resolve_command
 from .processing_models import ProcessingCommand, ProcessingTaskContext, ProcessingTaskFailed, ProcessingTaskResult
 
+COLMAP_MAPPER_MIN_TIMEOUT_SEC = 300
+COLMAP_MAPPER_TIMEOUT_PER_FRAME_SEC = 3
+
 
 def estimate_camera_motion(context: ProcessingTaskContext) -> ProcessingTaskResult:
     backend = normalized_pose_backend(context.processing_settings)
@@ -41,6 +44,7 @@ def estimate_camera_motion(context: ProcessingTaskContext) -> ProcessingTaskResu
 
 def build_camera_motion_command(context: ProcessingTaskContext) -> ProcessingCommand | list[ProcessingCommand]:
     backend = normalized_pose_backend(context.processing_settings)
+    frames = frame_inventory(frames_root(context)).frames
 
     if backend == "stub":
         return placeholder_command(
@@ -57,7 +61,11 @@ def build_camera_motion_command(context: ProcessingTaskContext) -> ProcessingCom
             ProcessingCommand(
                 artifact_name=command.artifact_name,
                 command=command.command,
-                timeout_sec=context.processing_settings.pose_timeout_sec,
+                timeout_sec=_colmap_command_timeout_sec(
+                    context.processing_settings,
+                    command.artifact_name,
+                    len(frames),
+                ),
             )
             for command in build_colmap_pipeline_commands(
                 colmap_command,
@@ -74,6 +82,23 @@ def build_camera_motion_command(context: ProcessingTaskContext) -> ProcessingCom
 
 def normalized_pose_backend(settings: ProcessingSettings) -> str:
     return settings.pose_backend.strip().lower()
+
+
+def _colmap_command_timeout_sec(
+    settings: ProcessingSettings,
+    artifact_name: str,
+    frame_count: int,
+) -> float:
+    if artifact_name != "colmap_mapper_command.json":
+        return settings.pose_timeout_sec
+
+    # Favor the mapper budget on longer clips because local COLMAP runtimes vary materially with frame count.
+    adaptive_timeout_sec = max(
+        settings.pose_timeout_sec,
+        COLMAP_MAPPER_MIN_TIMEOUT_SEC,
+        frame_count * COLMAP_MAPPER_TIMEOUT_PER_FRAME_SEC,
+    )
+    return float(adaptive_timeout_sec)
 
 
 def _raw_camera_poses(

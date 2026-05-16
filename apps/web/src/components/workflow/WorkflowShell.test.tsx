@@ -156,6 +156,35 @@ describe("WorkflowShell", () => {
     expect(screen.getByRole("button", { name: "Open processed scene" }).hasAttribute("disabled")).toBe(true);
   });
 
+  it("shows a long running pose-estimation message instead of looking stalled", async () => {
+    vi.mocked(fetchJobStatus).mockResolvedValueOnce({
+      job_id: "scene_abc123",
+      state: "running",
+      stage: "estimating_camera_motion",
+      progress: 0.2,
+      elapsed_sec: 96,
+      message: "Estimating camera motion",
+      output_scene_id: null,
+      error_message: null,
+      failed_stage: null,
+      failed_artifact: null
+    });
+
+    render(<WorkflowShell reconstructionCapabilities={reconstructionCapabilities} sceneBundle={sceneBundle} />);
+
+    fireEvent.change(screen.getByLabelText("Walkthrough video"), {
+      target: { files: [new File(["video"], "walkthrough.mp4", { type: "video/mp4" })] }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Start processing" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Estimating camera motion locally. This COLMAP step can take several minutes on a laptop.")
+      ).not.toBeNull();
+    });
+    expect(screen.getByText("96s elapsed · 240s estimate")).not.toBeNull();
+  });
+
   it("enables explorer when the worker completes the job", async () => {
     vi.mocked(fetchJobStatus).mockResolvedValueOnce({
       job_id: "scene_abc123",

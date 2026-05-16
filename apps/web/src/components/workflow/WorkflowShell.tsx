@@ -50,6 +50,17 @@ export function WorkflowShell({ reconstructionCapabilities, sceneBundle }: Workf
   const failedStage = jobStatus?.failed_stage ?? null;
   const failedStageLabel = getStageLabel(failedStage);
   const failureGuidance = getFailureGuidance(failedStage, jobStatus?.error_message);
+  const longPoseStage = jobStatus?.stage === "estimating_camera_motion" && (jobStatus.elapsed_sec ?? 0) >= 45 && !jobFailed;
+  const progressSummary = jobFailed
+    ? "Stopped"
+    : `${jobStatus?.elapsed_sec ?? 0}s elapsed · ${uploadResponse?.estimated_processing_time_sec ?? 240}s estimate`;
+  const progressMessage = jobFailed
+    ? failedStageLabel
+      ? `Failed while ${failedStageLabel.toLowerCase()}.`
+      : failureGuidance.summary
+    : longPoseStage
+      ? "Estimating camera motion locally. This COLMAP step can take several minutes on a laptop."
+      : jobStatus?.message ?? "Creating processing job";
 
   useEffect(() => {
     if (!uploadResponse || view !== "processing") {
@@ -178,13 +189,7 @@ export function WorkflowShell({ reconstructionCapabilities, sceneBundle }: Workf
             </span>
             <div>
               <h1>{jobFailed ? "Processing stopped" : "Processing walkthrough"}</h1>
-              <p>
-                {jobFailed && failedStageLabel
-                  ? `Failed while ${failedStageLabel.toLowerCase()}.`
-                  : jobFailed
-                    ? failureGuidance.summary
-                    : jobStatus?.message ?? "Creating processing job"}
-              </p>
+              <p>{progressMessage}</p>
             </div>
           </div>
 
@@ -193,7 +198,7 @@ export function WorkflowShell({ reconstructionCapabilities, sceneBundle }: Workf
           </div>
           <div className="progress-meta">
             <span>{percent}%</span>
-            <span>{jobFailed ? "Stopped" : `${uploadResponse?.estimated_processing_time_sec ?? 240}s estimate`}</span>
+            <span>{progressSummary}</span>
           </div>
 
           <ol className="stage-list">

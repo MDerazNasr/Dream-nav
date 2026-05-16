@@ -114,6 +114,13 @@ export function getFailureGuidance(
   }
 
   if (failedStage === "estimating_camera_motion" || message.includes("colmap") || message.includes("pose")) {
+    if (message.includes("timed out")) {
+      return {
+        summary: "DreamNav ran out of time while recovering the camera path for this walkthrough.",
+        nextStep: "Retry after the pose-estimation timeout budget is raised or use a shorter, slower walkthrough."
+      };
+    }
+
     return {
       summary: "DreamNav could not recover the camera path for this walkthrough.",
       nextStep: "Try a slower walkthrough with more textured surfaces and less motion blur."
