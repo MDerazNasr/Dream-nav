@@ -20,13 +20,19 @@ const visibilityCellSchema = z.object({
 
 export const visibilityManifestSchema = z.object({
   scene_id: sceneIdSchema,
-  method: z.enum(["voxel_visibility_v1", "per_gaussian_visibility_v1"]),
+  method: z.enum(["voxel_visibility_v1", "voxel_visibility_v1_adaptive", "per_gaussian_visibility_v1"]),
   observed_threshold: z.number().int().min(1),
   partial_threshold: z.tuple([z.number().int().min(0), z.number().int().min(0)]),
   observed_ratio: ratioSchema,
   partial_ratio: ratioSchema,
   completion_candidate_ratio: ratioSchema,
   unknown_ratio: ratioSchema,
+  adaptive_thresholds: z
+    .object({
+      near_radius_meters: nonNegativeNumberSchema,
+      far_radius_meters: nonNegativeNumberSchema
+    })
+    .optional(),
   cells: z.array(visibilityCellSchema).min(1)
 });
 
