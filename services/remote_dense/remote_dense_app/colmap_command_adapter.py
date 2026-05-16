@@ -46,6 +46,7 @@ def run_adapter(
             artifacts_root=artifacts_root,
             frames_root=frames_root,
             output_splat=output_ply,
+            camera_path=artifacts_root / "camera_path.json",
             colmap_command=colmap_command,
         )
     except ColmapDenseToSplatError as error:

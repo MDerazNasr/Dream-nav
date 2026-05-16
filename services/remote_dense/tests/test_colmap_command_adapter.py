@@ -11,10 +11,11 @@ def test_run_adapter_calls_colmap_dense_builder(tmp_path, monkeypatch) -> None:
     output_ply = tmp_path / "dense_result.ply"
     frames_root.mkdir(parents=True, exist_ok=True)
 
-    def fake_builder(*, artifacts_root, frames_root, output_splat, colmap_command=None):
+    def fake_builder(*, artifacts_root, frames_root, output_splat, camera_path=None, colmap_command=None):
         captured["artifacts_root"] = artifacts_root
         captured["frames_root"] = frames_root
         captured["output_splat"] = output_splat
+        captured["camera_path"] = camera_path
         captured["colmap_command"] = colmap_command
         output_splat.write_text(
             "ply\nformat ascii 1.0\nelement vertex 1\nproperty float x\nproperty float y\nproperty float z\nproperty uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n0 0 0 255 255 255\n",
@@ -36,6 +37,7 @@ def test_run_adapter_calls_colmap_dense_builder(tmp_path, monkeypatch) -> None:
     assert captured["artifacts_root"] == artifacts_root
     assert captured["frames_root"] == frames_root
     assert captured["output_splat"] == output_ply
+    assert captured["camera_path"] == artifacts_root / "camera_path.json"
     assert captured["colmap_command"] == "colmap"
 
 

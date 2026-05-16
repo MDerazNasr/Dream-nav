@@ -11,6 +11,10 @@ def test_build_dense_splat_from_colmap_runs_dense_stereo_and_writes_splat(tmp_pa
     sparse_root.mkdir(parents=True, exist_ok=True)
     frames_root.mkdir(parents=True, exist_ok=True)
     (frames_root / "frame_0000.jpg").write_bytes(b"jpg")
+    (artifacts_root / "camera_path.json").write_text(
+        '{"poses":[{"position":[0,1,-2]},{"position":[0.8,1.3,-2.6]}]}',
+        encoding="utf-8",
+    )
     (artifacts_root / "colmap" / "colmap_model_selection.json").write_text(
         '{"selected_model":"0"}',
         encoding="utf-8",
@@ -44,7 +48,7 @@ def test_build_dense_splat_from_colmap_runs_dense_stereo_and_writes_splat(tmp_pa
         "        'end_header\\n'\n"
         "        '0 1 -2 255 0 0\\n'\n"
         "        '0.4 1.1 -2.2 0 255 64\\n'\n"
-        "        '0.8 1.3 -2.6 0 32 255\\n',\n"
+        "        '20 20 20 0 32 255\\n',\n"
         "        encoding='utf-8',\n"
         "    )\n"
         "print('fake colmap ' + ' '.join(sys.argv[1:]))\n",
@@ -56,12 +60,12 @@ def test_build_dense_splat_from_colmap_runs_dense_stereo_and_writes_splat(tmp_pa
         artifacts_root,
         frames_root,
         output_splat,
+        camera_path=artifacts_root / "camera_path.json",
         colmap_command=str(fake_colmap),
     )
 
     payload = output_splat.read_bytes()
 
-    assert vertex_count == 3
+    assert vertex_count == 2
     assert b"format binary_little_endian 1.0" in payload
-    assert b"element vertex 3" in payload
-
+    assert b"element vertex 2" in payload

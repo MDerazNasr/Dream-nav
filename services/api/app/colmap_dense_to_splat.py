@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from json import JSONDecodeError, loads
+from math import dist
 from pathlib import Path
 from shutil import which
 from subprocess import CompletedProcess, run
@@ -24,6 +25,7 @@ def build_dense_splat_from_colmap(
     artifacts_root: Path,
     frames_root: Path,
     output_splat: Path,
+    camera_path: Path | None = None,
     colmap_command: str | None = None,
     max_points: int = MAX_DENSE_POINTS,
 ) -> int:
@@ -83,6 +85,10 @@ def build_dense_splat_from_colmap(
 
     try:
         points = read_ply_points(fused_path)
+        # Dense fusion can include far off-path junk, so trim to points plausibly supported by the recovered walkthrough.
+        filtered_points = _filter_points_by_camera_path(points, camera_path)
+        if filtered_points:
+            points = filtered_points
         return write_splat_from_points(points, output_splat, max_points=max_points)
     except PointCloudToSplatError as error:
         raise ColmapDenseToSplatError(str(error)) from error
@@ -163,6 +169,7 @@ def main(args: list[str]) -> int:
             Path(parsed["artifacts_root"]),
             Path(parsed["frames_root"]),
             Path(parsed["output_splat"]),
+            camera_path=Path(parsed["camera_path"]),
             colmap_command=parsed.get("colmap_command"),
         )
     except ColmapDenseToSplatError as error:
@@ -191,12 +198,66 @@ def _parse_args(args: list[str]) -> dict[str, str]:
         "artifacts_root": parsed["--artifacts-root"],
         "frames_root": parsed["--frames-root"],
         "output_splat": parsed["--output-splat"],
+        "camera_path": parsed["--camera-path"],
         **(
             {"colmap_command": parsed["--colmap-command"]}
             if "--colmap-command" in parsed
             else {}
         ),
     }
+
+
+def _filter_points_by_camera_path(
+    points: list[dict[str, object]],
+    camera_path: Path | None,
+) -> list[dict[str, object]]:
+    if camera_path is None:
+        return points
+
+    poses = _camera_positions(camera_path)
+    if not poses:
+        return points
+
+    max_distance = _max_supported_distance(poses)
+    filtered = []
+    for point in points:
+        position = point.get("position")
+        if not isinstance(position, list) or len(position) != 3:
+            continue
+
+        nearest_distance = min(dist(position, pose) for pose in poses)
+        if nearest_distance <= max_distance:
+            filtered.append(point)
+
+    return filtered
+
+
+def _camera_positions(camera_path: Path) -> list[tuple[float, float, float]]:
+    try:
+        payload = loads(camera_path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return []
+    except JSONDecodeError as error:
+        raise ColmapDenseToSplatError("Camera path is invalid.") from error
+
+    poses = payload.get("poses")
+    if not isinstance(poses, list):
+        return []
+
+    return [
+        (float(position[0]), float(position[1]), float(position[2]))
+        for pose in poses
+        if isinstance(pose, dict)
+        and isinstance((position := pose.get("position")), list)
+        and len(position) == 3
+    ]
+
+
+def _max_supported_distance(poses: list[tuple[float, float, float]]) -> float:
+    mins = [min(pose[axis] for pose in poses) for axis in range(3)]
+    maxs = [max(pose[axis] for pose in poses) for axis in range(3)]
+    path_diagonal = dist(mins, maxs)
+    return max(4.0, min(9.0, (path_diagonal * 0.35) + 3.0))
 
 
 if __name__ == "__main__":
