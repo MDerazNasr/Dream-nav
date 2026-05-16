@@ -38,6 +38,7 @@ Optional environment variables:
 - `DREAMNAV_REMOTE_DENSE_DOCKER_RUNTIME` overrides the container runtime binary and defaults to `docker`.
 - `DREAMNAV_REMOTE_DENSE_DOCKER_GPUS` passes a value to `docker run --gpus`. Set this to `all` on a GPU worker when using the CUDA image.
 - `DREAMNAV_REMOTE_DENSE_DOCKER_PLATFORM` passes a value to `docker run --platform`. This is useful when the worker host and image architecture differ.
+- `DREAMNAV_REMOTE_DENSE_DOCKER_BUILD_PLATFORM` controls the platform used by `npm run remote-dense:image:build:cuda`. It defaults to `linux/amd64` because the intended dense worker target is an NVIDIA Linux host, not the architecture of the machine that kicked off the build.
 - `DREAMNAV_REMOTE_DENSE_COLMAP_COMMAND` selects the COLMAP binary to use for dense capability checks and wrapper execution.
 - `DREAMNAV_REMOTE_DENSE_ALLOW_MOCK_FALLBACK=0` disables auto fallback when `backend=auto`.
 - `DREAMNAV_REMOTE_DENSE_CALLBACK_TIMEOUT_SEC` controls the callback request timeout.
@@ -77,6 +78,12 @@ Build the CUDA engine image on a GPU worker:
 
 ```bash
 npm run remote-dense:image:build:cuda
+```
+
+Override the CUDA image build platform when needed:
+
+```bash
+DREAMNAV_REMOTE_DENSE_DOCKER_BUILD_PLATFORM=linux/amd64 npm run remote-dense:image:build:cuda
 ```
 
 Current state:
