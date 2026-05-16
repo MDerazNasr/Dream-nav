@@ -7,7 +7,7 @@ import { confidenceZoneColors, type ConfidenceZoneArtifacts, zoneCells } from ".
 import { getLensFov } from "../../lib/lens";
 import { loadSplatScene } from "../../lib/splat-loader";
 import { createCompletionProjection, type CompletionProjectionTarget } from "./completion-projection";
-import type { ViewerCameraPose } from "./viewer-camera";
+import { initialViewerCameraPose, type ViewerCameraPose } from "./viewer-camera";
 
 type SceneViewportProps = {
   cameraPath: CameraPath;
@@ -29,7 +29,7 @@ type ViewportRuntime = {
   poseReporter: { emit: (force: boolean) => void };
   rotationState: { pitch: number; yaw: number };
   scene: THREE.Scene;
-  startPosition: THREE.Vector3;
+  startPose: ViewerCameraPose;
 };
 
 export function SceneViewport({
@@ -81,7 +81,7 @@ export function SceneViewport({
       return;
     }
 
-    resetCamera(runtime.camera, runtime.startPosition, runtime.rotationState);
+    applyCameraPose(runtime.camera, runtime.startPose, runtime.rotationState);
     runtime.poseReporter.emit(true);
   }, [resetSignal]);
 
@@ -106,9 +106,9 @@ export function SceneViewport({
     scene.background = new THREE.Color("#111412");
 
     const camera = new THREE.PerspectiveCamera(getLensFov(lensMode), 1, 0.1, 100);
-    const startPosition = startCameraPosition(cameraPath);
+    const startPose = initialViewerCameraPose(cameraPath, lensMode);
     const rotationState = { pitch: 0, yaw: 0 };
-    resetCamera(camera, startPosition, rotationState);
+    applyCameraPose(camera, startPose, rotationState);
     const poseReporter = createCameraPoseReporter(camera, rotationState, lensModeRef, onCameraPoseChange);
     runtimeRef.current = {
       camera,
@@ -116,7 +116,7 @@ export function SceneViewport({
       poseReporter,
       rotationState,
       scene,
-      startPosition
+      startPose
     };
     replaceCompletionProjection(runtimeRef.current, completionProjectionRef.current, cameraPath, zoneArtifacts);
     poseReporter.emit(true);
@@ -414,18 +414,6 @@ function createCameraPoseReporter(
   };
 }
 
-function resetCamera(
-  camera: THREE.PerspectiveCamera,
-  startPosition: THREE.Vector3,
-  rotationState: { pitch: number; yaw: number }
-): void {
-  rotationState.pitch = 0;
-  rotationState.yaw = 0;
-  camera.position.copy(startPosition);
-  camera.rotation.order = "YXZ";
-  camera.rotation.set(0, 0, 0);
-}
-
 function applyCameraPose(
   camera: THREE.PerspectiveCamera,
   pose: ViewerCameraPose,
@@ -437,13 +425,4 @@ function applyCameraPose(
   camera.rotation.order = "YXZ";
   camera.rotation.y = pose.yaw;
   camera.rotation.x = pose.pitch;
-}
-
-function startCameraPosition(cameraPath: CameraPath): THREE.Vector3 {
-  const startPose = cameraPath.poses[0];
-  return new THREE.Vector3(
-    startPose?.position[0] ?? 0,
-    startPose?.position[1] ?? 1.55,
-    startPose?.position[2] ?? 3
-  );
 }
