@@ -35,7 +35,7 @@ export function QualityReportPanel({
 }: QualityReportPanelProps) {
   const [copyStatus, setCopyStatus] = useState<CopyStatus>("idle");
   const reportText = useMemo(
-    () => buildQualityReportText({ completion, currentPose, match, metadata, quality, visibility }),
+    () => buildQualityReportText({ completion, currentPose, match, metadata, quality, remoteDenseResult, visibility }),
     [completion, currentPose, match, metadata, quality, remoteDenseResult, visibility]
   );
 

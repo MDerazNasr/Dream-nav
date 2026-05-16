@@ -33,7 +33,7 @@ export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
   const [overlayEnabled, setOverlayEnabled] = useState(true);
   const [selectedLens, setSelectedLens] = useState<LensMode>("35mm");
   const [currentPose, setCurrentPose] = useState<ViewerCameraPose>(() =>
-    initialViewerCameraPose(sceneBundle.cameraPath, "35mm")
+    initialViewerCameraPose(sceneBundle.cameraPath, "35mm", sceneBundle.zoneArtifacts)
   );
   const [cameraBookmarks, setCameraBookmarks] = useState<CameraBookmark[]>([]);
   const [bookmarksSceneId, setBookmarksSceneId] = useState(sceneId);

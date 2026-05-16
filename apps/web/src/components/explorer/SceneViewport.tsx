@@ -106,7 +106,7 @@ export function SceneViewport({
     scene.background = new THREE.Color("#111412");
 
     const camera = new THREE.PerspectiveCamera(getLensFov(lensMode), 1, 0.1, 100);
-    const startPose = initialViewerCameraPose(cameraPath, lensMode);
+    const startPose = initialViewerCameraPose(cameraPath, lensMode, zoneArtifacts);
     const rotationState = { pitch: 0, yaw: 0 };
     applyCameraPose(camera, startPose, rotationState);
     const poseReporter = createCameraPoseReporter(camera, rotationState, lensModeRef, onCameraPoseChange);

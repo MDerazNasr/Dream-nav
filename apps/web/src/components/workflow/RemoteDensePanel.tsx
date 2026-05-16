@@ -37,7 +37,7 @@ export function RemoteDensePanel({ jobId }: RemoteDensePanelProps) {
         if (!cancelled) {
           setCapabilities(nextCapabilities);
           if (!nextCapabilities.submission_allowed && nextCapabilities.missing_requirements.length > 0) {
-            setMessage(nextCapabilities.missing_requirements[0]);
+            setMessage(nextCapabilities.missing_requirements[0] ?? "Remote dense worker is not ready");
           }
         }
       } catch {
