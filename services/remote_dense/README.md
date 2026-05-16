@@ -28,6 +28,7 @@ Containerized engine adapter:
 - `services/remote_dense/remote_dense_app/docker_command_adapter.py`
 - if `DREAMNAV_REMOTE_DENSE_DOCKER_IMAGE` is set, the worker now prefers this bundled Docker adapter by default
 - the container image must implement the same DreamNav dense command contract and accept `--bundle-root`, `--artifacts-root`, `--frames-root`, and `--output-ply`
+- the worker now probes the container with `--health-check` before treating it as real-dense ready
 
 Optional environment variables:
 
@@ -62,4 +63,10 @@ Default local address:
 
 ```txt
 http://127.0.0.1:8010
+```
+
+Build the reference engine image:
+
+```bash
+npm run remote-dense:image:build
 ```
