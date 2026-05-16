@@ -1,6 +1,7 @@
 from json import dumps
 from pathlib import Path
 
+from app.point_cloud_to_splat import write_splat_from_points
 from app.splat_assets import ensure_job_splat_asset
 from app.visibility_assets import build_visibility_manifest
 
@@ -33,6 +34,31 @@ def test_visibility_manifest_uses_splat_points_and_camera_poses(tmp_path: Path) 
     assert "observed" in zones
     assert "completion" in zones
     assert 0.99 <= ratio_total <= 1.01
+
+
+def test_visibility_manifest_uses_adaptive_fallback_for_room_scale_dense_points(tmp_path: Path) -> None:
+    camera_path = _camera_path()
+    points = [
+        {
+            "position": [6.0 + (index * 0.04), 1.2, 7.0 + (index * 0.03)],
+            "color": [255, 255, 255],
+            "scale": 0.02,
+        }
+        for index in range(128)
+    ]
+    write_splat_from_points(points, tmp_path / "splat.ply", max_points=128)
+
+    manifest = build_visibility_manifest(
+        "scene_abc123",
+        camera_path,
+        tmp_path / "splat.ply",
+        {"method": "voxel_visibility_v1", "observed_threshold": 3},
+    )
+
+    assert manifest["method"] == "voxel_visibility_v1_adaptive"
+    assert manifest["observed_ratio"] > 0.0
+    assert manifest["completion_candidate_ratio"] < 1.0
+    assert "adaptive_thresholds" in manifest
 
 
 def _camera_path() -> dict[str, object]:

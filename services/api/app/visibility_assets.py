@@ -33,10 +33,26 @@ def build_visibility_manifest(
         raise VisibilityBuildError(str(error)) from error
 
     cells = _visibility_cells(splat_points, poses, observed_threshold)
+    method = _string_value(visibility_support, "method", "voxel_visibility_v1")
+    adaptive_thresholds = None
+    if _needs_adaptive_visibility(cells, splat_points):
+        near_radius, far_radius = _adaptive_distance_thresholds(splat_points, poses)
+        cells = _visibility_cells(
+            splat_points,
+            poses,
+            observed_threshold,
+            near_radius=near_radius,
+            far_radius=far_radius,
+        )
+        adaptive_thresholds = {
+            "near_radius_meters": round(near_radius, 3),
+            "far_radius_meters": round(far_radius, 3),
+        }
+        method = f"{method}_adaptive"
     ratios = _zone_ratios(cells)
-    return {
+    manifest = {
         "scene_id": scene_id,
-        "method": _string_value(visibility_support, "method", "voxel_visibility_v1"),
+        "method": method,
         "observed_threshold": observed_threshold,
         "partial_threshold": [1, max(1, observed_threshold - 1)],
         "observed_ratio": ratios["observed"],
@@ -45,16 +61,21 @@ def build_visibility_manifest(
         "unknown_ratio": ratios["unknown"],
         "cells": cells,
     }
+    if adaptive_thresholds is not None:
+        manifest["adaptive_thresholds"] = adaptive_thresholds
+    return manifest
 
 
 def _visibility_cells(
     splat_points: list[SplatPoint],
     poses: list[PosePoint],
     observed_threshold: int,
+    near_radius: float = 1.2,
+    far_radius: float = 2.4,
 ) -> list[dict[str, object]]:
     cells = []
     for index, point in enumerate(splat_points[:64]):
-        visibility_count = _visibility_count(point, poses)
+        visibility_count = _visibility_count(point, poses, near_radius, far_radius)
         cells.append(
             {
                 "cell_id": f"cell_{index:03d}",
@@ -80,13 +101,13 @@ def _visibility_cells(
     return cells
 
 
-def _visibility_count(point: SplatPoint, poses: list[PosePoint]) -> int:
+def _visibility_count(point: SplatPoint, poses: list[PosePoint], near_radius: float, far_radius: float) -> int:
     support = 0
     for pose in poses:
         distance = _distance(point, pose)
-        if distance <= 1.2:
+        if distance <= near_radius:
             support += 2
-        elif distance <= 2.4:
+        elif distance <= far_radius:
             support += 1
 
     return support
@@ -150,6 +171,39 @@ def _completion_anchor(splat_points: list[SplatPoint], poses: list[PosePoint]) -
 
 def _distance(point: SplatPoint, pose: PosePoint) -> float:
     return sqrt((point.x - pose.x) ** 2 + (point.y - pose.y) ** 2 + (point.z - pose.z) ** 2)
+
+
+def _needs_adaptive_visibility(cells: list[dict[str, object]], splat_points: list[SplatPoint]) -> bool:
+    if len(splat_points) < 64:
+        return False
+
+    observed_ratio = _rounded_ratio(cells, "observed", max(1, len(cells)))
+    completion_ratio = _rounded_ratio(cells, "completion", max(1, len(cells)))
+    return observed_ratio == 0 and completion_ratio >= 0.9
+
+
+def _adaptive_distance_thresholds(splat_points: list[SplatPoint], poses: list[PosePoint]) -> tuple[float, float]:
+    nearest_distances = sorted(
+        min(_distance(point, pose) for pose in poses)
+        for point in splat_points[:128]
+    )
+    if not nearest_distances:
+        return 2.4, 4.0
+
+    near_radius = _clamp(_percentile(nearest_distances, 0.55), 2.4, 10.0)
+    far_radius = _clamp(max(near_radius + 1.5, _percentile(nearest_distances, 0.9)), 4.0, 14.0)
+    return near_radius, far_radius
+
+
+def _percentile(sorted_values: list[float], quantile: float) -> float:
+    if not sorted_values:
+        return 0.0
+    index = min(len(sorted_values) - 1, max(0, int((len(sorted_values) - 1) * quantile)))
+    return sorted_values[index]
+
+
+def _clamp(value: float, minimum: float, maximum: float) -> float:
+    return max(minimum, min(maximum, value))
 
 
 def _int_value(payload: dict[str, Any], key: str, default: int = 0) -> int:
