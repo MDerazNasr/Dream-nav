@@ -70,3 +70,14 @@ Build the reference engine image:
 ```bash
 npm run remote-dense:image:build
 ```
+
+Build the CUDA engine image on a GPU worker:
+
+```bash
+npm run remote-dense:image:build:cuda
+```
+
+Current state:
+
+- `remote-dense:image:build` produces a reference Ubuntu image that is useful for validating the container contract and health probe, but it still installs a CPU only COLMAP build.
+- `remote-dense:image:build:cuda` is the intended path for a real dense capable worker because it builds COLMAP with CUDA enabled from source.
