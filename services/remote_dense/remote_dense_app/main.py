@@ -75,34 +75,27 @@ def create_app(settings: RemoteDenseSettings | None = None) -> FastAPI:
                 bundle_bytes,
                 resolved_settings.retained_job_count,
             )
-            dense_result = build_dense_result(
-                submission_bundle,
-                submission_bundle.parent,
-                resolved_settings.backend,
-                resolved_settings.colmap_command,
-                resolved_settings.dense_command,
-                resolved_settings.allow_mock_fallback,
-            )
         except RemoteDenseGenerationError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
-        except RemoteDenseBackendError as error:
-            raise HTTPException(status_code=400, detail=str(error)) from error
-
-        background_tasks.add_task(
-            app.state.callback_sender,
-            callback_url,
-            callback_token,
-            dense_result.dense_ply,
-            remote_job_id,
-            dense_result.backend,
-            resolved_settings.callback_timeout_sec,
-        )
 
         _write_job_result_metadata(
             submission_bundle.parent,
             manifest,
-            dense_result.backend,
-            dense_result.warnings,
+            status="submitted",
+            backend=resolved_settings.backend,
+            warnings=[],
+            error=None,
+        )
+        background_tasks.add_task(
+            _process_submission,
+            submission_bundle,
+            submission_bundle.parent,
+            manifest,
+            callback_url,
+            callback_token,
+            remote_job_id,
+            resolved_settings,
+            app.state.callback_sender,
         )
 
         return _submission_response(
@@ -113,8 +106,8 @@ def create_app(settings: RemoteDenseSettings | None = None) -> FastAPI:
             bundle_file=submission_bundle.name,
             bundle_size_bytes=submission_bundle.stat().st_size,
             frame_count=manifest.get("frame_count", 0),
-            backend=dense_result.backend,
-            warnings=dense_result.warnings,
+            backend=resolved_settings.backend,
+            warnings=[],
         )
 
     return app
@@ -165,18 +158,78 @@ def _post_dense_callback(
         response.raise_for_status()
 
 
+def _process_submission(
+    submission_bundle: Path,
+    job_root: Path,
+    manifest: dict[str, object],
+    callback_url: str,
+    callback_token: str,
+    remote_job_id: str,
+    settings: RemoteDenseSettings,
+    callback_sender,
+) -> None:
+    _write_job_result_metadata(
+        job_root,
+        manifest,
+        status="running",
+        backend=settings.backend,
+        warnings=[],
+        error=None,
+    )
+    try:
+        dense_result = build_dense_result(
+            submission_bundle,
+            job_root,
+            settings.backend,
+            settings.colmap_command,
+            settings.dense_command,
+            settings.allow_mock_fallback,
+        )
+        callback_sender(
+            callback_url,
+            callback_token,
+            dense_result.dense_ply,
+            remote_job_id,
+            dense_result.backend,
+            settings.callback_timeout_sec,
+        )
+    except Exception as error:
+        _write_job_result_metadata(
+            job_root,
+            manifest,
+            status="failed",
+            backend=settings.backend,
+            warnings=[],
+            error=str(error),
+        )
+        return
+
+    _write_job_result_metadata(
+        job_root,
+        manifest,
+        status="completed",
+        backend=dense_result.backend,
+        warnings=dense_result.warnings,
+        error=None,
+    )
+
+
 def _write_job_result_metadata(
     job_root: Path,
     manifest: dict[str, object],
-    backend: str,
+    status: str,
+    backend: str | None,
     warnings: list[str],
+    error: str | None,
 ) -> None:
     payload = {
         "job_id": manifest.get("job_id"),
         "source_video": manifest.get("source_video"),
         "frame_count": manifest.get("frame_count"),
+        "status": status,
         "backend": backend,
         "warnings": warnings,
+        "error": error,
     }
     (job_root / "result.json").write_text(dumps(payload, indent=2), encoding="utf-8")
 

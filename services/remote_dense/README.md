@@ -4,7 +4,13 @@ Local remote dense provider for the DreamNav handoff flow.
 
 It accepts the DreamNav bundle zip, attempts a dense `.ply` build, and posts the result back to the configured DreamNav callback route.
 
-Each remote job is unpacked into its own workspace under `.context/remote-dense-submissions/<remote_job_id>/`. The worker writes `bundle.zip`, extracted bundle contents, and a small `result.json` file with the backend that was actually used.
+Each remote job is unpacked into its own workspace under `.context/remote-dense-submissions/<remote_job_id>/`. The worker writes `bundle.zip`, extracted bundle contents, and a small `result.json` file with submission status, backend, warnings, and any terminal error.
+
+Submission model:
+
+- `POST /jobs` returns immediately after the bundle is validated and written to disk.
+- The dense build and callback run in the background from that saved workspace.
+- `result.json` progresses through `submitted`, `running`, `completed`, or `failed`.
 
 Retention:
 

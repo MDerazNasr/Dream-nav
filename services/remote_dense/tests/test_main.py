@@ -1,5 +1,4 @@
-from os import utime
-
+from json import loads
 from os import utime
 
 from fastapi.testclient import TestClient
@@ -44,8 +43,41 @@ def test_submit_job_returns_remote_job_id_and_posts_callback(tmp_path) -> None:
     assert captured["backend"] == "mock"
     assert captured["dense_ply"].startswith(b"ply\nformat ascii 1.0\n")
     assert captured["remote_job_id"] == response.json()["remote_job_id"]
-    assert (tmp_path / ".context" / "remote-dense-submissions" / response.json()["remote_job_id"] / "bundle.zip").is_file()
-    assert (tmp_path / ".context" / "remote-dense-submissions" / response.json()["remote_job_id"] / "result.json").is_file()
+
+    job_root = tmp_path / ".context" / "remote-dense-submissions" / response.json()["remote_job_id"]
+    assert (job_root / "bundle.zip").is_file()
+    result = loads((job_root / "result.json").read_text(encoding="utf-8"))
+    assert result["status"] == "completed"
+    assert result["backend"] == "mock"
+    assert result["error"] is None
+
+
+def test_submit_job_records_failed_status_when_callback_fails(tmp_path) -> None:
+    app = create_app(RemoteDenseSettings(repo_root=tmp_path, backend="mock"))
+    client = TestClient(app)
+
+    def fake_callback_sender(*_args):
+        raise RuntimeError("callback failed")
+
+    app.state.callback_sender = fake_callback_sender
+
+    response = client.post(
+        "/jobs",
+        data={
+            "job_id": "scene_abc123",
+            "callback_url": "https://dreamnav.example/jobs/scene_abc123/remote-dense-result",
+            "callback_token": "callback-secret",
+            "source_video": "walkthrough.mov",
+        },
+        files={"bundle": ("remote_dense_bundle.zip", build_bundle_bytes(), "application/zip")},
+    )
+
+    assert response.status_code == 200
+    job_root = tmp_path / ".context" / "remote-dense-submissions" / response.json()["remote_job_id"]
+    result = loads((job_root / "result.json").read_text(encoding="utf-8"))
+    assert result["status"] == "failed"
+    assert result["backend"] == "mock"
+    assert result["error"] == "callback failed"
 
 
 def test_submit_job_prunes_old_remote_workspaces(tmp_path) -> None:
