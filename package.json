@@ -15,7 +15,7 @@
     "lint": "npm run lint --workspaces --if-present",
     "remote-dense:dev": ".venv/bin/uvicorn remote_dense_app.main:app --app-dir services/remote_dense --host 127.0.0.1 --port 8010",
     "remote-dense:image:build": "docker build -f services/remote_dense/image/Dockerfile -t dreamnav/remote-dense-colmap:local .",
-    "remote-dense:image:build:cuda": "docker build -f services/remote_dense/image/Dockerfile.cuda -t dreamnav/remote-dense-colmap:cuda .",
+    "remote-dense:image:build:cuda": "sh -c 'docker build --platform \"${DREAMNAV_REMOTE_DENSE_DOCKER_BUILD_PLATFORM:-linux/amd64}\" -f services/remote_dense/image/Dockerfile.cuda -t dreamnav/remote-dense-colmap:cuda .'",
     "remote-dense:test": ".venv/bin/python -m pytest services/remote_dense/tests",
     "test": "npm run build -w @dream-nav/shared && npm run build -w @dream-nav/scene-registry && npm run test --workspaces --if-present && npm run api:test && npm run remote-dense:test",
     "typecheck": "npm run typecheck -w @dream-nav/shared && npm run build -w @dream-nav/shared && npm run typecheck -w @dream-nav/scene-registry && npm run build -w @dream-nav/scene-registry && npm run typecheck -w @dream-nav/web",
