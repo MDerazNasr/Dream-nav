@@ -89,7 +89,6 @@ def test_capabilities_require_docker_image_for_bundled_docker_adapter(tmp_path, 
         lambda command: (False, "The configured COLMAP build does not support dense stereo."),
     )
     monkeypatch.delenv("DREAMNAV_REMOTE_DENSE_DOCKER_IMAGE", raising=False)
-    monkeypatch.setattr("remote_dense_app.capabilities.which", lambda command: "/usr/local/bin/docker")
     app = create_app(
         RemoteDenseSettings(
             repo_root=tmp_path,
@@ -110,3 +109,28 @@ def test_capabilities_require_docker_image_for_bundled_docker_adapter(tmp_path, 
         "Set DREAMNAV_REMOTE_DENSE_DOCKER_IMAGE to a container image that implements the DreamNav dense command contract."
         in payload["missing_requirements"]
     )
+
+
+def test_capabilities_accept_docker_adapter_when_image_probe_passes(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(
+        "remote_dense_app.capabilities.detect_colmap_dense_support",
+        lambda command: (False, "The configured COLMAP build does not support dense stereo."),
+    )
+    monkeypatch.setenv("DREAMNAV_REMOTE_DENSE_DOCKER_IMAGE", "dreamnav/dense-engine:latest")
+    monkeypatch.setattr("remote_dense_app.capabilities.probe_docker_engine", lambda **kwargs: (True, None))
+    app = create_app(
+        RemoteDenseSettings(
+            repo_root=tmp_path,
+            backend="command",
+            dense_command=str(Path(__file__).resolve().parents[1] / "remote_dense_app" / "docker_command_adapter.py"),
+            allow_mock_fallback=False,
+        )
+    )
+    client = TestClient(app)
+
+    response = client.get("/capabilities")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["real_dense_ready"] is True
+    assert payload["missing_requirements"] == []

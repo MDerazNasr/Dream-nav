@@ -79,3 +79,20 @@ def test_resolve_image_requires_configuration(monkeypatch) -> None:
         assert "DREAMNAV_REMOTE_DENSE_DOCKER_IMAGE" in str(error)
     else:
         raise AssertionError("Expected docker image resolution to fail")
+
+
+def test_probe_engine_reports_failed_image_health_check(monkeypatch) -> None:
+    monkeypatch.setattr(docker_command_adapter, "_resolve_runtime", lambda runtime: "/usr/local/bin/docker")
+    monkeypatch.setattr(docker_command_adapter, "_resolve_image", lambda image: "dreamnav/dense-engine:latest")
+
+    class Completed:
+        returncode = 1
+        stdout = ""
+        stderr = "The dense engine image COLMAP build does not support dense stereo."
+
+    monkeypatch.setattr(docker_command_adapter, "run", lambda *args, **kwargs: Completed())
+
+    supported, reason = docker_command_adapter.probe_engine()
+
+    assert supported is False
+    assert reason == "The dense engine image COLMAP build does not support dense stereo."

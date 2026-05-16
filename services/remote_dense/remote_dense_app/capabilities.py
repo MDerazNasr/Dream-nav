@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from os import environ
 from pathlib import Path
-from shutil import which
 from typing import TYPE_CHECKING
 
 from .backend import detect_colmap_dense_support
+from .docker_command_adapter import probe_engine as probe_docker_engine
 
 if TYPE_CHECKING:
     from .main import RemoteDenseSettings
@@ -19,11 +19,10 @@ def remote_dense_capabilities(settings: RemoteDenseSettings) -> dict[str, object
     uses_bundled_adapter = dense_command_path == bundled_adapter_path if dense_command_path else False
     uses_docker_adapter = dense_command_path == docker_adapter_path if dense_command_path else False
     colmap_supported, colmap_reason = detect_colmap_dense_support(settings.colmap_command)
-    docker_runtime = environ.get("DREAMNAV_REMOTE_DENSE_DOCKER_RUNTIME") or "docker"
-    docker_available = which(docker_runtime) is not None
     docker_image = environ.get("DREAMNAV_REMOTE_DENSE_DOCKER_IMAGE")
     if uses_docker_adapter:
-        command_backend_ready = bundled_adapter and docker_available and bool(docker_image)
+        docker_ready, docker_reason = _probe_docker_backend() if docker_image else (False, None)
+        command_backend_ready = bundled_adapter and docker_ready
     else:
         command_backend_ready = bundled_adapter and (colmap_supported if uses_bundled_adapter else True)
 
@@ -35,10 +34,8 @@ def remote_dense_capabilities(settings: RemoteDenseSettings) -> dict[str, object
         missing_requirements.append(
             "Set DREAMNAV_REMOTE_DENSE_DOCKER_IMAGE to a container image that implements the DreamNav dense command contract."
         )
-    if uses_docker_adapter and not docker_available:
-        missing_requirements.append(
-            "Install Docker or set DREAMNAV_REMOTE_DENSE_DOCKER_RUNTIME to a compatible container runtime."
-        )
+    if uses_docker_adapter and docker_image and docker_reason:
+        missing_requirements.append(docker_reason)
     if settings.backend in {"auto", "colmap_dense"} and not colmap_supported:
         warnings.append(colmap_reason or "COLMAP dense support is unavailable.")
 
@@ -59,3 +56,13 @@ def remote_dense_capabilities(settings: RemoteDenseSettings) -> dict[str, object
         "missing_requirements": missing_requirements,
         "warnings": warnings,
     }
+
+
+def _probe_docker_backend() -> tuple[bool, str | None]:
+    try:
+        return probe_docker_engine(
+            docker_image=environ.get("DREAMNAV_REMOTE_DENSE_DOCKER_IMAGE"),
+            docker_runtime=environ.get("DREAMNAV_REMOTE_DENSE_DOCKER_RUNTIME"),
+        )
+    except Exception as error:
+        return False, str(error)

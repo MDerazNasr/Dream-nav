@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+from shutil import which
+from subprocess import run
 from sys import argv, exit
 
 try:
@@ -44,8 +46,32 @@ def run_adapter(
     return vertex_count
 
 
+def run_health_check(colmap_command: str | None = None) -> int:
+    resolved_command = _resolve_colmap_command(colmap_command)
+    if not resolved_command:
+        raise RemoteDenseCommandAdapterError("COLMAP is not available inside the dense engine image.")
+
+    completed = run(
+        [resolved_command, "patch_match_stereo", "-h"],
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    output = "\n".join(part for part in [completed.stdout.strip(), completed.stderr.strip()] if part)
+    if "without CUDA" in output:
+        raise RemoteDenseCommandAdapterError("The dense engine image COLMAP build does not support dense stereo.")
+    if completed.returncode != 0:
+        raise RemoteDenseCommandAdapterError("The dense engine image COLMAP dense stereo support could not be verified.")
+
+    print("remote_dense_command_adapter health=ok")
+    return 0
+
+
 def main(args: list[str]) -> int:
     try:
+        if args == ["--health-check"]:
+            run_health_check()
+            return 0
         parsed = _parse_args(args)
         run_adapter(
             bundle_root=Path(parsed["bundle_root"]),
@@ -82,6 +108,17 @@ def _parse_args(args: list[str]) -> dict[str, str]:
         "output_ply": parsed["--output-ply"],
         **({"colmap_command": parsed["--colmap-command"]} if "--colmap-command" in parsed else {}),
     }
+
+
+def _resolve_colmap_command(configured_command: str | None) -> str | None:
+    if not configured_command:
+        return which("colmap")
+
+    configured_path = Path(configured_command)
+    if configured_path.parent != Path("."):
+        return str(configured_path) if configured_path.is_file() else None
+
+    return which(configured_command)
 
 
 if __name__ == "__main__":

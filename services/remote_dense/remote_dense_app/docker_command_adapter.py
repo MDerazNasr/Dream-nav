@@ -63,6 +63,22 @@ def run_adapter(
     print(f"remote_dense_docker_adapter image={resolved_image}")
 
 
+def probe_engine(docker_image: str | None = None, docker_runtime: str | None = None) -> tuple[bool, str | None]:
+    resolved_runtime = _resolve_runtime(docker_runtime)
+    resolved_image = _resolve_image(docker_image)
+    completed = run(
+        [resolved_runtime, "run", "--rm", resolved_image, "--health-check"],
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    if completed.returncode == 0:
+        return True, None
+
+    details = completed.stderr.strip() or completed.stdout.strip() or "Dense engine image health check failed."
+    return False, details
+
+
 def main(args: list[str]) -> int:
     try:
         parsed = _parse_args(args)

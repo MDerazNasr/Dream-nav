@@ -61,3 +61,30 @@ def test_main_accepts_command_contract_arguments(tmp_path, monkeypatch) -> None:
     )
 
     assert status == 0
+
+
+def test_health_check_requires_dense_capable_colmap(tmp_path, monkeypatch) -> None:
+    colmap_path = tmp_path / "colmap"
+    colmap_path.write_text(
+        "#!/bin/sh\n"
+        "echo 'COLMAP patch_match_stereo is unavailable without CUDA' >&2\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    colmap_path.chmod(0o755)
+    monkeypatch.setattr(colmap_command_adapter, "which", lambda command: str(colmap_path))
+
+    try:
+        colmap_command_adapter.run_health_check()
+    except colmap_command_adapter.RemoteDenseCommandAdapterError as error:
+        assert "does not support dense stereo" in str(error)
+    else:
+        raise AssertionError("Expected dense-capability health check to fail")
+
+
+def test_main_accepts_health_check_argument(monkeypatch) -> None:
+    monkeypatch.setattr(colmap_command_adapter, "run_health_check", lambda colmap_command=None: 0)
+
+    status = colmap_command_adapter.main(["--health-check"])
+
+    assert status == 0
