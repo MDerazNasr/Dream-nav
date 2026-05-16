@@ -85,7 +85,7 @@ def detect_colmap_dense_support(colmap_command: str | None) -> tuple[bool, str |
         text=True,
     )
     output = "\n".join(part for part in [completed.stdout.strip(), completed.stderr.strip()] if part)
-    if "without CUDA" in output:
+    if "without CUDA" in output or "requires CUDA" in output:
         return False, "The configured COLMAP build does not support dense stereo."
 
     if completed.returncode != 0:

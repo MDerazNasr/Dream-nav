@@ -10,10 +10,19 @@ from sys import argv, exit
 try:
     from app.colmap_dense_to_splat import ColmapDenseToSplatError, build_dense_splat_from_colmap
 except ImportError:
-    services_root = Path(__file__).resolve().parents[3] / "services" / "api"
-    if str(services_root) not in __import__("sys").path:
-        __import__("sys").path.insert(0, str(services_root))
-    from app.colmap_dense_to_splat import ColmapDenseToSplatError, build_dense_splat_from_colmap
+    candidate_roots = [
+        Path(__file__).resolve().parents[3] / "services" / "api" / "app",
+        Path(__file__).resolve().parents[1] / "app",
+    ]
+    for app_root in candidate_roots:
+        if app_root.is_dir():
+            if str(app_root) not in __import__("sys").path:
+                __import__("sys").path.insert(0, str(app_root))
+            from colmap_dense_to_splat import ColmapDenseToSplatError, build_dense_splat_from_colmap
+
+            break
+    else:
+        raise
 
 
 class RemoteDenseCommandAdapterError(Exception):
@@ -58,7 +67,7 @@ def run_health_check(colmap_command: str | None = None) -> int:
         text=True,
     )
     output = "\n".join(part for part in [completed.stdout.strip(), completed.stderr.strip()] if part)
-    if "without CUDA" in output:
+    if "without CUDA" in output or "requires CUDA" in output:
         raise RemoteDenseCommandAdapterError("The dense engine image COLMAP build does not support dense stereo.")
     if completed.returncode != 0:
         raise RemoteDenseCommandAdapterError("The dense engine image COLMAP dense stereo support could not be verified.")
