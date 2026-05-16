@@ -5,6 +5,7 @@ from json import dumps, loads
 from os import environ
 from pathlib import Path
 from secrets import token_hex
+from threading import Semaphore
 
 import httpx
 from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
@@ -46,6 +47,7 @@ def create_app(settings: RemoteDenseSettings | None = None) -> FastAPI:
     app = FastAPI(title="DreamNav Remote Dense Worker", version="0.1.0")
     app.state.settings = resolved_settings
     app.state.callback_sender = _post_dense_callback
+    app.state.job_semaphore = Semaphore(1)
 
     @app.get("/health")
     def health() -> dict[str, str]:
@@ -104,6 +106,7 @@ def create_app(settings: RemoteDenseSettings | None = None) -> FastAPI:
             remote_job_id,
             resolved_settings,
             app.state.callback_sender,
+            app.state.job_semaphore,
         )
 
         return _submission_response(
@@ -175,32 +178,34 @@ def _process_submission(
     remote_job_id: str,
     settings: RemoteDenseSettings,
     callback_sender,
+    job_semaphore: Semaphore,
 ) -> None:
-    _write_job_result_metadata(
-        job_root,
-        manifest,
-        status="running",
-        backend=settings.backend,
-        warnings=[],
-        error=None,
-    )
     try:
-        dense_result = build_dense_result(
-            submission_bundle,
-            job_root,
-            settings.backend,
-            settings.colmap_command,
-            settings.dense_command,
-            settings.allow_mock_fallback,
-        )
-        callback_sender(
-            callback_url,
-            callback_token,
-            dense_result.dense_ply,
-            remote_job_id,
-            dense_result.backend,
-            settings.callback_timeout_sec,
-        )
+        with job_semaphore:
+            _write_job_result_metadata(
+                job_root,
+                manifest,
+                status="running",
+                backend=settings.backend,
+                warnings=[],
+                error=None,
+            )
+            dense_result = build_dense_result(
+                submission_bundle,
+                job_root,
+                settings.backend,
+                settings.colmap_command,
+                settings.dense_command,
+                settings.allow_mock_fallback,
+            )
+            callback_sender(
+                callback_url,
+                callback_token,
+                dense_result.dense_ply,
+                remote_job_id,
+                dense_result.backend,
+                settings.callback_timeout_sec,
+            )
     except Exception as error:
         _write_job_result_metadata(
             job_root,
