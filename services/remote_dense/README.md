@@ -40,6 +40,9 @@ Containerized engine adapter:
 Optional environment variables:
 
 - `DREAMNAV_REMOTE_GAUSSIAN_COMMAND` points to a trained Gaussian backend executable. DreamNav calls it with `--bundle-root`, `--artifacts-root`, `--frames-root`, and `--output-ply`. `auto` prefers this path before the older point cloud bridge.
+- `DREAMNAV_NERFSTUDIO_TRAIN_COMMAND` points to `ns-train` or a compatible wrapper. When this or `DREAMNAV_NERFSTUDIO_EXPORT_COMMAND` is set, the bundled `gaussian_command_adapter.py` prefers the repo-native `nerfstudio_splatfacto_backend.py`.
+- `DREAMNAV_NERFSTUDIO_EXPORT_COMMAND` points to `ns-export` or a compatible wrapper. The bundled Nerfstudio backend probes `gaussian-splat --help` before reporting ready.
+- `DREAMNAV_NERFSTUDIO_METHOD` overrides the default Nerfstudio trainer method and defaults to `splatfacto`.
 - When `DREAMNAV_TRAINED_GAUSSIAN_TRAIN_COMMAND_JSON` or `DREAMNAV_TRAINED_GAUSSIAN_EXPORT_COMMAND_JSON` is set, DreamNav can use the bundled `gaussian_command_adapter.py` plus `trained_gaussian_backend.py` path without a separate custom wrapper executable.
 - `DREAMNAV_TRAINED_GAUSSIAN_TRAIN_COMMAND_JSON` is a JSON array command template for the trainer step. It can reference `{bundle_root}`, `{artifacts_root}`, `{frames_root}`, `{camera_path}`, `{colmap_root}`, `{workspace_root}`, and `{output_ply}`.
 - `DREAMNAV_TRAINED_GAUSSIAN_EXPORT_COMMAND_JSON` is an optional JSON array command template for a second export step when training does not write the final `.ply` directly.
@@ -59,7 +62,7 @@ Capability probe:
 
 - `GET /capabilities` reports whether the worker is actually ready to run a real dense backend.
 - `real_dense_ready=true` means the worker can use either a trained Gaussian backend, a valid command adapter, or a supported COLMAP dense path.
-- `gaussian_backend_ready=true` means the worker has a configured trained Gaussian executable and `auto` can prefer it ahead of the point-cloud bridge.
+- `gaussian_backend_ready=true` means the worker has a configured trained Gaussian executable, Nerfstudio backend, or command-template backend and `auto` can prefer it ahead of the point-cloud bridge.
 - `missing_requirements` lists hard blockers such as a missing command executable or no real dense backend on the machine.
 - `warnings` reports softer issues such as a COLMAP build that cannot run dense stereo while a command adapter is still available.
 
