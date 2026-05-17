@@ -73,7 +73,7 @@ def test_worker_completes_queued_job(tmp_path: Path) -> None:
     assert camera_motion["pose_count"] == 3
     assert camera_path["scene_id"] == response.job_id
     assert camera_path["coordinate_system"] == "dreamnav_viewer_v1"
-    assert camera_path["poses"][1]["timestamp_sec"] == 0.5
+    assert camera_path["poses"][1]["timestamp_sec"] == 0.25
     metadata = _read_job_artifact(tmp_path, response.job_id, "metadata.json")
     quality = _read_job_artifact(tmp_path, response.job_id, "quality.json")
     visibility = _read_job_artifact(tmp_path, response.job_id, "visibility_manifest.json")

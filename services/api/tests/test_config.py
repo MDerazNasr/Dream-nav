@@ -96,3 +96,15 @@ def test_default_settings_uses_real_pose_timeout_budget(monkeypatch) -> None:
     settings = default_settings()
 
     assert settings.processing.pose_timeout_sec == 180
+
+
+def test_default_settings_use_denser_live_frame_defaults(monkeypatch) -> None:
+    monkeypatch.delenv("DREAMNAV_FRAME_TIMEOUT_SEC", raising=False)
+    monkeypatch.delenv("DREAMNAV_FRAME_RATE", raising=False)
+    monkeypatch.delenv("DREAMNAV_FRAME_MAX_COUNT", raising=False)
+
+    settings = default_settings()
+
+    assert settings.processing.frame_timeout_sec == 45
+    assert settings.processing.frame_rate == 4
+    assert settings.processing.frame_max_count == 360

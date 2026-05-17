@@ -3,7 +3,7 @@ from os import environ
 from pathlib import Path
 from shutil import which
 
-DEFAULT_FRAME_TIMEOUT_SEC = 30
+DEFAULT_FRAME_TIMEOUT_SEC = 45
 DEFAULT_POSE_TIMEOUT_SEC = 180
 DEFAULT_GAUSSIAN_TIMEOUT_SEC = 60
 
@@ -13,8 +13,8 @@ class ProcessingSettings:
     frame_backend: str = "stub"
     frame_command: str | None = None
     frame_timeout_sec: float = DEFAULT_FRAME_TIMEOUT_SEC
-    frame_rate: float = 2
-    frame_max_count: int = 240
+    frame_rate: float = 4
+    frame_max_count: int = 360
     frame_max_duration_sec: float = 60
     pose_backend: str = "stub"
     pose_command: str | None = None
@@ -77,8 +77,8 @@ def default_settings() -> ApiSettings:
             frame_backend=resolved_frame_backend,
             frame_command=resolved_frame_command,
             frame_timeout_sec=float(environ.get("DREAMNAV_FRAME_TIMEOUT_SEC", str(DEFAULT_FRAME_TIMEOUT_SEC))),
-            frame_rate=float(environ.get("DREAMNAV_FRAME_RATE", "2")),
-            frame_max_count=int(environ.get("DREAMNAV_FRAME_MAX_COUNT", "240")),
+            frame_rate=float(environ.get("DREAMNAV_FRAME_RATE", "4")),
+            frame_max_count=int(environ.get("DREAMNAV_FRAME_MAX_COUNT", "360")),
             frame_max_duration_sec=float(environ.get("DREAMNAV_FRAME_MAX_DURATION_SEC", "60")),
             pose_backend=resolved_pose_backend,
             pose_command=resolved_pose_command,
