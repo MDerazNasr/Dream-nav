@@ -64,6 +64,20 @@ def test_probe_engine_defaults_to_bundled_backend_when_training_commands_are_con
     assert backend_path.is_file()
 
 
+def test_probe_engine_prefers_nerfstudio_backend_when_configured(monkeypatch) -> None:
+    backend_path = Path(gaussian_command_adapter.__file__).with_name("nerfstudio_splatfacto_backend.py")
+    monkeypatch.setenv("DREAMNAV_NERFSTUDIO_TRAIN_COMMAND", "missing-train")
+    monkeypatch.delenv("DREAMNAV_REMOTE_GAUSSIAN_EXECUTABLE", raising=False)
+    monkeypatch.delenv("DREAMNAV_TRAINED_GAUSSIAN_TRAIN_COMMAND_JSON", raising=False)
+    monkeypatch.delenv("DREAMNAV_TRAINED_GAUSSIAN_EXPORT_COMMAND_JSON", raising=False)
+
+    ready, reason = gaussian_command_adapter.probe_engine()
+
+    assert ready is False
+    assert "Nerfstudio train command was not found." in (reason or "")
+    assert backend_path.is_file()
+
+
 def test_main_accepts_command_contract_arguments(tmp_path, monkeypatch) -> None:
     bundle_root = tmp_path / "bundle"
     artifacts_root = bundle_root / "artifacts"

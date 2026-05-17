@@ -150,6 +150,11 @@ def _resolve_gaussian_executable(configured_executable: str | None) -> str:
 
 
 def _default_bundled_backend() -> str | None:
+    if environ.get("DREAMNAV_NERFSTUDIO_TRAIN_COMMAND") or environ.get("DREAMNAV_NERFSTUDIO_EXPORT_COMMAND"):
+        backend_path = Path(__file__).with_name("nerfstudio_splatfacto_backend.py")
+        if backend_path.is_file():
+            return str(backend_path)
+
     if not (environ.get("DREAMNAV_TRAINED_GAUSSIAN_TRAIN_COMMAND_JSON") or environ.get("DREAMNAV_TRAINED_GAUSSIAN_EXPORT_COMMAND_JSON")):
         return None
 
