@@ -220,6 +220,19 @@ def get_remote_dense_status(job_id: str, request: Request) -> RemoteDenseJobStat
     if not isinstance(remote_job_id, str) or not remote_job_id:
         raise HTTPException(status_code=409, detail="Remote dense job has not been assigned yet")
 
+    imported_result = _matching_remote_dense_result(job_repository, job_id, remote_job_id)
+    if imported_result is not None:
+        return RemoteDenseJobStatusResponse(
+            job_id=job_id,
+            remote_job_id=remote_job_id,
+            status="completed",
+            backend=imported_result.get("backend"),
+            source_video=submission.get("source_video"),
+            frame_count=submission.get("frame_count"),
+            warnings=[],
+            error=None,
+        )
+
     settings = request.app.state.settings
     try:
         summary = remote_dense_job_status(
@@ -426,3 +439,16 @@ def _remote_dense_callback_url(request: Request, job_id: str) -> str:
     configured_base_url = request.app.state.settings.public_api_base_url
     base_url = configured_base_url or str(request.base_url).rstrip("/")
     return f"{base_url}/jobs/{job_id}/remote-dense-result"
+
+
+def _matching_remote_dense_result(
+    job_repository: JobRepository,
+    job_id: str,
+    remote_job_id: str,
+) -> dict[str, object] | None:
+    try:
+        result = job_repository.read_artifact(job_id, "remote_dense_result.json")
+    except (JobArtifactNameError, JobArtifactNotFoundError):
+        return None
+
+    return result if result.get("remote_job_id") == remote_job_id else None

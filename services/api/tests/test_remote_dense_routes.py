@@ -195,6 +195,75 @@ def test_remote_dense_status_route_reads_worker_status(tmp_path, monkeypatch) ->
     assert response.json()["remote_job_id"] == "remote_001"
 
 
+def test_remote_dense_status_route_prefers_imported_result_over_worker_failure(tmp_path) -> None:
+    app = create_app(
+        ApiSettings(
+            repo_root=tmp_path,
+            auto_start_worker=False,
+            public_api_base_url="https://dreamnav.example",
+            remote_dense_url="https://dense.example/jobs",
+            remote_dense_callback_token="callback-secret",
+        )
+    )
+    client = TestClient(app)
+    job_id = _completed_job(client, app)
+    app.state.job_repository.write_artifact(
+        job_id,
+        "remote_dense_submission.json",
+        {
+            "job_id": job_id,
+            "provider_url": "https://dense.example/jobs",
+            "remote_job_id": "remote_001",
+            "submission_status": "submitted",
+            "backend": "colmap_dense",
+            "bundle_file": "remote_dense_bundle.zip",
+            "bundle_size_bytes": 180024,
+            "frame_count": 59,
+            "source_video": "walkthrough.mov",
+            "callback_url": f"https://dreamnav.example/jobs/{job_id}/remote-dense-result",
+            "callback_token_configured": True,
+            "worker_capabilities": {
+                "provider_url": "https://dense.example/jobs",
+                "configured": True,
+                "callback_token_configured": True,
+                "backend": "colmap_dense",
+                "dense_command": "/opt/dreamnav/dense-adapter",
+                "bundled_adapter_available": False,
+                "colmap_command": "/opt/homebrew/bin/colmap",
+                "colmap_dense_supported": True,
+                "colmap_dense_reason": None,
+                "allow_mock_fallback": False,
+                "retained_job_count": 8,
+                "real_dense_ready": True,
+                "submission_allowed": True,
+                "missing_requirements": [],
+                "warnings": [],
+            },
+            "warnings": [],
+            "submitted_at_sec": 1,
+        },
+    )
+    app.state.job_repository.write_artifact(
+        job_id,
+        "remote_dense_result.json",
+        {
+            "job_id": job_id,
+            "remote_job_id": "remote_001",
+            "backend": "colmap_dense",
+            "source_file": "imports/dense_result.ply",
+            "validation_status": "pass",
+            "gaussian_count": 20000,
+        },
+    )
+
+    response = client.get(f"/jobs/{job_id}/remote-dense-status")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "completed"
+    assert response.json()["remote_job_id"] == "remote_001"
+    assert response.json()["error"] is None
+
+
 def test_remote_dense_result_route_requires_callback_token(tmp_path) -> None:
     app = create_app(
         ApiSettings(
