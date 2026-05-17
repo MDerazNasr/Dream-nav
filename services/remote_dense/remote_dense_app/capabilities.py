@@ -6,18 +6,27 @@ from typing import TYPE_CHECKING
 
 from .backend import detect_colmap_dense_support
 from .docker_command_adapter import probe_engine as probe_docker_engine
+from .gaussian_command_adapter import probe_engine as probe_gaussian_engine
 
 if TYPE_CHECKING:
     from .main import RemoteDenseSettings
 
 
 def remote_dense_capabilities(settings: RemoteDenseSettings) -> dict[str, object]:
+    gaussian_adapter_path = Path(__file__).with_name("gaussian_command_adapter.py").resolve()
     bundled_adapter_path = Path(__file__).with_name("colmap_command_adapter.py").resolve()
     docker_adapter_path = Path(__file__).with_name("docker_command_adapter.py").resolve()
     gaussian_command_path = Path(settings.gaussian_command).resolve() if settings.gaussian_command else None
     dense_command_path = Path(settings.dense_command).resolve() if settings.dense_command else None
-    gaussian_backend_ready = gaussian_command_path is not None and gaussian_command_path.is_file()
     gaussian_backend_configured = settings.gaussian_command is not None
+    uses_gaussian_adapter = gaussian_command_path == gaussian_adapter_path if gaussian_command_path else False
+    if uses_gaussian_adapter:
+        gaussian_backend_ready, gaussian_reason = probe_gaussian_engine(
+            environ.get("DREAMNAV_REMOTE_GAUSSIAN_EXECUTABLE")
+        )
+    else:
+        gaussian_backend_ready = gaussian_command_path is not None and gaussian_command_path.is_file()
+        gaussian_reason = None
     bundled_adapter = dense_command_path is not None and dense_command_path.is_file()
     uses_bundled_adapter = dense_command_path == bundled_adapter_path if dense_command_path else False
     uses_docker_adapter = dense_command_path == docker_adapter_path if dense_command_path else False
@@ -33,6 +42,8 @@ def remote_dense_capabilities(settings: RemoteDenseSettings) -> dict[str, object
     warnings: list[str] = []
     if settings.backend == "gaussian_command" and not gaussian_backend_ready:
         missing_requirements.append("Set DREAMNAV_REMOTE_GAUSSIAN_COMMAND to a valid trained Gaussian backend executable.")
+    if uses_gaussian_adapter and gaussian_reason:
+        missing_requirements.append(gaussian_reason)
     if settings.backend == "command" and not command_backend_ready and not uses_docker_adapter:
         missing_requirements.append("Set DREAMNAV_REMOTE_DENSE_COMMAND to a valid executable.")
     if uses_docker_adapter and not docker_image:
@@ -53,6 +64,7 @@ def remote_dense_capabilities(settings: RemoteDenseSettings) -> dict[str, object
         "gaussian_command": settings.gaussian_command,
         "gaussian_backend_configured": gaussian_backend_configured,
         "gaussian_backend_ready": gaussian_backend_ready,
+        "gaussian_backend_reason": gaussian_reason,
         "dense_command": settings.dense_command,
         "bundled_adapter_available": bundled_adapter,
         "colmap_command": settings.colmap_command,

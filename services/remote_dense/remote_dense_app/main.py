@@ -37,7 +37,7 @@ def default_settings() -> RemoteDenseSettings:
         callback_timeout_sec=float(environ.get("DREAMNAV_REMOTE_DENSE_CALLBACK_TIMEOUT_SEC", "30")),
         backend=environ.get("DREAMNAV_REMOTE_DENSE_BACKEND", "auto"),
         colmap_command=environ.get("DREAMNAV_REMOTE_DENSE_COLMAP_COMMAND"),
-        gaussian_command=environ.get("DREAMNAV_REMOTE_GAUSSIAN_COMMAND"),
+        gaussian_command=environ.get("DREAMNAV_REMOTE_GAUSSIAN_COMMAND") or _default_gaussian_command(),
         dense_command=environ.get("DREAMNAV_REMOTE_DENSE_COMMAND") or _default_dense_command(),
         allow_mock_fallback=environ.get("DREAMNAV_REMOTE_DENSE_ALLOW_MOCK_FALLBACK", "1") != "0",
         retained_job_count=max(1, int(environ.get("DREAMNAV_REMOTE_DENSE_RETAINED_JOBS", "8"))),
@@ -257,6 +257,14 @@ def _default_dense_command() -> str | None:
             return str(docker_adapter)
 
     adapter_path = Path(__file__).with_name("colmap_command_adapter.py")
+    return str(adapter_path) if adapter_path.is_file() else None
+
+
+def _default_gaussian_command() -> str | None:
+    if not environ.get("DREAMNAV_REMOTE_GAUSSIAN_EXECUTABLE"):
+        return None
+
+    adapter_path = Path(__file__).with_name("gaussian_command_adapter.py")
     return str(adapter_path) if adapter_path.is_file() else None
 
 

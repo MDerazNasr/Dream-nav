@@ -64,6 +64,30 @@ def test_capabilities_reports_trained_gaussian_backend_when_configured(tmp_path,
     assert payload["real_dense_ready"] is True
 
 
+def test_capabilities_probe_bundled_gaussian_adapter(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(
+        "remote_dense_app.capabilities.detect_colmap_dense_support",
+        lambda command: (False, "The configured COLMAP build does not support dense stereo."),
+    )
+    monkeypatch.setattr("remote_dense_app.capabilities.probe_gaussian_engine", lambda command=None: (True, None))
+    app = create_app(
+        RemoteDenseSettings(
+            repo_root=tmp_path,
+            backend="auto",
+            gaussian_command=str(Path(__file__).resolve().parents[1] / "remote_dense_app" / "gaussian_command_adapter.py"),
+            allow_mock_fallback=False,
+        )
+    )
+    client = TestClient(app)
+
+    response = client.get("/capabilities")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["gaussian_backend_ready"] is True
+    assert payload["gaussian_backend_reason"] is None
+
+
 def test_capabilities_block_bundled_adapter_when_colmap_dense_is_unavailable(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(
         "remote_dense_app.capabilities.detect_colmap_dense_support",
