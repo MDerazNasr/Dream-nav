@@ -36,7 +36,7 @@ def test_run_adapter_calls_external_gaussian_executable(tmp_path: Path) -> None:
 
 
 def test_probe_engine_accepts_health_check_or_help(tmp_path: Path) -> None:
-    executable = tmp_path / "fake_gaussian.py"
+    executable = tmp_path / "fake_gaussian"
     executable.write_text(
         "#!/bin/sh\n"
         "if [ \"$1\" = \"--health-check\" ]; then exit 1; fi\n"
@@ -50,6 +50,18 @@ def test_probe_engine_accepts_health_check_or_help(tmp_path: Path) -> None:
 
     assert ready is True
     assert reason is None
+
+
+def test_probe_engine_defaults_to_bundled_backend_when_training_commands_are_configured(tmp_path, monkeypatch) -> None:
+    backend_path = Path(gaussian_command_adapter.__file__).with_name("trained_gaussian_backend.py")
+    monkeypatch.setenv("DREAMNAV_TRAINED_GAUSSIAN_TRAIN_COMMAND_JSON", '["echo","ok"]')
+    monkeypatch.delenv("DREAMNAV_REMOTE_GAUSSIAN_EXECUTABLE", raising=False)
+
+    ready, reason = gaussian_command_adapter.probe_engine()
+
+    assert ready is True
+    assert reason is None
+    assert backend_path.is_file()
 
 
 def test_main_accepts_command_contract_arguments(tmp_path, monkeypatch) -> None:

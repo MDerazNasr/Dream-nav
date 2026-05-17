@@ -261,7 +261,11 @@ def _default_dense_command() -> str | None:
 
 
 def _default_gaussian_command() -> str | None:
-    if not environ.get("DREAMNAV_REMOTE_GAUSSIAN_EXECUTABLE"):
+    if not (
+        environ.get("DREAMNAV_REMOTE_GAUSSIAN_EXECUTABLE")
+        or environ.get("DREAMNAV_TRAINED_GAUSSIAN_TRAIN_COMMAND_JSON")
+        or environ.get("DREAMNAV_TRAINED_GAUSSIAN_EXPORT_COMMAND_JSON")
+    ):
         return None
 
     adapter_path = Path(__file__).with_name("gaussian_command_adapter.py")

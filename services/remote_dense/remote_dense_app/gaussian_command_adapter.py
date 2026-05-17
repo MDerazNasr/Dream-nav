@@ -6,7 +6,7 @@ from os import environ
 from pathlib import Path
 from shutil import which
 from subprocess import run
-from sys import argv, exit
+from sys import argv, executable, exit
 
 
 class RemoteGaussianCommandAdapterError(Exception):
@@ -32,7 +32,7 @@ def run_adapter(
     output_ply.parent.mkdir(parents=True, exist_ok=True)
 
     command = [
-        resolved_executable,
+        *_executable_prefix(resolved_executable),
         "--bundle-root",
         str(bundle_root),
         "--artifacts-root",
@@ -61,7 +61,7 @@ def probe_engine(gaussian_executable: str | None = None) -> tuple[bool, str | No
         return False, str(error)
 
     completed = run(
-        [resolved_executable, "--health-check"],
+        [*_executable_prefix(resolved_executable), "--health-check"],
         capture_output=True,
         check=False,
         text=True,
@@ -70,7 +70,7 @@ def probe_engine(gaussian_executable: str | None = None) -> tuple[bool, str | No
         return True, None
 
     fallback = run(
-        [resolved_executable, "--help"],
+        [*_executable_prefix(resolved_executable), "--help"],
         capture_output=True,
         check=False,
         text=True,
@@ -130,7 +130,7 @@ def _parse_args(args: list[str]) -> dict[str, str]:
 
 
 def _resolve_gaussian_executable(configured_executable: str | None) -> str:
-    executable = configured_executable or environ.get("DREAMNAV_REMOTE_GAUSSIAN_EXECUTABLE")
+    executable = configured_executable or environ.get("DREAMNAV_REMOTE_GAUSSIAN_EXECUTABLE") or _default_bundled_backend()
     if not executable:
         raise RemoteGaussianCommandAdapterError(
             "Set DREAMNAV_REMOTE_GAUSSIAN_EXECUTABLE to the trained Gaussian backend executable."
@@ -147,6 +147,18 @@ def _resolve_gaussian_executable(configured_executable: str | None) -> str:
         return resolved
 
     raise RemoteGaussianCommandAdapterError("Configured trained Gaussian backend executable was not found.")
+
+
+def _default_bundled_backend() -> str | None:
+    if not (environ.get("DREAMNAV_TRAINED_GAUSSIAN_TRAIN_COMMAND_JSON") or environ.get("DREAMNAV_TRAINED_GAUSSIAN_EXPORT_COMMAND_JSON")):
+        return None
+
+    backend_path = Path(__file__).with_name("trained_gaussian_backend.py")
+    return str(backend_path) if backend_path.is_file() else None
+
+
+def _executable_prefix(resolved_executable: str) -> list[str]:
+    return [executable, resolved_executable] if resolved_executable.endswith(".py") else [resolved_executable]
 
 
 if __name__ == "__main__":

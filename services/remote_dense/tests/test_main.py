@@ -199,6 +199,25 @@ def test_default_settings_prefers_bundled_gaussian_adapter_when_engine_is_config
     assert settings.gaussian_command.endswith("remote_dense_app/gaussian_command_adapter.py")
 
 
+def test_default_settings_prefers_bundled_gaussian_adapter_when_train_command_is_configured(monkeypatch) -> None:
+    for name in (
+        "DREAMNAV_REMOTE_GAUSSIAN_COMMAND",
+        "DREAMNAV_REMOTE_GAUSSIAN_EXECUTABLE",
+        "DREAMNAV_REMOTE_DENSE_COMMAND",
+        "DREAMNAV_REMOTE_DENSE_BACKEND",
+        "DREAMNAV_REMOTE_DENSE_COLMAP_COMMAND",
+        "DREAMNAV_REMOTE_DENSE_ALLOW_MOCK_FALLBACK",
+        "DREAMNAV_REMOTE_DENSE_RETAINED_JOBS",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("DREAMNAV_TRAINED_GAUSSIAN_TRAIN_COMMAND_JSON", '["echo","train"]')
+
+    settings = default_settings()
+
+    assert settings.gaussian_command is not None
+    assert settings.gaussian_command.endswith("remote_dense_app/gaussian_command_adapter.py")
+
+
 def test_process_submission_serializes_dense_jobs(tmp_path) -> None:
     settings = RemoteDenseSettings(repo_root=tmp_path, backend="mock")
     app = create_app(settings)
