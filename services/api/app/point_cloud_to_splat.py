@@ -1,12 +1,16 @@
 from __future__ import annotations
 
-from math import dist, log
+from math import dist, log, sqrt
 from struct import Struct
 from typing import BinaryIO
 
 SH_C0 = 0.28209479177387814
 DEFAULT_DENSE_SCALE = 0.018
 MAX_ADAPTIVE_DENSE_SCALE = 0.05
+DEFAULT_DENSE_OPACITY = 4.0
+SURFEL_OPACITY = 2.8
+SURFEL_TANGENT_SCALE_FACTOR = 0.3
+SURFEL_NORMAL_SCALE_FACTOR = 0.14
 
 _PLY_TYPES = {
     "char": ("b", 1),
@@ -38,7 +42,7 @@ def write_splat_from_points(
     max_points: int,
 ) -> int:
     sampled_points = _apply_adaptive_scales(sample_points(points, max_points))
-    rows = [_pack_splat_row(point["position"], point["color"], point["scale"]) for point in sampled_points]
+    rows = [_pack_splat_row(point) for point in sampled_points]
     header = "\n".join(
         [
             "ply",
@@ -162,6 +166,22 @@ def _apply_adaptive_scales(points: list[dict[str, object]]) -> list[dict[str, ob
     scaled_points = []
     for index, point in enumerate(points):
         adaptive_scale = max(DEFAULT_DENSE_SCALE, min(scale_cap, nearest_distances[index] * 0.35))
+        normal = _normalized_normal(point.get("normal"))
+        if normal is not None:
+            tangent_scale = max(DEFAULT_DENSE_SCALE * 0.6, min(scale_cap * 0.85, nearest_distances[index] * SURFEL_TANGENT_SCALE_FACTOR))
+            normal_scale = max(DEFAULT_DENSE_SCALE * 0.08, tangent_scale * SURFEL_NORMAL_SCALE_FACTOR)
+            scaled_points.append(
+                {
+                    "position": point["position"],
+                    "color": point["color"],
+                    "scales": [tangent_scale, tangent_scale, normal_scale],
+                    "rotation_xyzw": _rotation_from_z_axis(normal),
+                    "opacity": SURFEL_OPACITY,
+                    **({"normal": point["normal"]} if "normal" in point else {}),
+                }
+            )
+            continue
+
         scaled_points.append(
             {
                 "position": point["position"],
@@ -348,11 +368,15 @@ def _point_from_values(values, properties: list[tuple[str, str]], default_scale:
     green = _color_value(property_map.get("green", property_map.get("g", 255)))
     blue = _color_value(property_map.get("blue", property_map.get("b", 255)))
 
-    return {
+    point = {
         "position": [x, y, z],
         "color": [red, green, blue],
         "scale": default_scale,
     }
+    normal = _normal_value(property_map)
+    if normal is not None:
+        point["normal"] = normal
+    return point
 
 
 def _color_value(value: object) -> int:
@@ -365,8 +389,37 @@ def _color_value(value: object) -> int:
     return 255
 
 
-def _pack_splat_row(position: list[float], color: list[int], scale: float) -> bytes:
-    scale_log = log(scale)
+def _normal_value(property_map: dict[str, object]) -> list[float] | None:
+    try:
+        nx = float(property_map["nx"])
+        ny = float(property_map["ny"])
+        nz = float(property_map["nz"])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+    length = sqrt((nx * nx) + (ny * ny) + (nz * nz))
+    if length <= 1e-6:
+        return None
+
+    return [nx / length, ny / length, nz / length]
+
+
+def _pack_splat_row(point: dict[str, object]) -> bytes:
+    position = point["position"]
+    color = point["color"]
+    scales = point.get("scales")
+    if isinstance(scales, list) and len(scales) == 3:
+        scale_values = [log(max(1e-6, float(scale))) for scale in scales]
+    else:
+        scale = float(point.get("scale", DEFAULT_DENSE_SCALE))
+        scale_log = log(scale)
+        scale_values = [scale_log, scale_log, scale_log]
+
+    rotation = point.get("rotation_xyzw")
+    if not isinstance(rotation, list) or len(rotation) != 4:
+        rotation = [0.0, 0.0, 0.0, 1.0]
+
+    opacity = float(point.get("opacity", DEFAULT_DENSE_OPACITY))
     values = [
         float(position[0]),
         float(position[1]),
@@ -374,16 +427,43 @@ def _pack_splat_row(position: list[float], color: list[int], scale: float) -> by
         _rgb_channel_to_sh(color[0]),
         _rgb_channel_to_sh(color[1]),
         _rgb_channel_to_sh(color[2]),
-        4,
-        scale_log,
-        scale_log,
-        scale_log,
-        0,
-        0,
-        0,
-        1,
+        opacity,
+        *scale_values,
+        float(rotation[0]),
+        float(rotation[1]),
+        float(rotation[2]),
+        float(rotation[3]),
     ]
     return Struct("<14f").pack(*values)
+
+
+def _normalized_normal(value: object) -> list[float] | None:
+    if not isinstance(value, list) or len(value) != 3:
+        return None
+
+    length = sqrt(sum(float(component) * float(component) for component in value))
+    if length <= 1e-6:
+        return None
+
+    return [float(component) / length for component in value]
+
+
+def _rotation_from_z_axis(normal: list[float]) -> list[float]:
+    z_axis = [0.0, 0.0, 1.0]
+    dot = sum(z_axis[index] * normal[index] for index in range(3))
+    if dot <= -0.999999:
+        return [1.0, 0.0, 0.0, 0.0]
+    if dot >= 0.999999:
+        return [0.0, 0.0, 0.0, 1.0]
+
+    cross = [
+        z_axis[1] * normal[2] - z_axis[2] * normal[1],
+        z_axis[2] * normal[0] - z_axis[0] * normal[2],
+        z_axis[0] * normal[1] - z_axis[1] * normal[0],
+    ]
+    quaternion = [cross[0], cross[1], cross[2], 1.0 + dot]
+    length = sqrt(sum(component * component for component in quaternion))
+    return [component / length for component in quaternion]
 
 
 def _rgb_channel_to_sh(channel: int) -> float:
