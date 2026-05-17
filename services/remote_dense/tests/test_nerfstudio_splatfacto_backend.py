@@ -55,6 +55,8 @@ def test_run_backend_materializes_dataset_and_exports_ply(tmp_path: Path) -> Non
         "from sys import argv\n"
         "if len(argv) > 2 and argv[1] == 'splatfacto' and argv[2] == '--help':\n"
         "    raise SystemExit(0)\n"
+        "assert '--vis' in argv\n"
+        "assert argv[argv.index('--vis') + 1] == 'tensorboard'\n"
         "data_root = Path(argv[argv.index('--data') + 1])\n"
         "workspace_root = Path.cwd()\n"
         "(workspace_root / 'outputs' / 'run').mkdir(parents=True, exist_ok=True)\n"

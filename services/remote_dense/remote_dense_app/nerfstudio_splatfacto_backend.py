@@ -54,13 +54,24 @@ def run_backend(
     if not resolved_export:
         raise NerfstudioSplatfactoBackendError("Nerfstudio export command was not found.")
 
+    train_args = [
+        resolved_train,
+        environ.get("DREAMNAV_NERFSTUDIO_METHOD", "splatfacto"),
+        "--data",
+        str(dataset_root),
+        "--vis",
+        environ.get("DREAMNAV_NERFSTUDIO_VIS", "tensorboard"),
+    ]
+    if "viewer" in environ.get("DREAMNAV_NERFSTUDIO_VIS", "tensorboard"):
+        train_args.extend(
+            [
+                "--viewer.quit-on-train-completion",
+                environ.get("DREAMNAV_NERFSTUDIO_VIEWER_QUIT_ON_COMPLETION", "True"),
+            ]
+        )
+
     _run_command(
-        [
-            resolved_train,
-            environ.get("DREAMNAV_NERFSTUDIO_METHOD", "splatfacto"),
-            "--data",
-            str(dataset_root),
-        ],
+        train_args,
         workspace_root,
     )
 
