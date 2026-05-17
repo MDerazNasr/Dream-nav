@@ -78,6 +78,18 @@ Start the worker:
 npm run remote-dense:dev
 ```
 
+Install Nerfstudio on a GPU worker:
+
+```bash
+bash services/remote_dense/scripts/install_nerfstudio_runpod.sh
+```
+
+Start the worker with the bundled Nerfstudio backend:
+
+```bash
+bash services/remote_dense/scripts/start_nerfstudio_worker.sh
+```
+
 Default local address:
 
 ```txt
