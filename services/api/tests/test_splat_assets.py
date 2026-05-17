@@ -31,6 +31,7 @@ def test_splat_asset_generator_keeps_existing_splat(tmp_path: Path) -> None:
 
 
 def test_import_job_splat_asset_converts_point_cloud_ply(tmp_path: Path) -> None:
+    _write_camera_path(tmp_path)
     payload = (
         "ply\n"
         "format ascii 1.0\n"
@@ -53,6 +54,30 @@ def test_import_job_splat_asset_converts_point_cloud_ply(tmp_path: Path) -> None
     assert summary.gaussian_count == 3
     assert summary.source_file == "imports/dense_scene.ply"
     assert (tmp_path / "splat.ply").read_bytes().startswith(b"ply\nformat binary_little_endian 1.0")
+
+
+def test_import_job_splat_asset_crops_far_outliers_to_camera_bounds(tmp_path: Path) -> None:
+    _write_camera_path(tmp_path)
+    payload = (
+        "ply\n"
+        "format ascii 1.0\n"
+        "element vertex 3\n"
+        "property float x\n"
+        "property float y\n"
+        "property float z\n"
+        "property uchar red\n"
+        "property uchar green\n"
+        "property uchar blue\n"
+        "end_header\n"
+        "0 1.5 0 255 0 0\n"
+        "0.4 1.4 -1.0 0 255 64\n"
+        "-40 10 25 0 32 255\n"
+    ).encode("utf-8")
+
+    summary = import_job_splat_asset(tmp_path, "dense_scene.ply", payload)
+
+    assert summary.import_format == "point_cloud_ply"
+    assert summary.gaussian_count == 2
 
 
 def test_import_job_splat_asset_keeps_imported_splat(tmp_path: Path) -> None:

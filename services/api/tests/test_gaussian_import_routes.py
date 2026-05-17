@@ -86,7 +86,10 @@ def _completed_job(client: TestClient, app) -> str:
 
 def _point_cloud_ply(vertex_count: int) -> bytes:
     rows = "\n".join(
-        f"{index * 0.01:.2f} 1.0 {-2.0 - (index * 0.01):.2f} 255 128 64"
+        f"{(((index % 120) - 60) * 0.02):.2f} "
+        f"{(1.1 + (((index // 120) % 8) * 0.04)):.2f} "
+        f"{(-0.4 - (((index // 960) % 10) * 0.12)):.2f} "
+        "255 128 64"
         for index in range(vertex_count)
     )
     return (

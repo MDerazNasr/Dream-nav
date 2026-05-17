@@ -1,11 +1,7 @@
 from pathlib import Path
 
-from app.colmap_dense_to_splat import (
-    _filter_points_by_camera_path,
-    _max_supported_distance,
-    _supported_camera_positions,
-    build_dense_splat_from_colmap,
-)
+from app.colmap_dense_to_splat import build_dense_splat_from_colmap
+from app.point_cloud_bounds import filter_points_to_camera_bounds
 
 
 def test_build_dense_splat_from_colmap_runs_dense_stereo_and_writes_splat(tmp_path: Path) -> None:
@@ -71,21 +67,12 @@ def test_build_dense_splat_from_colmap_runs_dense_stereo_and_writes_splat(tmp_pa
 
     payload = output_splat.read_bytes()
 
-    assert vertex_count == 3
+    assert vertex_count == 2
     assert b"format binary_little_endian 1.0" in payload
-    assert b"element vertex 3" in payload
+    assert b"element vertex 2" in payload
 
 
-def test_supported_camera_positions_drops_extreme_pose_outliers() -> None:
-    poses = [(-0.46 + index * 0.005, 0.36, -0.12) for index in range(8)] + [(7.2, -5.7, 2.2)]
-
-    supported = _supported_camera_positions(poses)
-
-    assert len(supported) == 8
-    assert (7.2, -5.7, 2.2) not in supported
-
-
-def test_filter_points_by_camera_path_uses_supported_pose_cluster(tmp_path: Path) -> None:
+def test_filter_points_to_camera_bounds_uses_supported_pose_cluster(tmp_path: Path) -> None:
     camera_path = tmp_path / "camera_path.json"
     camera_path.write_text(
         '{"poses":['
@@ -106,15 +93,7 @@ def test_filter_points_by_camera_path_uses_supported_pose_cluster(tmp_path: Path
         {"position": [7.15, -5.65, 2.18], "color": [255, 64, 0], "scale": 0.02},
     ]
 
-    filtered = _filter_points_by_camera_path(points, camera_path)
+    filtered = filter_points_to_camera_bounds(points, camera_path)
 
     assert len(filtered) == 1
     assert filtered[0]["position"] == [-0.42, 0.36, -0.12]
-
-
-def test_max_supported_distance_stays_compact_for_small_pose_clusters() -> None:
-    poses = [(-0.46, 0.36, -0.12), (-0.39, 0.36, -0.12), (-0.42, 0.28, -0.09)]
-
-    max_distance = _max_supported_distance(poses)
-
-    assert max_distance == 1.25

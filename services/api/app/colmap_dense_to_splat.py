@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
-from json import JSONDecodeError, loads
-from math import dist
+from json import loads
 from pathlib import Path
 from shutil import which
 from subprocess import CompletedProcess, run
 from sys import argv, exit
 
 try:
+    from .point_cloud_bounds import filter_points_to_camera_bounds
     from .point_cloud_to_splat import PointCloudToSplatError, read_ply_points, write_splat_from_points
 except ImportError:
+    from point_cloud_bounds import filter_points_to_camera_bounds
     from point_cloud_to_splat import PointCloudToSplatError, read_ply_points, write_splat_from_points
 
 MAX_DENSE_POINTS = 50000
@@ -85,6 +86,8 @@ def build_dense_splat_from_colmap(
 
     try:
         points = read_ply_points(fused_path)
+        if camera_path is not None:
+            points = filter_points_to_camera_bounds(points, camera_path)
         return write_splat_from_points(points, output_splat, max_points=max_points)
     except PointCloudToSplatError as error:
         raise ColmapDenseToSplatError(str(error)) from error
@@ -201,88 +204,5 @@ def _parse_args(args: list[str]) -> dict[str, str]:
             else {}
         ),
     }
-
-
-def _filter_points_by_camera_path(
-    points: list[dict[str, object]],
-    camera_path: Path | None,
-) -> list[dict[str, object]]:
-    if camera_path is None:
-        return points
-
-    poses = _camera_positions(camera_path)
-    if not poses:
-        return points
-
-    supported_poses = _supported_camera_positions(poses)
-    max_distance = _max_supported_distance(supported_poses)
-    filtered = []
-    for point in points:
-        position = point.get("position")
-        if not isinstance(position, list) or len(position) != 3:
-            continue
-
-        nearest_distance = min(dist(position, pose) for pose in supported_poses)
-        if nearest_distance <= max_distance:
-            filtered.append(point)
-
-    return filtered
-
-
-def _camera_positions(camera_path: Path) -> list[tuple[float, float, float]]:
-    try:
-        payload = loads(camera_path.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return []
-    except JSONDecodeError as error:
-        raise ColmapDenseToSplatError("Camera path is invalid.") from error
-
-    poses = payload.get("poses")
-    if not isinstance(poses, list):
-        return []
-
-    return [
-        (float(position[0]), float(position[1]), float(position[2]))
-        for pose in poses
-        if isinstance(pose, dict)
-        and isinstance((position := pose.get("position")), list)
-        and len(position) == 3
-    ]
-
-
-def _max_supported_distance(poses: list[tuple[float, float, float]]) -> float:
-    mins = [min(pose[axis] for pose in poses) for axis in range(3)]
-    maxs = [max(pose[axis] for pose in poses) for axis in range(3)]
-    path_diagonal = dist(mins, maxs)
-    return max(1.25, min(4.0, (path_diagonal * 1.5) + 0.5))
-
-
-def _supported_camera_positions(
-    poses: list[tuple[float, float, float]],
-) -> list[tuple[float, float, float]]:
-    if len(poses) < 8:
-        return poses
-
-    percentile_mins = [_percentile([pose[axis] for pose in poses], 0.1) for axis in range(3)]
-    percentile_maxs = [_percentile([pose[axis] for pose in poses], 0.9) for axis in range(3)]
-    margins = [max(0.35, (percentile_maxs[axis] - percentile_mins[axis]) * 0.5) for axis in range(3)]
-    filtered = [
-        pose
-        for pose in poses
-        if all(
-            percentile_mins[axis] - margins[axis] <= pose[axis] <= percentile_maxs[axis] + margins[axis]
-            for axis in range(3)
-        )
-    ]
-    minimum_supported_count = max(4, len(poses) // 3)
-    return filtered if len(filtered) >= minimum_supported_count else poses
-
-
-def _percentile(values: list[float], quantile: float) -> float:
-    ordered = sorted(values)
-    index = min(len(ordered) - 1, max(0, int((len(ordered) - 1) * quantile)))
-    return ordered[index]
-
-
 if __name__ == "__main__":
     exit(main(argv[1:]))

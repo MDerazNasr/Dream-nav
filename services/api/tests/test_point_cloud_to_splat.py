@@ -2,7 +2,7 @@ from math import exp
 from struct import Struct
 from pathlib import Path
 
-from app.point_cloud_to_splat import DEFAULT_DENSE_SCALE, write_splat_from_points
+from app.point_cloud_to_splat import DEFAULT_DENSE_SCALE, sample_points, write_splat_from_points
 
 
 def test_write_splat_from_points_adapts_sparse_point_scales(tmp_path: Path) -> None:
@@ -57,6 +57,37 @@ def test_write_splat_from_points_caps_dense_cloud_scales(tmp_path: Path) -> None
 
     assert len(rows) == 12
     assert max(recovered_scales) <= 0.05 + 1e-6
+
+
+def test_sample_points_preserves_sparse_spatial_regions() -> None:
+    points = [
+        {"position": [index * 0.001, 0.0, 0.0], "color": [255, 255, 255], "scale": DEFAULT_DENSE_SCALE}
+        for index in range(1000)
+    ] + [
+        {"position": [100.0 + index * 0.001, 0.0, 0.0], "color": [255, 0, 0], "scale": DEFAULT_DENSE_SCALE}
+        for index in range(10)
+    ]
+
+    sampled = sample_points(points, 10)
+    sampled_x = sorted(point["position"][0] for point in sampled)
+
+    assert len(sampled) == 10
+    assert sampled_x[0] < 1
+    assert sampled_x[-1] >= 100
+
+
+def test_sample_points_thins_voxel_representatives_evenly() -> None:
+    points = [
+        {"position": [float(index), 0.0, 0.0], "color": [255, 255, 255], "scale": DEFAULT_DENSE_SCALE}
+        for index in range(100)
+    ]
+
+    sampled = sample_points(points, 10)
+    sampled_x = [point["position"][0] for point in sampled]
+
+    assert len(sampled) == 10
+    assert sampled_x[0] == 0.0
+    assert sampled_x[-1] >= 90.0
 
 
 def _read_splat_rows(path: Path) -> list[tuple[float, ...]]:

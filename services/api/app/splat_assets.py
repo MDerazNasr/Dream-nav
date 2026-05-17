@@ -8,6 +8,7 @@ from re import sub
 from struct import pack, unpack
 from typing import Any
 
+from .point_cloud_bounds import filter_points_to_camera_bounds
 from .point_cloud_to_splat import PointCloudToSplatError, read_ply_points, write_splat_from_points
 
 IMPORTED_POINT_CLOUD_MAX_POINTS = 50000
@@ -97,6 +98,7 @@ def import_job_splat_asset(
     else:
         try:
             points = read_ply_points(imported_path)
+            points = filter_points_to_camera_bounds(points, artifacts_root / "camera_path.json")
             gaussian_count = write_splat_from_points(points, splat_path, max_points=max_points)
         except PointCloudToSplatError as error:
             raise SplatAssetError(str(error)) from error

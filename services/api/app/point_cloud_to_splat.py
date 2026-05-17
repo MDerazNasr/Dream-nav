@@ -72,12 +72,85 @@ def sample_points(points: list[dict[str, object]], max_points: int) -> list[dict
     if len(points) <= max_points:
         return points
 
-    stride = max(1, len(points) // max_points)
-    sampled = points[::stride][:max_points]
+    sampled = _spatially_sample_points(points, max_points)
     if not sampled:
         raise PointCloudToSplatError("Point cloud could not be sampled.")
 
     return sampled
+
+
+def _spatially_sample_points(points: list[dict[str, object]], max_points: int) -> list[dict[str, object]]:
+    positions = [point["position"] for point in points if isinstance(point.get("position"), list) and len(point["position"]) == 3]
+    if len(positions) != len(points):
+        return _stride_sample_points(points, max_points)
+
+    xs = [float(position[0]) for position in positions]
+    ys = [float(position[1]) for position in positions]
+    zs = [float(position[2]) for position in positions]
+    min_x, max_x = min(xs), max(xs)
+    min_y, max_y = min(ys), max(ys)
+    min_z, max_z = min(zs), max(zs)
+    extents = [max(max_x - min_x, 1e-6), max(max_y - min_y, 1e-6), max(max_z - min_z, 1e-6)]
+    volume = extents[0] * extents[1] * extents[2]
+    if volume <= 0:
+        return _stride_sample_points(points, max_points)
+
+    cell_size = max(1e-4, (volume / max_points) ** (1 / 3))
+    sampled_indices: list[int] = []
+    for _ in range(24):
+        sampled_indices = _voxel_sample_indices(points, min_x, min_y, min_z, cell_size)
+        if len(sampled_indices) <= max_points:
+            break
+        cell_size *= 1.6
+
+    if len(sampled_indices) > max_points:
+        sampled_indices = _stride_sample_indices(sampled_indices, max_points)
+
+    sampled = [points[index] for index in sampled_indices]
+    if len(sampled) >= max_points:
+        return sampled
+
+    used_indices = set(sampled_indices)
+    remaining = [points[index] for index in range(len(points)) if index not in used_indices]
+    needed = max_points - len(sampled)
+    sampled.extend(_stride_sample_points(remaining, needed))
+    return sampled[:max_points]
+
+
+def _voxel_sample_indices(
+    points: list[dict[str, object]],
+    min_x: float,
+    min_y: float,
+    min_z: float,
+    cell_size: float,
+) -> list[int]:
+    voxel_to_index: dict[tuple[int, int, int], int] = {}
+    for index, point in enumerate(points):
+        position = point["position"]
+        voxel = (
+            int((float(position[0]) - min_x) / cell_size),
+            int((float(position[1]) - min_y) / cell_size),
+            int((float(position[2]) - min_z) / cell_size),
+        )
+        voxel_to_index.setdefault(voxel, index)
+
+    return list(voxel_to_index.values())
+
+
+def _stride_sample_points(points: list[dict[str, object]], max_points: int) -> list[dict[str, object]]:
+    if not points or max_points <= 0:
+        return []
+
+    stride = max(1, len(points) // max_points)
+    return points[::stride][:max_points]
+
+
+def _stride_sample_indices(indices: list[int], max_points: int) -> list[int]:
+    if not indices or max_points <= 0:
+        return []
+
+    stride = max(1, len(indices) // max_points)
+    return indices[::stride][:max_points]
 
 
 def _apply_adaptive_scales(points: list[dict[str, object]]) -> list[dict[str, object]]:
