@@ -40,6 +40,10 @@ Containerized engine adapter:
 Optional environment variables:
 
 - `DREAMNAV_REMOTE_GAUSSIAN_COMMAND` points to a trained Gaussian backend executable. DreamNav calls it with `--bundle-root`, `--artifacts-root`, `--frames-root`, and `--output-ply`. `auto` prefers this path before the older point cloud bridge.
+- When `DREAMNAV_TRAINED_GAUSSIAN_TRAIN_COMMAND_JSON` or `DREAMNAV_TRAINED_GAUSSIAN_EXPORT_COMMAND_JSON` is set, DreamNav can use the bundled `gaussian_command_adapter.py` plus `trained_gaussian_backend.py` path without a separate custom wrapper executable.
+- `DREAMNAV_TRAINED_GAUSSIAN_TRAIN_COMMAND_JSON` is a JSON array command template for the trainer step. It can reference `{bundle_root}`, `{artifacts_root}`, `{frames_root}`, `{camera_path}`, `{colmap_root}`, `{workspace_root}`, and `{output_ply}`.
+- `DREAMNAV_TRAINED_GAUSSIAN_EXPORT_COMMAND_JSON` is an optional JSON array command template for a second export step when training does not write the final `.ply` directly.
+- `DREAMNAV_REMOTE_GAUSSIAN_EXECUTABLE` still works for custom wrappers, but the bundled trained-Gaussian backend is now the preferred repo-native path.
 - `DREAMNAV_REMOTE_DENSE_COMMAND` points to an external dense engine adapter executable. DreamNav calls it with `--bundle-root`, `--artifacts-root`, `--frames-root`, and `--output-ply`.
 - Command backends can now emit either a DreamNav-ready splat PLY or a standard dense point-cloud PLY. The worker normalizes point-cloud output into the viewer splat format before callback import.
 - `DREAMNAV_REMOTE_DENSE_DOCKER_IMAGE` selects a container image for the bundled Docker adapter.
