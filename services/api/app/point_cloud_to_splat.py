@@ -6,6 +6,7 @@ from typing import BinaryIO
 
 SH_C0 = 0.28209479177387814
 DEFAULT_DENSE_SCALE = 0.018
+MAX_ADAPTIVE_DENSE_SCALE = 0.05
 
 _PLY_TYPES = {
     "char": ("b", 1),
@@ -84,9 +85,10 @@ def _apply_adaptive_scales(points: list[dict[str, object]]) -> list[dict[str, ob
         return points
 
     nearest_distances = _nearest_neighbor_distances(points)
+    scale_cap = _adaptive_scale_cap(nearest_distances)
     scaled_points = []
     for index, point in enumerate(points):
-        adaptive_scale = max(DEFAULT_DENSE_SCALE, min(0.12, nearest_distances[index] * 0.65))
+        adaptive_scale = max(DEFAULT_DENSE_SCALE, min(scale_cap, nearest_distances[index] * 0.35))
         scaled_points.append(
             {
                 "position": point["position"],
@@ -138,6 +140,15 @@ def _nearest_neighbor_distances(points: list[dict[str, object]]) -> list[float]:
             nearest[index] = DEFAULT_DENSE_SCALE
 
     return nearest
+
+
+def _adaptive_scale_cap(nearest_distances: list[float]) -> float:
+    if not nearest_distances:
+        return MAX_ADAPTIVE_DENSE_SCALE
+
+    ordered = sorted(nearest_distances)
+    median_distance = ordered[len(ordered) // 2]
+    return min(MAX_ADAPTIVE_DENSE_SCALE, max(DEFAULT_DENSE_SCALE * 1.75, median_distance * 0.8))
 
 
 def read_ply_points(ply_path, default_scale: float = DEFAULT_DENSE_SCALE) -> list[dict[str, object]]:

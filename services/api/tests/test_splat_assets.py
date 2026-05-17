@@ -1,7 +1,8 @@
 from json import dumps
 from pathlib import Path
+from struct import pack
 
-from app.splat_assets import ensure_job_splat_asset, import_job_splat_asset
+from app.splat_assets import ensure_job_splat_asset, import_job_splat_asset, read_splat_points
 
 
 def test_splat_asset_generator_writes_browser_ply(tmp_path: Path) -> None:
@@ -81,6 +82,42 @@ def test_import_job_splat_asset_keeps_imported_splat(tmp_path: Path) -> None:
     assert summary.import_format == "splat_ply"
     assert summary.gaussian_count == 1
     assert (tmp_path / "splat.ply").read_bytes() == imported_splat
+
+
+def test_read_splat_points_samples_across_large_splats(tmp_path: Path) -> None:
+    splat_path = tmp_path / "splat.ply"
+    header = (
+        "ply\n"
+        "format binary_little_endian 1.0\n"
+        "element vertex 4\n"
+        "property float x\n"
+        "property float y\n"
+        "property float z\n"
+        "property float f_dc_0\n"
+        "property float f_dc_1\n"
+        "property float f_dc_2\n"
+        "property float opacity\n"
+        "property float scale_0\n"
+        "property float scale_1\n"
+        "property float scale_2\n"
+        "property float rot_0\n"
+        "property float rot_1\n"
+        "property float rot_2\n"
+        "property float rot_3\n"
+        "end_header\n"
+    ).encode("utf-8")
+    rows = [
+        pack("<14f", 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0),
+        pack("<14f", 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0),
+        pack("<14f", 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0),
+        pack("<14f", 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0),
+    ]
+    splat_path.write_bytes(header + b"".join(rows))
+
+    points = read_splat_points(splat_path, max_points=2)
+
+    assert len(points) == 2
+    assert [point.x for point in points] == [0.0, 2.0]
 
 
 def _write_camera_path(tmp_path: Path) -> None:

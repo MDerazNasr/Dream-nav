@@ -234,8 +234,9 @@ def read_splat_points(path: Path, max_points: int = 512) -> list[SplatPoint]:
 
     row_size = len(properties) * 4
     point_count = min(vertex_count, max_points)
+    sample_indices = _sample_vertex_indices(vertex_count, point_count)
     points = []
-    for index in range(point_count):
+    for index in sample_indices:
         offset = index * row_size
         if offset + 12 > len(body):
             break
@@ -247,6 +248,14 @@ def read_splat_points(path: Path, max_points: int = 512) -> list[SplatPoint]:
         raise SplatAssetError("Splat PLY did not contain readable points.")
 
     return points
+
+
+def _sample_vertex_indices(vertex_count: int, point_count: int) -> list[int]:
+    if point_count >= vertex_count:
+        return list(range(vertex_count))
+
+    stride = vertex_count / point_count
+    return [min(vertex_count - 1, int(index * stride)) for index in range(point_count)]
 
 
 def _vertex_count_from_header(header: str) -> int:

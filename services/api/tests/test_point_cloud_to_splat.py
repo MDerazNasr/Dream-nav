@@ -43,6 +43,22 @@ def test_write_splat_from_points_preserves_explicit_scales(tmp_path: Path) -> No
     assert abs(exp(rows[1][7]) - 0.04) < 1e-6
 
 
+def test_write_splat_from_points_caps_dense_cloud_scales(tmp_path: Path) -> None:
+    output_path = tmp_path / "splat.ply"
+    points = [
+        {"position": [index * 0.05, 0.0, 0.0], "color": [255, 255, 255], "scale": DEFAULT_DENSE_SCALE}
+        for index in range(12)
+    ]
+
+    write_splat_from_points(points, output_path, max_points=32)
+
+    rows = _read_splat_rows(output_path)
+    recovered_scales = [exp(row[7]) for row in rows]
+
+    assert len(rows) == 12
+    assert max(recovered_scales) <= 0.05 + 1e-6
+
+
 def _read_splat_rows(path: Path) -> list[tuple[float, ...]]:
     with path.open("rb") as payload:
         vertex_count = 0
