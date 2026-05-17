@@ -19,6 +19,7 @@ Retention:
 
 Backend selection:
 
+- `DREAMNAV_REMOTE_DENSE_BACKEND=gaussian_command` runs a trained Gaussian backend executable and is the preferred path for product-quality reconstruction once a true 3DGS engine is available.
 - `DREAMNAV_REMOTE_DENSE_BACKEND=auto` tries a configured command backend first, then the DreamNav COLMAP dense wrapper, and falls back to the mock generator when those real paths are unavailable.
 - `DREAMNAV_REMOTE_DENSE_BACKEND=command` runs the configured external dense engine command and requires it to write the output `.ply`.
 - `DREAMNAV_REMOTE_DENSE_BACKEND=colmap_dense` requires the real COLMAP dense path and returns an error instead of falling back.
@@ -38,6 +39,7 @@ Containerized engine adapter:
 
 Optional environment variables:
 
+- `DREAMNAV_REMOTE_GAUSSIAN_COMMAND` points to a trained Gaussian backend executable. DreamNav calls it with `--bundle-root`, `--artifacts-root`, `--frames-root`, and `--output-ply`. `auto` prefers this path before the older point cloud bridge.
 - `DREAMNAV_REMOTE_DENSE_COMMAND` points to an external dense engine adapter executable. DreamNav calls it with `--bundle-root`, `--artifacts-root`, `--frames-root`, and `--output-ply`.
 - Command backends can now emit either a DreamNav-ready splat PLY or a standard dense point-cloud PLY. The worker normalizes point-cloud output into the viewer splat format before callback import.
 - `DREAMNAV_REMOTE_DENSE_DOCKER_IMAGE` selects a container image for the bundled Docker adapter.
@@ -52,7 +54,8 @@ Optional environment variables:
 Capability probe:
 
 - `GET /capabilities` reports whether the worker is actually ready to run a real dense backend.
-- `real_dense_ready=true` means the worker can use either a valid command adapter or a supported COLMAP dense path.
+- `real_dense_ready=true` means the worker can use either a trained Gaussian backend, a valid command adapter, or a supported COLMAP dense path.
+- `gaussian_backend_ready=true` means the worker has a configured trained Gaussian executable and `auto` can prefer it ahead of the point-cloud bridge.
 - `missing_requirements` lists hard blockers such as a missing command executable or no real dense backend on the machine.
 - `warnings` reports softer issues such as a COLMAP build that cannot run dense stereo while a command adapter is still available.
 
