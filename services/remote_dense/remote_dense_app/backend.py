@@ -34,6 +34,7 @@ def build_dense_result(
     workspace_root: Path,
     backend: str,
     colmap_command: str | None,
+    gaussian_command: str | None,
     dense_command: str | None,
     allow_mock_fallback: bool,
 ) -> DenseBuildResult:
@@ -46,8 +47,15 @@ def build_dense_result(
     if normalized_backend == "mock":
         return DenseBuildResult("mock", generate_mock_dense_ply_from_extracted(extracted_root), warnings)
 
-    if normalized_backend not in {"auto", "colmap_dense", "command"}:
+    if normalized_backend not in {"auto", "colmap_dense", "command", "gaussian_command"}:
         raise RemoteDenseBackendError(f"Unsupported remote dense backend: {backend}")
+
+    if normalized_backend == "gaussian_command":
+        return DenseBuildResult(
+            "gaussian_command",
+            build_gaussian_command_ply(extracted_root, workspace_root, gaussian_command),
+            warnings,
+        )
 
     if normalized_backend == "command":
         return DenseBuildResult(
@@ -57,7 +65,7 @@ def build_dense_result(
         )
 
     if normalized_backend == "auto":
-        for candidate_backend, builder in _auto_builders(extracted_root, workspace_root, colmap_command, dense_command):
+        for candidate_backend, builder in _auto_builders(extracted_root, workspace_root, colmap_command, gaussian_command, dense_command):
             try:
                 return DenseBuildResult(candidate_backend, builder(), warnings)
             except RemoteDenseBackendError as error:
@@ -71,6 +79,36 @@ def build_dense_result(
         build_dense_colmap_ply(extracted_root, workspace_root, colmap_command),
         warnings,
     )
+
+
+def build_gaussian_command_ply(extracted_root: Path, workspace_root: Path, gaussian_command: str | None) -> bytes:
+    resolved_command = _resolve_dense_command(gaussian_command)
+    if not resolved_command:
+        raise RemoteDenseBackendError("DREAMNAV_REMOTE_GAUSSIAN_COMMAND was not found.")
+
+    output_ply = workspace_root / "gaussian_result.ply"
+    command = [
+        resolved_command,
+        "--bundle-root",
+        str(extracted_root),
+        "--artifacts-root",
+        str(extracted_root / "artifacts"),
+        "--frames-root",
+        str(extracted_root / "frames"),
+        "--output-ply",
+        str(output_ply),
+    ]
+    completed = run(
+        command,
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    if completed.returncode != 0 or not output_ply.is_file():
+        details = completed.stderr.strip() or completed.stdout.strip() or "Remote trained Gaussian backend failed."
+        raise RemoteDenseBackendError(details)
+
+    return _normalize_dense_output(output_ply)
 
 
 def detect_colmap_dense_support(colmap_command: str | None) -> tuple[bool, str | None]:
@@ -169,9 +207,12 @@ def _auto_builders(
     extracted_root: Path,
     workspace_root: Path,
     colmap_command: str | None,
+    gaussian_command: str | None,
     dense_command: str | None,
 ) -> list[tuple[str, Callable[[], bytes]]]:
     builders: list[tuple[str, Callable[[], bytes]]] = []
+    if gaussian_command:
+        builders.append(("gaussian_command", lambda: build_gaussian_command_ply(extracted_root, workspace_root, gaussian_command)))
     if dense_command:
         builders.append(("command", lambda: build_dense_command_ply(extracted_root, workspace_root, dense_command)))
     builders.append(("colmap_dense", lambda: build_dense_colmap_ply(extracted_root, workspace_root, colmap_command)))

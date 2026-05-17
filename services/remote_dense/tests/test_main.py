@@ -136,6 +136,7 @@ def test_submit_job_prunes_old_remote_workspaces(tmp_path) -> None:
 
 def test_default_settings_prefers_bundled_command_adapter(monkeypatch) -> None:
     for name in (
+        "DREAMNAV_REMOTE_GAUSSIAN_COMMAND",
         "DREAMNAV_REMOTE_DENSE_COMMAND",
         "DREAMNAV_REMOTE_DENSE_BACKEND",
         "DREAMNAV_REMOTE_DENSE_COLMAP_COMMAND",
@@ -146,6 +147,7 @@ def test_default_settings_prefers_bundled_command_adapter(monkeypatch) -> None:
 
     settings = default_settings()
 
+    assert settings.gaussian_command is None
     assert settings.dense_command is not None
     assert settings.dense_command.endswith("remote_dense_app/colmap_command_adapter.py")
 
@@ -153,6 +155,7 @@ def test_default_settings_prefers_bundled_command_adapter(monkeypatch) -> None:
 def test_default_settings_prefers_bundled_docker_adapter_when_image_is_configured(monkeypatch) -> None:
     monkeypatch.setenv("DREAMNAV_REMOTE_DENSE_DOCKER_IMAGE", "dreamnav/dense-engine:latest")
     for name in (
+        "DREAMNAV_REMOTE_GAUSSIAN_COMMAND",
         "DREAMNAV_REMOTE_DENSE_COMMAND",
         "DREAMNAV_REMOTE_DENSE_BACKEND",
         "DREAMNAV_REMOTE_DENSE_COLMAP_COMMAND",
@@ -163,8 +166,17 @@ def test_default_settings_prefers_bundled_docker_adapter_when_image_is_configure
 
     settings = default_settings()
 
+    assert settings.gaussian_command is None
     assert settings.dense_command is not None
     assert settings.dense_command.endswith("remote_dense_app/docker_command_adapter.py")
+
+
+def test_default_settings_reads_trained_gaussian_command(monkeypatch) -> None:
+    monkeypatch.setenv("DREAMNAV_REMOTE_GAUSSIAN_COMMAND", "/opt/dreamnav/gaussian-backend")
+
+    settings = default_settings()
+
+    assert settings.gaussian_command == "/opt/dreamnav/gaussian-backend"
 
 
 def test_process_submission_serializes_dense_jobs(tmp_path) -> None:

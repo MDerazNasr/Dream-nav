@@ -31,8 +31,37 @@ def test_capabilities_reports_real_dense_ready_when_external_adapter_exists(tmp_
     payload = response.json()
     assert payload["bundled_adapter_available"] is True
     assert payload["real_dense_ready"] is True
+    assert payload["gaussian_backend_ready"] is False
     assert payload["colmap_dense_supported"] is False
     assert payload["warnings"] == ["The configured COLMAP build does not support dense stereo."]
+
+
+def test_capabilities_reports_trained_gaussian_backend_when_configured(tmp_path, monkeypatch) -> None:
+    gaussian_path = tmp_path / "gaussian_backend.py"
+    gaussian_path.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    gaussian_path.chmod(0o755)
+    monkeypatch.setattr(
+        "remote_dense_app.capabilities.detect_colmap_dense_support",
+        lambda command: (False, "The configured COLMAP build does not support dense stereo."),
+    )
+
+    app = create_app(
+        RemoteDenseSettings(
+            repo_root=tmp_path,
+            backend="auto",
+            gaussian_command=str(gaussian_path),
+            allow_mock_fallback=False,
+        )
+    )
+    client = TestClient(app)
+
+    response = client.get("/capabilities")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["gaussian_backend_configured"] is True
+    assert payload["gaussian_backend_ready"] is True
+    assert payload["real_dense_ready"] is True
 
 
 def test_capabilities_block_bundled_adapter_when_colmap_dense_is_unavailable(tmp_path, monkeypatch) -> None:
@@ -81,6 +110,32 @@ def test_capabilities_reports_missing_requirements_when_no_real_backend_is_avail
     assert payload["bundled_adapter_available"] is False
     assert payload["real_dense_ready"] is False
     assert "Set DREAMNAV_REMOTE_DENSE_COMMAND to a valid executable." in payload["missing_requirements"]
+
+
+def test_capabilities_require_gaussian_backend_when_forced(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(
+        "remote_dense_app.capabilities.detect_colmap_dense_support",
+        lambda command: (False, "The configured COLMAP build does not support dense stereo."),
+    )
+    app = create_app(
+        RemoteDenseSettings(
+            repo_root=tmp_path,
+            backend="gaussian_command",
+            gaussian_command=str(tmp_path / "missing_gaussian.py"),
+            allow_mock_fallback=False,
+        )
+    )
+    client = TestClient(app)
+
+    response = client.get("/capabilities")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["gaussian_backend_ready"] is False
+    assert (
+        "Set DREAMNAV_REMOTE_GAUSSIAN_COMMAND to a valid trained Gaussian backend executable."
+        in payload["missing_requirements"]
+    )
 
 
 def test_capabilities_require_docker_image_for_bundled_docker_adapter(tmp_path, monkeypatch) -> None:
