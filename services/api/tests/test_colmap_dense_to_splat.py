@@ -71,9 +71,9 @@ def test_build_dense_splat_from_colmap_runs_dense_stereo_and_writes_splat(tmp_pa
 
     payload = output_splat.read_bytes()
 
-    assert vertex_count == 2
+    assert vertex_count == 3
     assert b"format binary_little_endian 1.0" in payload
-    assert b"element vertex 2" in payload
+    assert b"element vertex 3" in payload
 
 
 def test_supported_camera_positions_drops_extreme_pose_outliers() -> None:

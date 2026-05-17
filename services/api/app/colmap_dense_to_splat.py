@@ -14,7 +14,7 @@ try:
 except ImportError:
     from point_cloud_to_splat import PointCloudToSplatError, read_ply_points, write_splat_from_points
 
-MAX_DENSE_POINTS = 40000
+MAX_DENSE_POINTS = 50000
 
 
 class ColmapDenseToSplatError(Exception):
@@ -85,10 +85,6 @@ def build_dense_splat_from_colmap(
 
     try:
         points = read_ply_points(fused_path)
-        # Dense fusion can include far off-path junk, so trim to points plausibly supported by the recovered walkthrough.
-        filtered_points = _filter_points_by_camera_path(points, camera_path)
-        if filtered_points:
-            points = filtered_points
         return write_splat_from_points(points, output_splat, max_points=max_points)
     except PointCloudToSplatError as error:
         raise ColmapDenseToSplatError(str(error)) from error
