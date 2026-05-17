@@ -1,6 +1,7 @@
 from pathlib import Path
 from zipfile import ZipFile
 
+import app.remote_dense_handoff as remote_dense_handoff
 from app.remote_dense_handoff import (
     RemoteDenseHandoffError,
     build_remote_dense_bundle,
@@ -151,6 +152,28 @@ def test_remote_dense_capabilities_summary_reads_worker_probe() -> None:
     assert summary.submission_allowed is True
     assert summary.real_dense_ready is True
     assert summary.backend == "auto"
+
+
+def test_remote_dense_capabilities_summary_uses_extended_probe_timeout(monkeypatch) -> None:
+    captured = {}
+
+    def fake_httpx_request(method, url, headers, error_prefix, content=None, timeout_sec=30.0):
+        captured["method"] = method
+        captured["url"] = url
+        captured["timeout_sec"] = timeout_sec
+        return 200, FakeCapabilityResponse().read()
+
+    monkeypatch.setattr(remote_dense_handoff, "_httpx_request", fake_httpx_request)
+
+    summary = remote_dense_capabilities_summary(
+        "https://dense.example/jobs",
+        "callback-secret",
+    )
+
+    assert summary.submission_allowed is True
+    assert captured["method"] == "GET"
+    assert captured["url"] == "https://dense.example/capabilities"
+    assert captured["timeout_sec"] == remote_dense_handoff.REMOTE_DENSE_CAPABILITY_TIMEOUT_SEC
 
 
 def test_remote_dense_capabilities_summary_marks_missing_configuration() -> None:

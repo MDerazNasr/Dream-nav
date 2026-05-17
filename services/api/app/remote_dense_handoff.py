@@ -16,6 +16,9 @@ class RemoteDenseHandoffError(Exception):
     pass
 
 
+REMOTE_DENSE_CAPABILITY_TIMEOUT_SEC = 120.0
+
+
 @dataclass(frozen=True)
 class RemoteDenseBundle:
     bundle_file: str
@@ -224,7 +227,7 @@ def remote_dense_capabilities_summary(
             _capabilities_url(provider_url),
             headers=capability_headers,
             error_prefix="Remote dense worker capability probe",
-            timeout_sec=30.0,
+            timeout_sec=REMOTE_DENSE_CAPABILITY_TIMEOUT_SEC,
         )
     else:
         request = Request(_capabilities_url(provider_url), method="GET")
