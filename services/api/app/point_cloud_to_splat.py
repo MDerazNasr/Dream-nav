@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from math import log
+from math import dist, log
 from struct import Struct
 from typing import BinaryIO
 
@@ -36,7 +36,7 @@ def write_splat_from_points(
     output_splat,
     max_points: int,
 ) -> int:
-    sampled_points = sample_points(points, max_points)
+    sampled_points = _apply_adaptive_scales(sample_points(points, max_points))
     rows = [_pack_splat_row(point["position"], point["color"], point["scale"]) for point in sampled_points]
     header = "\n".join(
         [
@@ -77,6 +77,67 @@ def sample_points(points: list[dict[str, object]], max_points: int) -> list[dict
         raise PointCloudToSplatError("Point cloud could not be sampled.")
 
     return sampled
+
+
+def _apply_adaptive_scales(points: list[dict[str, object]]) -> list[dict[str, object]]:
+    if len(points) < 2 or not _uniform_default_scales(points):
+        return points
+
+    nearest_distances = _nearest_neighbor_distances(points)
+    scaled_points = []
+    for index, point in enumerate(points):
+        adaptive_scale = max(DEFAULT_DENSE_SCALE, min(0.12, nearest_distances[index] * 0.65))
+        scaled_points.append(
+            {
+                "position": point["position"],
+                "color": point["color"],
+                "scale": adaptive_scale,
+            }
+        )
+
+    return scaled_points
+
+
+def _uniform_default_scales(points: list[dict[str, object]]) -> bool:
+    return all(abs(float(point.get("scale", DEFAULT_DENSE_SCALE)) - DEFAULT_DENSE_SCALE) < 1e-6 for point in points)
+
+
+def _nearest_neighbor_distances(points: list[dict[str, object]]) -> list[float]:
+    neighbor_span = min(12, max(4, len(points) // 2000 + 4))
+    axis_orders = [sorted(range(len(points)), key=lambda index: float(points[index]["position"][axis])) for axis in range(3)]
+    axis_ranks = [[0] * len(points) for _ in range(3)]
+    for axis, order in enumerate(axis_orders):
+        for rank, index in enumerate(order):
+            axis_ranks[axis][index] = rank
+
+    nearest = [float("inf")] * len(points)
+    for index, point in enumerate(points):
+        candidates: set[int] = set()
+        for axis, order in enumerate(axis_orders):
+            rank = axis_ranks[axis][index]
+            start = max(0, rank - neighbor_span)
+            stop = min(len(order), rank + neighbor_span + 1)
+            candidates.update(order[start:stop])
+
+        candidates.discard(index)
+        position = point["position"]
+        if not isinstance(position, list) or len(position) != 3:
+            nearest[index] = DEFAULT_DENSE_SCALE
+            continue
+
+        if candidates:
+            nearest[index] = min(
+                dist(position, points[candidate]["position"])
+                for candidate in candidates
+                if isinstance(points[candidate]["position"], list) and len(points[candidate]["position"]) == 3
+            )
+        else:
+            nearest[index] = DEFAULT_DENSE_SCALE
+
+        if nearest[index] == float("inf"):
+            nearest[index] = DEFAULT_DENSE_SCALE
+
+    return nearest
 
 
 def read_ply_points(ply_path, default_scale: float = DEFAULT_DENSE_SCALE) -> list[dict[str, object]]:
