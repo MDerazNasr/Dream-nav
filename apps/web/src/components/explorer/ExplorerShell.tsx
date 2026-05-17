@@ -30,7 +30,8 @@ type ExplorerShellProps = {
 
 export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
   const sceneId = sceneBundle.metadata.scene_id;
-  const [overlayEnabled, setOverlayEnabled] = useState(true);
+  const defaultOverlayEnabled = sceneBundle.assetStatus.viewer_render_mode === "placeholder";
+  const [overlayEnabled, setOverlayEnabled] = useState(defaultOverlayEnabled);
   const [selectedLens, setSelectedLens] = useState<LensMode>("35mm");
   const [currentPose, setCurrentPose] = useState<ViewerCameraPose>(() =>
     initialViewerCameraPose(sceneBundle.cameraPath, "35mm", sceneBundle.zoneArtifacts)
@@ -73,6 +74,10 @@ export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
     setBookmarksSceneId(sceneId);
     setBookmarksLoaded(true);
   }, [sceneId]);
+
+  useEffect(() => {
+    setOverlayEnabled(defaultOverlayEnabled);
+  }, [defaultOverlayEnabled, sceneId]);
 
   useEffect(() => {
     if (bookmarksLoaded && bookmarksSceneId === sceneId) {

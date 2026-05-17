@@ -289,15 +289,17 @@ function createSceneObjects(
   renderMode: ViewerRenderMode
 ): THREE.Object3D[] {
   const objects: THREE.Object3D[] = [];
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(16, 16),
-    new THREE.MeshStandardMaterial({
-      color: renderMode === "splat" ? "#242c28" : "#2a2f2b",
-      roughness: 0.82
-    })
-  );
-  floor.rotation.x = -Math.PI / 2;
-  objects.push(floor);
+  if (renderMode === "placeholder") {
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(16, 16),
+      new THREE.MeshStandardMaterial({
+        color: "#2a2f2b",
+        roughness: 0.82
+      })
+    );
+    floor.rotation.x = -Math.PI / 2;
+    objects.push(floor);
+  }
 
   if (renderMode === "placeholder" || overlayEnabled) {
     objects.push(...createVisibilityObjects(zoneArtifacts, overlayEnabled));

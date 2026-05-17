@@ -77,10 +77,11 @@ function openingOverviewPosition(zoneArtifacts?: ConfidenceZoneArtifacts): [numb
   const spanX = bounds.max[0] - bounds.min[0];
   const spanY = bounds.max[1] - bounds.min[1];
   const spanZ = bounds.max[2] - bounds.min[2];
-  const lateralSpan = Math.max(2, spanX, spanZ);
+  // Use a compact fallback span so small reconstructed scenes do not open from meters away.
+  const lateralSpan = Math.max(0.75, spanX, spanZ);
   return [
     center[0] - lateralSpan * 0.35,
-    center[1] + Math.max(1.25, spanY * 0.6),
+    center[1] + Math.max(0.6, spanY * 0.6),
     bounds.max[2] + lateralSpan * 1.1
   ];
 }

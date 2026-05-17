@@ -218,14 +218,15 @@ def _filter_points_by_camera_path(
     if not poses:
         return points
 
-    max_distance = _max_supported_distance(poses)
+    supported_poses = _supported_camera_positions(poses)
+    max_distance = _max_supported_distance(supported_poses)
     filtered = []
     for point in points:
         position = point.get("position")
         if not isinstance(position, list) or len(position) != 3:
             continue
 
-        nearest_distance = min(dist(position, pose) for pose in poses)
+        nearest_distance = min(dist(position, pose) for pose in supported_poses)
         if nearest_distance <= max_distance:
             filtered.append(point)
 
@@ -257,7 +258,34 @@ def _max_supported_distance(poses: list[tuple[float, float, float]]) -> float:
     mins = [min(pose[axis] for pose in poses) for axis in range(3)]
     maxs = [max(pose[axis] for pose in poses) for axis in range(3)]
     path_diagonal = dist(mins, maxs)
-    return max(4.0, min(9.0, (path_diagonal * 0.35) + 3.0))
+    return max(1.25, min(4.0, (path_diagonal * 1.5) + 0.5))
+
+
+def _supported_camera_positions(
+    poses: list[tuple[float, float, float]],
+) -> list[tuple[float, float, float]]:
+    if len(poses) < 8:
+        return poses
+
+    percentile_mins = [_percentile([pose[axis] for pose in poses], 0.1) for axis in range(3)]
+    percentile_maxs = [_percentile([pose[axis] for pose in poses], 0.9) for axis in range(3)]
+    margins = [max(0.35, (percentile_maxs[axis] - percentile_mins[axis]) * 0.5) for axis in range(3)]
+    filtered = [
+        pose
+        for pose in poses
+        if all(
+            percentile_mins[axis] - margins[axis] <= pose[axis] <= percentile_maxs[axis] + margins[axis]
+            for axis in range(3)
+        )
+    ]
+    minimum_supported_count = max(4, len(poses) // 3)
+    return filtered if len(filtered) >= minimum_supported_count else poses
+
+
+def _percentile(values: list[float], quantile: float) -> float:
+    ordered = sorted(values)
+    index = min(len(ordered) - 1, max(0, int((len(ordered) - 1) * quantile)))
+    return ordered[index]
 
 
 if __name__ == "__main__":

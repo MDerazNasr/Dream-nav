@@ -298,6 +298,25 @@ describe("ExplorerShell", () => {
     expect(toggle.getAttribute("data-active")).toBe("false");
   });
 
+  it("starts with the confidence overlay disabled for splat scenes", () => {
+    render(
+      <ExplorerShell
+        sceneBundle={{
+          ...sceneBundle,
+          assetStatus: {
+            ...sceneBundle.assetStatus,
+            viewer_render_mode: "splat",
+            splat_available: true
+          }
+        }}
+      />
+    );
+
+    expect(screen.getByRole("button", { name: "Toggle confidence overlay" }).getAttribute("data-active")).toBe(
+      "false"
+    );
+  });
+
   it("tracks saved camera markers", async () => {
     render(<ExplorerShell sceneBundle={sceneBundle} />);
 

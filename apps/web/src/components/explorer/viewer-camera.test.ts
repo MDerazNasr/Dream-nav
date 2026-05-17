@@ -131,12 +131,86 @@ describe("initialViewerCameraPose", () => {
     );
 
     expect(pose.position[0]).toBeCloseTo(-0.7, 5);
-    expect(pose.position[1]).toBeCloseTo(3.25, 5);
+    expect(pose.position[1]).toBeCloseTo(3.2, 5);
     expect(pose.position[2]).toBeCloseTo(9.2, 5);
     expect(pose.yaw).toBeGreaterThan(0.2);
     expect(pose.yaw).toBeLessThan(0.25);
     expect(pose.pitch).toBeLessThan(-0.3);
     expect(pose.pitch).toBeGreaterThan(-0.4);
+  });
+
+  it("keeps the overview camera close for compact observed bounds", () => {
+    const pose = initialViewerCameraPose(
+      {
+        scene_id: "scene_dense_small",
+        coordinate_system: "dreamnav_viewer_v1",
+        intrinsics: {
+          width: 1280,
+          height: 720,
+          fx: 910,
+          fy: 910,
+          cx: 640,
+          cy: 360
+        },
+        poses: [
+          {
+            frame_index: 0,
+            timestamp_sec: 0,
+            position: [0, 0, 0],
+            rotation_xyzw: [0, 0, 0, 1],
+            fov_degrees: 60
+          }
+        ]
+      },
+      "35mm",
+      {
+        observed: {
+          scene_id: "scene_dense_small",
+          zone: "observed",
+          source_manifest: "visibility_manifest.json",
+          cell_count: 4,
+          coverage_ratio: 1,
+          bounds: {
+            min: [-0.48, 0.23, -0.15],
+            max: [-0.38, 0.37, -0.08]
+          },
+          cells: []
+        },
+        partial: {
+          scene_id: "scene_dense_small",
+          zone: "partial",
+          source_manifest: "visibility_manifest.json",
+          cell_count: 0,
+          coverage_ratio: 0,
+          bounds: null,
+          cells: []
+        },
+        completion: {
+          scene_id: "scene_dense_small",
+          zone: "completion",
+          source_manifest: "visibility_manifest.json",
+          cell_count: 0,
+          coverage_ratio: 0,
+          bounds: null,
+          cells: []
+        },
+        unknown: {
+          scene_id: "scene_dense_small",
+          zone: "unknown",
+          source_manifest: "visibility_manifest.json",
+          cell_count: 0,
+          coverage_ratio: 0,
+          bounds: null,
+          cells: []
+        }
+      }
+    );
+
+    expect(pose.position[0]).toBeCloseTo(-0.6925, 4);
+    expect(pose.position[1]).toBeCloseTo(0.9, 4);
+    expect(pose.position[2]).toBeCloseTo(0.745, 4);
+    expect(pose.yaw).toBeGreaterThan(0.25);
+    expect(pose.yaw).toBeLessThan(0.35);
   });
 
   it("falls back cleanly when rotation is missing", () => {
