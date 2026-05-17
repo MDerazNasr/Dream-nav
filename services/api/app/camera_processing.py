@@ -12,7 +12,8 @@ from .processing_command_utils import placeholder_command, resolve_command
 from .processing_models import ProcessingCommand, ProcessingTaskContext, ProcessingTaskFailed, ProcessingTaskResult
 
 COLMAP_MAPPER_MIN_TIMEOUT_SEC = 300
-COLMAP_MAPPER_TIMEOUT_PER_FRAME_SEC = 3
+COLMAP_MAPPER_TIMEOUT_PER_FRAME_SEC = 6
+COLMAP_MAPPER_MAX_TIMEOUT_SEC = 900
 
 
 def estimate_camera_motion(context: ProcessingTaskContext) -> ProcessingTaskResult:
@@ -98,7 +99,7 @@ def _colmap_command_timeout_sec(
         COLMAP_MAPPER_MIN_TIMEOUT_SEC,
         frame_count * COLMAP_MAPPER_TIMEOUT_PER_FRAME_SEC,
     )
-    return float(adaptive_timeout_sec)
+    return float(min(adaptive_timeout_sec, COLMAP_MAPPER_MAX_TIMEOUT_SEC))
 
 
 def _raw_camera_poses(
