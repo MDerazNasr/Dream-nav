@@ -100,23 +100,6 @@ def probe_backend(train_command: str | None = None, export_command: str | None =
         return False, "Nerfstudio train command was not found."
     if not resolved_export:
         return False, "Nerfstudio export command was not found."
-
-    train_help = run(
-        [resolved_train, environ.get("DREAMNAV_NERFSTUDIO_METHOD", "splatfacto"), "--help"],
-        capture_output=True,
-        check=False,
-        text=True,
-    )
-    export_help = run(
-        [resolved_export, "gaussian-splat", "--help"],
-        capture_output=True,
-        check=False,
-        text=True,
-    )
-    if train_help.returncode != 0:
-        return False, train_help.stderr.strip() or train_help.stdout.strip() or "Nerfstudio train command failed health check."
-    if export_help.returncode != 0:
-        return False, export_help.stderr.strip() or export_help.stdout.strip() or "Nerfstudio export command failed health check."
     return True, None
 
 
