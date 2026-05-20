@@ -104,6 +104,12 @@ def test_run_backend_materializes_dataset_and_exports_ply(tmp_path: Path) -> Non
     assert transforms["frames"][0]["file_path"] == "images/frame_0001.jpg"
     assert transforms["frames"][1]["file_path"] == "images/frame_0002.jpg"
     assert transforms["ply_file_path"] == "sparse_pc.ply"
+    assert transforms["frames"][0]["transform_matrix"] == [
+        [1.0, -0.0, -0.0, 0.0],
+        [0.0, -1.0, -0.0, 0.0],
+        [0.0, -0.0, -1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ]
     assert (
         output_ply.parent / "nerfstudio-splatfacto-workspace" / "dataset" / "sparse_pc.ply"
     ).is_file()

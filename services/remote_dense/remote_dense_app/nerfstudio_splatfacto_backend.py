@@ -341,12 +341,20 @@ def _transform_matrix(position: object, rotation_xyzw: object) -> list[list[floa
     wy = w * y
     wz = w * z
 
-    return [
+    # DreamNav poses preserve COLMAP camera axes, but Nerfstudio expects NeRF style camera axes.
+    transform = [
         [1 - (2 * (yy + zz)), 2 * (xy - wz), 2 * (xz + wy), float(position[0])],
         [2 * (xy + wz), 1 - (2 * (xx + zz)), 2 * (yz - wx), float(position[1])],
         [2 * (xz - wy), 2 * (yz + wx), 1 - (2 * (xx + yy)), float(position[2])],
         [0.0, 0.0, 0.0, 1.0],
     ]
+    transform[0][1] *= -1.0
+    transform[1][1] *= -1.0
+    transform[2][1] *= -1.0
+    transform[0][2] *= -1.0
+    transform[1][2] *= -1.0
+    transform[2][2] *= -1.0
+    return transform
 
 
 if __name__ == "__main__":
