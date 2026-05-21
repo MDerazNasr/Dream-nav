@@ -134,6 +134,7 @@ async def import_gaussian_asset(
             job_id,
             file.filename or "gaussian_input.ply",
             payload,
+            source_coordinate_system=None,
         )
     except GaussianImportError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
@@ -285,6 +286,7 @@ async def remote_dense_result(
             job_id,
             file.filename or "remote_dense_result.ply",
             payload,
+            source_coordinate_system="nerfstudio_colmap_v1" if x_dreamnav_remote_backend == "gaussian_command" else None,
         )
     except GaussianImportError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error

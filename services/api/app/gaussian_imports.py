@@ -16,6 +16,7 @@ def apply_imported_gaussian_asset(
     job_id: str,
     file_name: str,
     payload: bytes,
+    source_coordinate_system: str | None = None,
 ) -> GaussianImportResponse:
     previous_gaussian_scene = _optional_job_artifact(job_repository, job_id, "gaussian_scene.json")
     previous_visibility = _optional_job_artifact(job_repository, job_id, "visibility_manifest.json")
@@ -26,6 +27,7 @@ def apply_imported_gaussian_asset(
             job_repository.artifact_root(job_id),
             file_name,
             payload,
+            source_coordinate_system=source_coordinate_system,
         )
     except SplatAssetError as error:
         raise GaussianImportError(str(error)) from error

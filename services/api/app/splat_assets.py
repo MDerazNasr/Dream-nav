@@ -5,7 +5,7 @@ from json import JSONDecodeError, loads
 from math import log
 from pathlib import Path
 from re import sub
-from struct import pack, unpack
+from struct import pack, pack_into, unpack, unpack_from
 from typing import Any
 
 from .point_cloud_bounds import filter_points_to_camera_bounds
@@ -76,6 +76,7 @@ def import_job_splat_asset(
     source_filename: str,
     payload: bytes,
     max_points: int = IMPORTED_POINT_CLOUD_MAX_POINTS,
+    source_coordinate_system: str | None = None,
 ) -> ImportedSplatAssetSummary:
     if not payload:
         raise SplatAssetError("Imported Gaussian asset is empty.")
@@ -92,7 +93,8 @@ def import_job_splat_asset(
 
     splat_path = artifacts_root / "splat.ply"
     if _is_splat_ply(imported_path):
-        splat_path.write_bytes(payload)
+        transformed_payload = _transform_imported_splat_payload(payload, source_coordinate_system)
+        splat_path.write_bytes(transformed_payload)
         gaussian_count = _read_vertex_count(splat_path)
         import_format = "splat_ply"
     else:
@@ -282,6 +284,86 @@ def _properties_from_header(header: str) -> list[str]:
 def _is_splat_ply(path: Path) -> bool:
     header = path.read_bytes().split(b"end_header\n", 1)[0].decode("utf-8", errors="replace")
     return "format binary_little_endian 1.0" in header and _SPLAT_PROPERTIES.issubset(_properties_from_header(header))
+
+
+def _transform_imported_splat_payload(payload: bytes, source_coordinate_system: str | None) -> bytes:
+    if source_coordinate_system != "nerfstudio_colmap_v1":
+        return payload
+
+    header, separator, body = payload.partition(b"end_header\n")
+    if not separator:
+        raise SplatAssetError("Imported splat PLY header is invalid.")
+
+    header_text = header.decode("utf-8", errors="replace")
+    vertex_count = _vertex_count_from_header(header_text)
+    properties = _properties_from_header(header_text)
+    if "format binary_little_endian 1.0" not in header_text:
+        raise SplatAssetError("Only binary little-endian splat PLY files are supported for Gaussian import.")
+
+    try:
+        x_index = properties.index("x")
+        y_index = properties.index("y")
+        z_index = properties.index("z")
+        rx_index = properties.index("rot_0")
+        ry_index = properties.index("rot_1")
+        rz_index = properties.index("rot_2")
+        rw_index = properties.index("rot_3")
+    except ValueError as error:
+        raise SplatAssetError("Imported splat PLY is missing position or rotation properties.") from error
+
+    row_size = len(properties) * 4
+    expected_size = vertex_count * row_size
+    if len(body) < expected_size:
+        raise SplatAssetError("Imported splat PLY body is truncated.")
+
+    transformed_body = bytearray(body)
+    row_format = "<" + ("f" * len(properties))
+    transform_rotation = _viewer_from_nerfstudio_quaternion()
+    for index in range(vertex_count):
+        offset = index * row_size
+        values = list(unpack_from(row_format, transformed_body, offset))
+        px, py, pz = _viewer_from_nerfstudio_position(values[x_index], values[y_index], values[z_index])
+        values[x_index] = px
+        values[y_index] = py
+        values[z_index] = pz
+        qx, qy, qz, qw = _multiply_quaternions(
+            transform_rotation,
+            (values[rx_index], values[ry_index], values[rz_index], values[rw_index]),
+        )
+        values[rx_index] = qx
+        values[ry_index] = qy
+        values[rz_index] = qz
+        values[rw_index] = qw
+        pack_into(row_format, transformed_body, offset, *values)
+
+    return header + separator + bytes(transformed_body)
+
+
+def _viewer_from_nerfstudio_position(x: float, y: float, z: float) -> tuple[float, float, float]:
+    return (x, -z, y)
+
+
+def _viewer_from_nerfstudio_quaternion() -> tuple[float, float, float, float]:
+    half_sqrt = 0.7071067811865476
+    return (half_sqrt, 0.0, 0.0, half_sqrt)
+
+
+def _multiply_quaternions(
+    left: tuple[float, float, float, float],
+    right: tuple[float, float, float, float],
+) -> tuple[float, float, float, float]:
+    lx, ly, lz, lw = left
+    rx, ry, rz, rw = right
+    result = (
+        (lw * rx) + (lx * rw) + (ly * rz) - (lz * ry),
+        (lw * ry) - (lx * rz) + (ly * rw) + (lz * rx),
+        (lw * rz) + (lx * ry) - (ly * rx) + (lz * rw),
+        (lw * rw) - (lx * rx) - (ly * ry) - (lz * rz),
+    )
+    length = sum(value * value for value in result) ** 0.5
+    if length <= 1e-8:
+        return (0.0, 0.0, 0.0, 1.0)
+    return tuple(value / length for value in result)
 
 
 def _safe_import_filename(filename: str) -> str:
