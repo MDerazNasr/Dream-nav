@@ -1,6 +1,6 @@
 from json import dumps
 from pathlib import Path
-from math import isclose, sqrt
+from math import isclose
 from struct import pack, unpack
 
 from app.splat_assets import ensure_job_splat_asset, import_job_splat_asset, read_splat_points
@@ -110,7 +110,7 @@ def test_import_job_splat_asset_keeps_imported_splat(tmp_path: Path) -> None:
     assert (tmp_path / "splat.ply").read_bytes() == imported_splat
 
 
-def test_import_job_splat_asset_transforms_nerfstudio_splats_into_viewer_coordinates(tmp_path: Path) -> None:
+def test_import_job_splat_asset_leaves_nerfstudio_splats_unchanged_without_metadata(tmp_path: Path) -> None:
     imported_splat = (
         "ply\n"
         "format binary_little_endian 1.0\n"
@@ -158,12 +158,74 @@ def test_import_job_splat_asset_transforms_nerfstudio_splats_into_viewer_coordin
     assert summary.import_format == "splat_ply"
     body = (tmp_path / "splat.ply").read_bytes().split(b"end_header\n", 1)[1]
     values = unpack("<14f", body[: 14 * 4])
-    assert values[:3] == (1.0, -3.0, 2.0)
-    half_sqrt = sqrt(0.5)
-    assert isclose(values[10], half_sqrt, rel_tol=1e-6)
+    assert values[:3] == (1.0, 2.0, 3.0)
+    assert isclose(values[10], 0.0, abs_tol=1e-6)
     assert isclose(values[11], 0.0, abs_tol=1e-6)
     assert isclose(values[12], 0.0, abs_tol=1e-6)
-    assert isclose(values[13], half_sqrt, rel_tol=1e-6)
+    assert isclose(values[13], 1.0, rel_tol=1e-6)
+
+
+def test_import_job_splat_asset_inverts_dataparser_transform_and_scale(tmp_path: Path) -> None:
+    imported_splat = (
+        "ply\n"
+        "format binary_little_endian 1.0\n"
+        "element vertex 1\n"
+        "property float x\n"
+        "property float y\n"
+        "property float z\n"
+        "property float f_dc_0\n"
+        "property float f_dc_1\n"
+        "property float f_dc_2\n"
+        "property float opacity\n"
+        "property float scale_0\n"
+        "property float scale_1\n"
+        "property float scale_2\n"
+        "property float rot_0\n"
+        "property float rot_1\n"
+        "property float rot_2\n"
+        "property float rot_3\n"
+        "end_header\n"
+    ).encode("utf-8") + pack(
+        "<14f",
+        4.0,
+        2.0,
+        2.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+    )
+
+    summary = import_job_splat_asset(
+        tmp_path,
+        "dense_scene.ply",
+        imported_splat,
+        source_coordinate_system="nerfstudio_colmap_v1",
+        source_coordinate_metadata={
+            "source_coordinate_system": "nerfstudio_colmap_v1",
+            "dataparser_transform": [
+                [1.0, 0.0, 0.0, 1.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+            ],
+            "dataparser_scale": 2.0,
+        },
+    )
+
+    assert summary.import_format == "splat_ply"
+    body = (tmp_path / "splat.ply").read_bytes().split(b"end_header\n", 1)[1]
+    values = unpack("<14f", body[: 14 * 4])
+    assert values[:3] == (1.0, 1.0, 1.0)
+    assert isclose(values[7], -0.6931471805599453, rel_tol=1e-6)
+    assert isclose(values[8], -0.6931471805599453, rel_tol=1e-6)
+    assert isclose(values[9], -0.6931471805599453, rel_tol=1e-6)
 
 
 def test_read_splat_points_samples_across_large_splats(tmp_path: Path) -> None:

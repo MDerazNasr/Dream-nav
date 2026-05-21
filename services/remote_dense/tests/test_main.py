@@ -15,12 +15,13 @@ def test_submit_job_returns_remote_job_id_and_posts_callback(tmp_path) -> None:
     client = TestClient(app)
     captured = {}
 
-    def fake_callback_sender(callback_url, callback_token, dense_ply, remote_job_id, backend, timeout_sec):
+    def fake_callback_sender(callback_url, callback_token, dense_ply, remote_job_id, backend, metadata, timeout_sec):
         captured["callback_url"] = callback_url
         captured["callback_token"] = callback_token
         captured["dense_ply"] = dense_ply
         captured["remote_job_id"] = remote_job_id
         captured["backend"] = backend
+        captured["metadata"] = metadata
         captured["timeout_sec"] = timeout_sec
 
     app.state.callback_sender = fake_callback_sender
@@ -44,6 +45,7 @@ def test_submit_job_returns_remote_job_id_and_posts_callback(tmp_path) -> None:
     assert captured["callback_token"] == "callback-secret"
     assert captured["callback_url"].endswith("/remote-dense-result")
     assert captured["backend"] == "mock"
+    assert captured["metadata"] is None
     assert captured["dense_ply"].startswith(b"ply\nformat ascii 1.0\n")
     assert captured["remote_job_id"] == response.json()["remote_job_id"]
 

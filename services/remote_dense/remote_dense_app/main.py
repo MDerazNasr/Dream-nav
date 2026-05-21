@@ -156,16 +156,22 @@ def _post_dense_callback(
     dense_ply: bytes,
     remote_job_id: str,
     backend: str,
+    metadata: dict[str, object] | None,
     timeout_sec: float,
 ) -> None:
+    headers = {
+        "X-DreamNav-Callback-Token": callback_token,
+        "X-DreamNav-Remote-Backend": backend,
+        "X-DreamNav-Remote-Job-Id": remote_job_id,
+    }
+    if metadata:
+        import base64
+
+        headers["X-DreamNav-Remote-Metadata"] = base64.b64encode(dumps(metadata).encode("utf-8")).decode("ascii")
     with httpx.Client(timeout=timeout_sec) as client:
         response = client.post(
             callback_url,
-            headers={
-                "X-DreamNav-Callback-Token": callback_token,
-                "X-DreamNav-Remote-Backend": backend,
-                "X-DreamNav-Remote-Job-Id": remote_job_id,
-            },
+            headers=headers,
             files={"file": (f"{remote_job_id}.ply", dense_ply, "application/octet-stream")},
         )
         response.raise_for_status()
@@ -207,6 +213,7 @@ def _process_submission(
                 dense_result.dense_ply,
                 remote_job_id,
                 dense_result.backend,
+                dense_result.metadata,
                 settings.callback_timeout_sec,
             )
     except Exception as error:

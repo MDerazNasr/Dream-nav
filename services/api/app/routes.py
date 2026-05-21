@@ -1,5 +1,8 @@
 from threading import Thread
 
+from base64 import b64decode
+from json import JSONDecodeError, loads
+
 from fastapi import APIRouter, File, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 
@@ -269,6 +272,7 @@ async def remote_dense_result(
     x_dreamnav_callback_token: str | None = Header(default=None),
     x_dreamnav_remote_backend: str | None = Header(default=None),
     x_dreamnav_remote_job_id: str | None = Header(default=None),
+    x_dreamnav_remote_metadata: str | None = Header(default=None),
 ) -> GaussianImportResponse:
     settings = request.app.state.settings
     if settings.remote_dense_callback_token and x_dreamnav_callback_token != settings.remote_dense_callback_token:
@@ -286,7 +290,7 @@ async def remote_dense_result(
             job_id,
             file.filename or "remote_dense_result.ply",
             payload,
-            source_coordinate_system="nerfstudio_colmap_v1" if x_dreamnav_remote_backend == "gaussian_command" else None,
+            **_remote_import_kwargs(x_dreamnav_remote_backend, x_dreamnav_remote_metadata),
         )
     except GaussianImportError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
@@ -304,6 +308,29 @@ async def remote_dense_result(
         },
     )
     return response
+
+
+def _remote_import_kwargs(
+    backend: str | None,
+    metadata_header: str | None,
+) -> dict[str, object]:
+    kwargs: dict[str, object] = {}
+    if backend != "gaussian_command":
+        return kwargs
+
+    kwargs["source_coordinate_system"] = "nerfstudio_colmap_v1"
+    if not metadata_header:
+        return kwargs
+
+    try:
+        metadata = loads(b64decode(metadata_header).decode("utf-8"))
+    except (ValueError, JSONDecodeError):
+        return kwargs
+
+    if isinstance(metadata, dict):
+        kwargs["source_coordinate_system"] = metadata.get("source_coordinate_system") or kwargs["source_coordinate_system"]
+        kwargs["source_coordinate_metadata"] = metadata
+    return kwargs
 
 
 @router.get("/status/{job_id}", response_model=JobStatus)

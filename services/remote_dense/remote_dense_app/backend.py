@@ -27,6 +27,7 @@ class DenseBuildResult:
     backend: str
     dense_ply: bytes
     warnings: list[str]
+    metadata: dict[str, object] | None = None
 
 
 def build_dense_result(
@@ -51,10 +52,12 @@ def build_dense_result(
         raise RemoteDenseBackendError(f"Unsupported remote dense backend: {backend}")
 
     if normalized_backend == "gaussian_command":
+        dense_ply, metadata = build_gaussian_command_ply(extracted_root, workspace_root, gaussian_command)
         return DenseBuildResult(
-            "gaussian_command",
-            build_gaussian_command_ply(extracted_root, workspace_root, gaussian_command),
-            warnings,
+            backend="gaussian_command",
+            dense_ply=dense_ply,
+            warnings=warnings,
+            metadata=metadata,
         )
 
     if normalized_backend == "command":
@@ -81,7 +84,11 @@ def build_dense_result(
     )
 
 
-def build_gaussian_command_ply(extracted_root: Path, workspace_root: Path, gaussian_command: str | None) -> bytes:
+def build_gaussian_command_ply(
+    extracted_root: Path,
+    workspace_root: Path,
+    gaussian_command: str | None,
+) -> tuple[bytes, dict[str, object] | None]:
     resolved_command = _resolve_dense_command(gaussian_command)
     if not resolved_command:
         raise RemoteDenseBackendError("DREAMNAV_REMOTE_GAUSSIAN_COMMAND was not found.")
@@ -108,7 +115,7 @@ def build_gaussian_command_ply(extracted_root: Path, workspace_root: Path, gauss
         details = completed.stderr.strip() or completed.stdout.strip() or "Remote trained Gaussian backend failed."
         raise RemoteDenseBackendError(details)
 
-    return _normalize_dense_output(output_ply)
+    return _normalize_dense_output(output_ply), _gaussian_import_metadata(workspace_root)
 
 
 def detect_colmap_dense_support(colmap_command: str | None) -> tuple[bool, str | None]:
@@ -212,7 +219,7 @@ def _auto_builders(
 ) -> list[tuple[str, Callable[[], bytes]]]:
     builders: list[tuple[str, Callable[[], bytes]]] = []
     if gaussian_command:
-        builders.append(("gaussian_command", lambda: build_gaussian_command_ply(extracted_root, workspace_root, gaussian_command)))
+        builders.append(("gaussian_command", lambda: build_gaussian_command_ply(extracted_root, workspace_root, gaussian_command)[0]))
     if dense_command:
         builders.append(("command", lambda: build_dense_command_ply(extracted_root, workspace_root, dense_command)))
     builders.append(("colmap_dense", lambda: build_dense_colmap_ply(extracted_root, workspace_root, colmap_command)))
@@ -243,6 +250,34 @@ def _resolve_dense_command(configured_command: str | None) -> str | None:
         return str(configured_path) if configured_path.is_file() else None
 
     return which(configured_command)
+
+
+def _gaussian_import_metadata(workspace_root: Path) -> dict[str, object] | None:
+    dataparser_path = _find_dataparser_transform_path(workspace_root)
+    if dataparser_path is None:
+        return None
+    try:
+        import json
+
+        payload = json.loads(dataparser_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    transform = payload.get("transform")
+    scale = payload.get("scale")
+    if not isinstance(transform, list) or not isinstance(scale, (int, float)):
+        return None
+    return {
+        "source_coordinate_system": "nerfstudio_colmap_v1",
+        "dataparser_transform": transform,
+        "dataparser_scale": float(scale),
+    }
+
+
+def _find_dataparser_transform_path(workspace_root: Path) -> Path | None:
+    candidates = sorted(workspace_root.glob("nerfstudio-splatfacto-workspace/outputs/**/dataparser_transforms.json"))
+    if not candidates:
+        return None
+    return candidates[-1]
 
 
 def _normalize_dense_output(output_ply: Path) -> bytes:

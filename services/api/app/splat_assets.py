@@ -77,6 +77,7 @@ def import_job_splat_asset(
     payload: bytes,
     max_points: int = IMPORTED_POINT_CLOUD_MAX_POINTS,
     source_coordinate_system: str | None = None,
+    source_coordinate_metadata: dict[str, object] | None = None,
 ) -> ImportedSplatAssetSummary:
     if not payload:
         raise SplatAssetError("Imported Gaussian asset is empty.")
@@ -93,7 +94,7 @@ def import_job_splat_asset(
 
     splat_path = artifacts_root / "splat.ply"
     if _is_splat_ply(imported_path):
-        transformed_payload = _transform_imported_splat_payload(payload, source_coordinate_system)
+        transformed_payload = _transform_imported_splat_payload(payload, source_coordinate_system, source_coordinate_metadata)
         splat_path.write_bytes(transformed_payload)
         gaussian_count = _read_vertex_count(splat_path)
         import_format = "splat_ply"
@@ -286,7 +287,11 @@ def _is_splat_ply(path: Path) -> bool:
     return "format binary_little_endian 1.0" in header and _SPLAT_PROPERTIES.issubset(_properties_from_header(header))
 
 
-def _transform_imported_splat_payload(payload: bytes, source_coordinate_system: str | None) -> bytes:
+def _transform_imported_splat_payload(
+    payload: bytes,
+    source_coordinate_system: str | None,
+    source_coordinate_metadata: dict[str, object] | None,
+) -> bytes:
     if source_coordinate_system != "nerfstudio_colmap_v1":
         return payload
 
@@ -316,36 +321,31 @@ def _transform_imported_splat_payload(payload: bytes, source_coordinate_system: 
     if len(body) < expected_size:
         raise SplatAssetError("Imported splat PLY body is truncated.")
 
+    dataparser_transform = _parse_dataparser_transform(source_coordinate_metadata)
+    if dataparser_transform is None:
+        return payload
+
     transformed_body = bytearray(body)
     row_format = "<" + ("f" * len(properties))
-    transform_rotation = _viewer_from_nerfstudio_quaternion()
     for index in range(vertex_count):
         offset = index * row_size
         values = list(unpack_from(row_format, transformed_body, offset))
-        px, py, pz = _viewer_from_nerfstudio_position(values[x_index], values[y_index], values[z_index])
+        px, py, pz = _invert_dataparser_position(values[x_index], values[y_index], values[z_index], dataparser_transform)
         values[x_index] = px
         values[y_index] = py
         values[z_index] = pz
-        qx, qy, qz, qw = _multiply_quaternions(
-            transform_rotation,
+        qx, qy, qz, qw = _invert_dataparser_rotation(
             (values[rx_index], values[ry_index], values[rz_index], values[rw_index]),
+            dataparser_transform,
         )
         values[rx_index] = qx
         values[ry_index] = qy
         values[rz_index] = qz
         values[rw_index] = qw
+        _apply_inverse_dataparser_scale(values, properties, dataparser_transform)
         pack_into(row_format, transformed_body, offset, *values)
 
     return header + separator + bytes(transformed_body)
-
-
-def _viewer_from_nerfstudio_position(x: float, y: float, z: float) -> tuple[float, float, float]:
-    return (x, -z, y)
-
-
-def _viewer_from_nerfstudio_quaternion() -> tuple[float, float, float, float]:
-    half_sqrt = 0.7071067811865476
-    return (half_sqrt, 0.0, 0.0, half_sqrt)
 
 
 def _multiply_quaternions(
@@ -364,6 +364,101 @@ def _multiply_quaternions(
     if length <= 1e-8:
         return (0.0, 0.0, 0.0, 1.0)
     return tuple(value / length for value in result)
+
+
+def _parse_dataparser_transform(source_coordinate_metadata: dict[str, object] | None) -> dict[str, object] | None:
+    if not isinstance(source_coordinate_metadata, dict):
+        return None
+    transform = source_coordinate_metadata.get("dataparser_transform")
+    scale = source_coordinate_metadata.get("dataparser_scale")
+    if not isinstance(transform, list) or not isinstance(scale, (int, float)):
+        return None
+    if len(transform) != 3 or any(not isinstance(row, list) or len(row) != 4 for row in transform):
+        return None
+    return {"transform": transform, "scale": float(scale)}
+
+
+def _invert_dataparser_position(
+    x: float,
+    y: float,
+    z: float,
+    dataparser_transform: dict[str, object] | None,
+) -> tuple[float, float, float]:
+    if dataparser_transform is None:
+        return (x, y, z)
+    transform = dataparser_transform["transform"]
+    scale = dataparser_transform["scale"]
+    scaled = [x / scale, y / scale, z / scale]
+    translation = [transform[0][3], transform[1][3], transform[2][3]]
+    shifted = [scaled[0] - translation[0], scaled[1] - translation[1], scaled[2] - translation[2]]
+    rotation = [[transform[row][column] for column in range(3)] for row in range(3)]
+    rotation_t = [[rotation[column][row] for column in range(3)] for row in range(3)]
+    return (
+        sum(rotation_t[0][column] * shifted[column] for column in range(3)),
+        sum(rotation_t[1][column] * shifted[column] for column in range(3)),
+        sum(rotation_t[2][column] * shifted[column] for column in range(3)),
+    )
+
+
+def _invert_dataparser_rotation(
+    quaternion: tuple[float, float, float, float],
+    dataparser_transform: dict[str, object] | None,
+) -> tuple[float, float, float, float]:
+    if dataparser_transform is None:
+        return quaternion
+    transform = dataparser_transform["transform"]
+    rotation = [[transform[row][column] for column in range(3)] for row in range(3)]
+    rotation_t = [[rotation[column][row] for column in range(3)] for row in range(3)]
+    rotation_quaternion = _rotation_matrix_to_quaternion(rotation_t)
+    return _multiply_quaternions(rotation_quaternion, quaternion)
+
+
+def _apply_inverse_dataparser_scale(
+    values: list[float],
+    properties: list[str],
+    dataparser_transform: dict[str, object] | None,
+) -> None:
+    if dataparser_transform is None:
+        return
+    scale = dataparser_transform["scale"]
+    if scale <= 1e-8:
+        return
+    scale_offset = -log(scale)
+    for property_name in ("scale_0", "scale_1", "scale_2"):
+        try:
+            index = properties.index(property_name)
+        except ValueError:
+            continue
+        values[index] += scale_offset
+
+
+def _rotation_matrix_to_quaternion(rotation: list[list[float]]) -> tuple[float, float, float, float]:
+    trace = rotation[0][0] + rotation[1][1] + rotation[2][2]
+    if trace > 0:
+        s = (trace + 1.0) ** 0.5 * 2.0
+        qw = 0.25 * s
+        qx = (rotation[2][1] - rotation[1][2]) / s
+        qy = (rotation[0][2] - rotation[2][0]) / s
+        qz = (rotation[1][0] - rotation[0][1]) / s
+    elif rotation[0][0] > rotation[1][1] and rotation[0][0] > rotation[2][2]:
+        s = (1.0 + rotation[0][0] - rotation[1][1] - rotation[2][2]) ** 0.5 * 2.0
+        qw = (rotation[2][1] - rotation[1][2]) / s
+        qx = 0.25 * s
+        qy = (rotation[0][1] + rotation[1][0]) / s
+        qz = (rotation[0][2] + rotation[2][0]) / s
+    elif rotation[1][1] > rotation[2][2]:
+        s = (1.0 + rotation[1][1] - rotation[0][0] - rotation[2][2]) ** 0.5 * 2.0
+        qw = (rotation[0][2] - rotation[2][0]) / s
+        qx = (rotation[0][1] + rotation[1][0]) / s
+        qy = 0.25 * s
+        qz = (rotation[1][2] + rotation[2][1]) / s
+    else:
+        s = (1.0 + rotation[2][2] - rotation[0][0] - rotation[1][1]) ** 0.5 * 2.0
+        qw = (rotation[1][0] - rotation[0][1]) / s
+        qx = (rotation[0][2] + rotation[2][0]) / s
+        qy = (rotation[1][2] + rotation[2][1]) / s
+        qz = 0.25 * s
+    return _multiply_quaternions((qx, qy, qz, qw), (0.0, 0.0, 0.0, 1.0))
 
 
 def _safe_import_filename(filename: str) -> str:
