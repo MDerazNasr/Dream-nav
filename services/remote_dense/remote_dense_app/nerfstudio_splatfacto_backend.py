@@ -37,16 +37,27 @@ def run_backend(
     workspace_root = output_ply.resolve().parent / "nerfstudio-splatfacto-workspace"
     dataset_root = workspace_root / "dataset"
     images_root = dataset_root / "images"
+    colmap_dataset_root = dataset_root / "colmap" / "sparse" / "0"
     outputs_root = workspace_root / "outputs"
     export_root = workspace_root / "export"
     images_root.mkdir(parents=True, exist_ok=True)
+    colmap_dataset_root.mkdir(parents=True, exist_ok=True)
     outputs_root.mkdir(parents=True, exist_ok=True)
     export_root.mkdir(parents=True, exist_ok=True)
 
     frame_names = _materialize_images(frames_root, images_root)
-    applied_transform = _colmap_applied_transform()
-    sparse_point_cloud = _write_sparse_point_cloud(colmap_root, dataset_root / "sparse_pc.ply", applied_transform)
-    _write_transforms(camera_path, colmap_root, dataset_root / "transforms.json", frame_names, sparse_point_cloud, applied_transform)
+    using_official_colmap = _materialize_colmap_dataset(colmap_root, colmap_dataset_root)
+    if not using_official_colmap:
+        applied_transform = _colmap_applied_transform()
+        sparse_point_cloud = _write_sparse_point_cloud(colmap_root, dataset_root / "sparse_pc.ply", applied_transform)
+        _write_transforms(
+            camera_path,
+            colmap_root,
+            dataset_root / "transforms.json",
+            frame_names,
+            sparse_point_cloud,
+            applied_transform,
+        )
 
     resolved_train = _resolve_command(train_command or environ.get("DREAMNAV_NERFSTUDIO_TRAIN_COMMAND") or "ns-train")
     resolved_export = _resolve_command(export_command or environ.get("DREAMNAV_NERFSTUDIO_EXPORT_COMMAND") or "ns-export")
@@ -63,6 +74,25 @@ def run_backend(
         "--vis",
         environ.get("DREAMNAV_NERFSTUDIO_VIS", "tensorboard"),
     ]
+    if using_official_colmap:
+        # Use Nerfstudio's own COLMAP parser so DreamNav does not have to emulate its dataset conventions.
+        train_args.extend(
+            [
+                "colmap",
+                "--orientation-method",
+                environ.get("DREAMNAV_NERFSTUDIO_ORIENTATION_METHOD", "none"),
+                "--center-method",
+                environ.get("DREAMNAV_NERFSTUDIO_CENTER_METHOD", "none"),
+                "--auto-scale-poses",
+                environ.get("DREAMNAV_NERFSTUDIO_AUTO_SCALE_POSES", "False"),
+                "--assume-colmap-world-coordinate-convention",
+                environ.get("DREAMNAV_NERFSTUDIO_ASSUME_COLMAP_WORLD_CONVENTION", "False"),
+                "--images-path",
+                "images",
+                "--colmap-path",
+                "colmap/sparse/0",
+            ]
+        )
     if "viewer" in environ.get("DREAMNAV_NERFSTUDIO_VIS", "tensorboard"):
         train_args.extend(
             [
@@ -205,6 +235,25 @@ def _materialize_images(frames_root: Path, images_root: Path) -> list[str]:
     if not frame_names:
         raise NerfstudioSplatfactoBackendError("DreamNav frames root did not contain usable images.")
     return frame_names
+
+
+def _materialize_colmap_dataset(colmap_root: Path, target_root: Path) -> bool:
+    required_names = ("cameras.txt", "images.txt")
+    source_files = [colmap_root / name for name in required_names]
+    if not all(path.is_file() for path in source_files):
+        return False
+
+    for path in sorted(colmap_root.iterdir()):
+        if not path.is_file():
+            continue
+        target = target_root / path.name
+        if target.exists():
+            continue
+        try:
+            symlink(path, target)
+        except OSError:
+            copy2(path, target)
+    return True
 
 
 def _write_transforms(

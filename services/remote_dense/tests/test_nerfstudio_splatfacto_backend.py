@@ -55,6 +55,7 @@ def test_run_backend_materializes_dataset_and_exports_ply(tmp_path: Path) -> Non
         "from sys import argv\n"
         "if len(argv) > 2 and argv[1] == 'splatfacto' and argv[2] == '--help':\n"
         "    raise SystemExit(0)\n"
+        "assert 'colmap' not in argv\n"
         "assert '--vis' in argv\n"
         "assert argv[argv.index('--vis') + 1] == 'tensorboard'\n"
         "data_root = Path(argv[argv.index('--data') + 1])\n"
@@ -166,6 +167,19 @@ def test_run_backend_prefers_raw_colmap_dataset_when_available(tmp_path: Path) -
         "from sys import argv\n"
         "if len(argv) > 2 and argv[1] == 'splatfacto' and argv[2] == '--help':\n"
         "    raise SystemExit(0)\n"
+        "assert 'colmap' in argv\n"
+        "assert argv[argv.index('colmap') + 1: argv.index('colmap') + 11] == [\n"
+        "    '--orientation-method', 'none',\n"
+        "    '--center-method', 'none',\n"
+        "    '--auto-scale-poses', 'False',\n"
+        "    '--assume-colmap-world-coordinate-convention', 'False',\n"
+        "    '--images-path', 'images',\n"
+        "]\n"
+        "assert argv[argv.index('--colmap-path') + 1] == 'colmap/sparse/0'\n"
+        "data_root = Path(argv[argv.index('--data') + 1])\n"
+        "assert (data_root / 'colmap' / 'sparse' / '0' / 'cameras.txt').is_file()\n"
+        "assert (data_root / 'colmap' / 'sparse' / '0' / 'images.txt').is_file()\n"
+        "assert (data_root / 'colmap' / 'sparse' / '0' / 'points3D.txt').is_file()\n"
         "workspace_root = Path.cwd()\n"
         "(workspace_root / 'outputs' / 'run').mkdir(parents=True, exist_ok=True)\n"
         "(workspace_root / 'outputs' / 'run' / 'config.yml').write_text('trainer: ok\\n', encoding='utf-8')\n",
@@ -202,20 +216,11 @@ def test_run_backend_prefers_raw_colmap_dataset_when_available(tmp_path: Path) -
     )
 
     dataset_root = output_ply.parent / "nerfstudio-splatfacto-workspace" / "dataset"
-    transforms = json.loads((dataset_root / "transforms.json").read_text(encoding="utf-8"))
-    assert transforms["frames"][0]["file_path"] == "images/frame_0001.jpg"
-    assert transforms["frames"][0]["fl_x"] == 700.0
-    assert transforms["frames"][1]["fl_x"] == 710.0
-    assert transforms["frames"][0]["k1"] == 0.12
-    assert transforms["frames"][0]["transform_matrix"] == [
-        [1.0, -0.0, -0.0, 0.0],
-        [0.0, -0.0, -1.0, 0.0],
-        [-0.0, 1.0, 0.0, -0.0],
-        [0.0, 0.0, 0.0, 1.0],
-    ]
-    assert transforms["frames"][1]["transform_matrix"][0][3] == 1.0
-    sparse_pc_lines = (dataset_root / "sparse_pc.ply").read_text(encoding="utf-8").splitlines()
-    assert sparse_pc_lines[-1] == "0.0 2.0 -1.0 255 0 0"
+    assert not (dataset_root / "transforms.json").exists()
+    assert (dataset_root / "images" / "frame_0001.jpg").exists()
+    assert (dataset_root / "colmap" / "sparse" / "0" / "cameras.txt").is_file()
+    assert (dataset_root / "colmap" / "sparse" / "0" / "images.txt").is_file()
+    assert (dataset_root / "colmap" / "sparse" / "0" / "points3D.txt").is_file()
 
 
 def test_probe_backend_checks_splatfacto_and_gaussian_export_help(tmp_path: Path) -> None:
