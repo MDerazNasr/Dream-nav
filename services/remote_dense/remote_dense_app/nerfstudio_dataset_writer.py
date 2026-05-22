@@ -4,7 +4,10 @@ from json import JSONDecodeError, dumps, loads
 from math import sqrt
 from pathlib import Path
 
-from remote_dense_app.nerfstudio_backend_error import NerfstudioSplatfactoBackendError
+try:
+    from remote_dense_app.nerfstudio_backend_error import NerfstudioSplatfactoBackendError
+except ModuleNotFoundError:
+    from nerfstudio_backend_error import NerfstudioSplatfactoBackendError
 
 
 def write_transforms(

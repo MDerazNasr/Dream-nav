@@ -8,12 +8,20 @@ from shutil import copy2, which
 from subprocess import run
 from sys import argv, exit
 
-from remote_dense_app.nerfstudio_backend_error import NerfstudioSplatfactoBackendError
-from remote_dense_app.nerfstudio_dataset_writer import (
-    colmap_applied_transform,
-    write_sparse_point_cloud,
-    write_transforms,
-)
+try:
+    from remote_dense_app.nerfstudio_backend_error import NerfstudioSplatfactoBackendError
+    from remote_dense_app.nerfstudio_dataset_writer import (
+        colmap_applied_transform,
+        write_sparse_point_cloud,
+        write_transforms,
+    )
+except ModuleNotFoundError:
+    from nerfstudio_backend_error import NerfstudioSplatfactoBackendError
+    from nerfstudio_dataset_writer import (
+        colmap_applied_transform,
+        write_sparse_point_cloud,
+        write_transforms,
+    )
 
 
 def run_backend(
