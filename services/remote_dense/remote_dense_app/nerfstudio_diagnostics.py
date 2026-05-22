@@ -87,12 +87,22 @@ def collect_render_pairs(render_output_root: Path) -> list[tuple[Path, Path, str
         return []
 
     pairs: list[tuple[Path, Path, str]] = []
-    for rgb_path in sorted(rgb_root.rglob("*.png")):
-        relative_name = rgb_path.relative_to(rgb_root).with_suffix("")
-        gt_path = gt_root / rgb_path.relative_to(rgb_root)
+    for rgb_path in iter_render_images(rgb_root):
+        relative_path = rgb_path.relative_to(rgb_root)
+        relative_name = relative_path.with_suffix("")
+        gt_path = gt_root / relative_path
         if gt_path.is_file():
             pairs.append((gt_path, rgb_path, str(relative_name)))
     return pairs
+
+
+def iter_render_images(root: Path) -> list[Path]:
+    supported_suffixes = {".jpg", ".jpeg", ".png"}
+    return sorted(
+        path
+        for path in root.rglob("*")
+        if path.is_file() and path.suffix.lower() in supported_suffixes
+    )
 
 
 def write_contact_sheet(

@@ -12,8 +12,8 @@ def test_collect_render_pairs_matches_rgb_and_gt_outputs(tmp_path: Path) -> None
     gt = root / "gt-rgb"
     (rgb / "nested").mkdir(parents=True)
     (gt / "nested").mkdir(parents=True)
-    image.new("RGB", (8, 8), color=(255, 0, 0)).save(rgb / "nested" / "frame_0001.png")
-    image.new("RGB", (8, 8), color=(0, 255, 0)).save(gt / "nested" / "frame_0001.png")
+    image.new("RGB", (8, 8), color=(255, 0, 0)).save(rgb / "nested" / "frame_0001.jpg")
+    image.new("RGB", (8, 8), color=(0, 255, 0)).save(gt / "nested" / "frame_0001.jpg")
     image.new("RGB", (8, 8), color=(0, 0, 255)).save(rgb / "nested" / "frame_0002.png")
 
     pairs = nerfstudio_diagnostics.collect_render_pairs(tmp_path / "dataset-renders")
