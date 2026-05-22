@@ -37,7 +37,7 @@ def render_dataset_diagnostics(
         "gt-rgb",
         "rgb",
     ]
-    completed = run(command, capture_output=True, check=False, text=True)
+    completed = run(command, capture_output=True, check=False, text=True, cwd=str(workspace_root))
     if completed.returncode != 0:
         details = completed.stderr.strip() or completed.stdout.strip() or "Nerfstudio dataset render failed."
         raise NerfstudioDiagnosticsError(details)
