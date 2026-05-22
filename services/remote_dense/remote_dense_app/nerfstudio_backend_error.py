@@ -1,0 +1,2 @@
+class NerfstudioSplatfactoBackendError(Exception):
+    pass
