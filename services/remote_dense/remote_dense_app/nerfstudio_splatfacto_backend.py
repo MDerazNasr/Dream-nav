@@ -83,6 +83,20 @@ def run_backend(
         "--vis",
         environ.get("DREAMNAV_NERFSTUDIO_VIS", "tensorboard"),
     ]
+    if using_official_colmap and environ.get("DREAMNAV_NERFSTUDIO_ENABLE_COLLIDER", "False").lower() not in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
+        # Nerfstudio applies args to the preceding subcommand, so model flags must stay
+        # attached to the method section rather than the trailing dataparser subcommand.
+        train_args.extend(
+            [
+                "--pipeline.model.enable-collider",
+                "False",
+            ]
+        )
     if using_official_colmap:
         # Use Nerfstudio's own COLMAP parser so DreamNav does not have to emulate its dataset conventions.
         train_args.extend(
@@ -106,15 +120,6 @@ def run_backend(
                 "colmap/sparse/0",
             ]
         )
-        # Indoor walkthroughs are not a bounded forward-facing capture, so the default collider
-        # can clip away valid room structure and leave only blob-like fragments.
-        if environ.get("DREAMNAV_NERFSTUDIO_ENABLE_COLLIDER", "False").lower() not in {"1", "true", "yes", "on"}:
-            train_args.extend(
-                [
-                    "--pipeline.model.enable-collider",
-                    "False",
-                ]
-            )
     if "viewer" in environ.get("DREAMNAV_NERFSTUDIO_VIS", "tensorboard"):
         train_args.extend(
             [
