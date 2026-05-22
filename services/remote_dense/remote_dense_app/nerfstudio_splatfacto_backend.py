@@ -270,6 +270,12 @@ def _materialize_colmap_dataset(colmap_root: Path, target_root: Path) -> bool:
     if not all(path.is_file() for path in source_files):
         return False
 
+    minimum_support = _configured_minimum_colmap_support()
+    if minimum_support > 0 and (colmap_root / "points3D.txt").is_file():
+        retained_count = _write_filtered_colmap_dataset(colmap_root, target_root, minimum_support)
+        if retained_count is not None:
+            return True
+
     for path in sorted(colmap_root.iterdir()):
         if not path.is_file():
             continue
@@ -281,6 +287,139 @@ def _materialize_colmap_dataset(colmap_root: Path, target_root: Path) -> bool:
         except OSError:
             copy2(path, target)
     return True
+
+
+def _configured_minimum_colmap_support() -> int:
+    raw_value = environ.get("DREAMNAV_NERFSTUDIO_MIN_IMAGE_POINT_SUPPORT", "300").strip()
+    try:
+        return max(0, int(raw_value))
+    except ValueError:
+        return 300
+
+
+def _configured_minimum_retained_images() -> int:
+    raw_value = environ.get("DREAMNAV_NERFSTUDIO_MIN_RETAINED_IMAGES", "24").strip()
+    try:
+        return max(1, int(raw_value))
+    except ValueError:
+        return 24
+
+
+def _write_filtered_colmap_dataset(colmap_root: Path, target_root: Path, minimum_support: int) -> int | None:
+    images_path = colmap_root / "images.txt"
+    points_path = colmap_root / "points3D.txt"
+    if not images_path.is_file() or not points_path.is_file():
+        return None
+
+    image_entries, image_comments = _parse_colmap_images(images_path)
+    if not image_entries:
+        return None
+
+    selected_entries = [entry for entry in image_entries if entry["support_count"] >= minimum_support]
+    minimum_retained = _configured_minimum_retained_images()
+    if len(selected_entries) < minimum_retained:
+        return None
+    if len(selected_entries) == len(image_entries):
+        return None
+
+    selected_image_ids = {entry["image_id"] for entry in selected_entries}
+
+    for path in sorted(colmap_root.iterdir()):
+        if not path.is_file():
+            continue
+        target = target_root / path.name
+        if target.exists():
+            continue
+        if path.name in {"images.txt", "points3D.txt"}:
+            continue
+        try:
+            symlink(path, target)
+        except OSError:
+            copy2(path, target)
+
+    cameras_path = colmap_root / "cameras.txt"
+    cameras_target = target_root / "cameras.txt"
+    if cameras_path.is_file() and not cameras_target.exists():
+        try:
+            symlink(cameras_path, cameras_target)
+        except OSError:
+            copy2(cameras_path, cameras_target)
+
+    filtered_images = [line for line in image_comments]
+    filtered_images.append(
+        f"# DreamNav filtered images with support >= {minimum_support}; retained {len(selected_entries)} / {len(image_entries)}"
+    )
+    for entry in selected_entries:
+        filtered_images.append(entry["image_line"])
+        filtered_images.append(entry["points_line"])
+    (target_root / "images.txt").write_text("\n".join(filtered_images) + "\n", encoding="utf-8")
+
+    point_comments, filtered_points = _filter_colmap_points(points_path, selected_image_ids)
+    (target_root / "points3D.txt").write_text("\n".join([*point_comments, *filtered_points]) + "\n", encoding="utf-8")
+    return len(selected_entries)
+
+
+def _parse_colmap_images(images_path: Path) -> tuple[list[dict[str, object]], list[str]]:
+    comments: list[str] = []
+    entries: list[dict[str, object]] = []
+    lines = images_path.read_text(encoding="utf-8").splitlines()
+    index = 0
+    while index < len(lines):
+        raw_line = lines[index]
+        stripped = raw_line.strip()
+        if not stripped:
+            index += 1
+            continue
+        if stripped.startswith("#"):
+            comments.append(raw_line)
+            index += 1
+            continue
+        parts = stripped.split()
+        if len(parts) < 10:
+            raise NerfstudioSplatfactoBackendError("COLMAP images.txt contains a malformed image row.")
+        if index + 1 >= len(lines):
+            raise NerfstudioSplatfactoBackendError("COLMAP images.txt is missing a points row.")
+        points_line = lines[index + 1].strip()
+        point_tokens = points_line.split()
+        support_count = sum(1 for token_index in range(2, len(point_tokens), 3) if point_tokens[token_index] != "-1")
+        entries.append(
+            {
+                "image_id": int(parts[0]),
+                "image_name": Path(parts[9]).name,
+                "image_line": raw_line,
+                "points_line": lines[index + 1],
+                "support_count": support_count,
+            }
+        )
+        index += 2
+    return entries, comments
+
+
+def _filter_colmap_points(points_path: Path, selected_image_ids: set[int]) -> tuple[list[str], list[str]]:
+    comments: list[str] = []
+    filtered_lines: list[str] = []
+    for raw_line in points_path.read_text(encoding="utf-8").splitlines():
+        stripped = raw_line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("#"):
+            comments.append(raw_line)
+            continue
+        parts = stripped.split()
+        if len(parts) < 8:
+            raise NerfstudioSplatfactoBackendError("COLMAP points3D.txt contains a malformed point row.")
+        track = parts[8:]
+        retained_track: list[str] = []
+        for index in range(0, len(track), 2):
+            if index + 1 >= len(track):
+                break
+            image_id = int(track[index])
+            if image_id in selected_image_ids:
+                retained_track.extend([track[index], track[index + 1]])
+        if len(retained_track) < 4:
+            continue
+        filtered_lines.append(" ".join(parts[:8] + retained_track))
+    return comments, filtered_lines
 
 
 if __name__ == "__main__":
