@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from json import dumps
+from statistics import median
 from pathlib import Path
 from shutil import which
 from subprocess import run
@@ -47,12 +48,14 @@ def render_dataset_diagnostics(
         raise NerfstudioDiagnosticsError("Nerfstudio dataset render did not produce comparable gt-rgb and rgb images.")
 
     summary_path = write_contact_sheet(output_root, pairs, sample_count)
+    error_summary = summarize_render_pairs(pairs)
     manifest = {
         "config_path": str(config_path),
         "render_output_root": str(render_output_root),
         "pair_count": len(pairs),
         "sample_count": min(sample_count, len(pairs)),
         "summary_image": str(summary_path),
+        "error_summary": error_summary,
     }
     (output_root / "diagnostics_manifest.json").write_text(dumps(manifest, indent=2), encoding="utf-8")
     return manifest
@@ -146,6 +149,34 @@ def write_contact_sheet(
     finally:
         for image in gt_images + rgb_images:
             image.close()
+
+
+def summarize_render_pairs(pairs: list[tuple[Path, Path, str]]) -> dict[str, object]:
+    try:
+        from PIL import Image
+        import numpy as np
+    except ModuleNotFoundError as error:
+        raise NerfstudioDiagnosticsError("Pillow and numpy are required to summarize Nerfstudio diagnostics.") from error
+
+    metrics: list[dict[str, object]] = []
+    for gt_path, rgb_path, label in pairs:
+        with Image.open(gt_path).convert("RGB") as gt_image, Image.open(rgb_path).convert("RGB") as rgb_image:
+            gt = np.asarray(gt_image, dtype=np.float32)
+            rgb = np.asarray(rgb_image, dtype=np.float32)
+        mae = float(np.mean(np.abs(gt - rgb)))
+        mse = float(np.mean((gt - rgb) ** 2))
+        metrics.append({"label": label, "mae": round(mae, 6), "mse": round(mse, 6)})
+
+    mae_values = [entry["mae"] for entry in metrics]
+    mse_values = [entry["mse"] for entry in metrics]
+    ranked = sorted(metrics, key=lambda entry: entry["mae"])
+    return {
+        "mean_mae": round(sum(mae_values) / len(mae_values), 6),
+        "median_mae": round(median(mae_values), 6),
+        "mean_mse": round(sum(mse_values) / len(mse_values), 6),
+        "best_frames": ranked[:5],
+        "worst_frames": list(reversed(ranked[-5:])),
+    }
 
 
 def evenly_sample_pairs(

@@ -49,3 +49,21 @@ def test_write_contact_sheet_creates_summary_image(tmp_path: Path) -> None:
         assert opened.height > 16
     finally:
         opened.close()
+
+
+def test_summarize_render_pairs_reports_best_and_worst_frames(tmp_path: Path) -> None:
+    image = pytest.importorskip("PIL.Image", reason="Pillow not installed in local test venv")
+    pairs = []
+    for index, delta in enumerate((0, 16, 64), start=1):
+        gt_path = tmp_path / f"gt_{index}.png"
+        rgb_path = tmp_path / f"rgb_{index}.png"
+        image.new("RGB", (4, 4), color=(128, 128, 128)).save(gt_path)
+        image.new("RGB", (4, 4), color=(128 + delta, 128, 128)).save(rgb_path)
+        pairs.append((gt_path, rgb_path, f"frame_{index:04d}"))
+
+    summary = nerfstudio_diagnostics.summarize_render_pairs(pairs)
+
+    assert summary["best_frames"][0]["label"] == "frame_0001"
+    assert summary["worst_frames"][0]["label"] == "frame_0003"
+    assert summary["mean_mae"] > 0
+    assert summary["median_mae"] > 0

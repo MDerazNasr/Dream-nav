@@ -10,6 +10,7 @@ from sys import argv, exit
 
 try:
     from remote_dense_app.nerfstudio_backend_error import NerfstudioSplatfactoBackendError
+    from remote_dense_app.nerfstudio_diagnostics import render_dataset_diagnostics
     from remote_dense_app.nerfstudio_dataset_writer import (
         colmap_applied_transform,
         write_sparse_point_cloud,
@@ -17,6 +18,7 @@ try:
     )
 except ModuleNotFoundError:
     from nerfstudio_backend_error import NerfstudioSplatfactoBackendError
+    from nerfstudio_diagnostics import render_dataset_diagnostics
     from nerfstudio_dataset_writer import (
         colmap_applied_transform,
         write_sparse_point_cloud,
@@ -132,6 +134,9 @@ def run_backend(
         train_args,
         workspace_root,
     )
+
+    if _diagnostics_enabled():
+        _maybe_render_dataset_diagnostics(workspace_root)
 
     config_path = _find_config_path(outputs_root)
     _run_command(
@@ -303,6 +308,32 @@ def _configured_minimum_retained_images() -> int:
         return max(1, int(raw_value))
     except ValueError:
         return 24
+
+
+def _diagnostics_enabled() -> bool:
+    return environ.get("DREAMNAV_NERFSTUDIO_ENABLE_DIAGNOSTICS", "1").lower() not in {"0", "false", "no", "off"}
+
+
+def _diagnostics_sample_count() -> int:
+    raw_value = environ.get("DREAMNAV_NERFSTUDIO_DIAGNOSTIC_SAMPLE_COUNT", "6").strip()
+    try:
+        return max(1, int(raw_value))
+    except ValueError:
+        return 6
+
+
+def _maybe_render_dataset_diagnostics(workspace_root: Path) -> None:
+    diagnostics_root = workspace_root / "diagnostics"
+    try:
+        render_dataset_diagnostics(
+            workspace_root=workspace_root,
+            output_root=diagnostics_root,
+            render_command=environ.get("DREAMNAV_NERFSTUDIO_RENDER_COMMAND") or "ns-render",
+            sample_count=_diagnostics_sample_count(),
+        )
+    except Exception:
+        if environ.get("DREAMNAV_NERFSTUDIO_REQUIRE_DIAGNOSTICS", "0").lower() in {"1", "true", "yes", "on"}:
+            raise
 
 
 def _write_filtered_colmap_dataset(colmap_root: Path, target_root: Path, minimum_support: int) -> int | None:

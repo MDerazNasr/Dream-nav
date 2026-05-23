@@ -150,6 +150,44 @@ def test_build_dense_result_prefers_gaussian_command_in_auto_mode(tmp_path) -> N
     assert b"property float f_dc_0" in result.dense_ply
 
 
+def test_build_dense_result_reads_gaussian_training_diagnostics(tmp_path) -> None:
+    bundle_path = tmp_path / "bundle.zip"
+    bundle_path.write_bytes(build_bundle_bytes(include_colmap_sparse=True))
+    gaussian_path = tmp_path / "fake_gaussian_command.py"
+    gaussian_path.write_text(
+        "#!/usr/bin/env python3\n"
+        "from pathlib import Path\n"
+        "from json import dumps\n"
+        "from sys import argv\n"
+        "parsed = dict(zip(argv[1::2], argv[2::2], strict=True))\n"
+        "output = Path(parsed['--output-ply'])\n"
+        "output.write_text(\n"
+        "    'ply\\nformat ascii 1.0\\nelement vertex 1\\nproperty float x\\nproperty float y\\nproperty float z\\nproperty uchar red\\nproperty uchar green\\nproperty uchar blue\\nend_header\\n0 0 0 255 255 255\\n',\n"
+        "    encoding='utf-8',\n"
+        ")\n"
+        "workspace = output.parent / 'nerfstudio-splatfacto-workspace' / 'diagnostics'\n"
+        "workspace.mkdir(parents=True, exist_ok=True)\n"
+        "(workspace / 'diagnostics_manifest.json').write_text(dumps({'error_summary': {'mean_mae': 12.5, 'worst_frames': [{'label': 'frame_0001', 'mae': 20.0, 'mse': 400.0}]}}), encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    gaussian_path.chmod(0o755)
+
+    result = build_dense_result(
+        bundle_path,
+        tmp_path / "workspace",
+        "gaussian_command",
+        None,
+        str(gaussian_path),
+        None,
+        allow_mock_fallback=True,
+    )
+
+    assert result.diagnostics == {
+        "mean_mae": 12.5,
+        "worst_frames": [{"label": "frame_0001", "mae": 20.0, "mse": 400.0}],
+    }
+
+
 def test_detect_colmap_dense_support_rejects_cuda_less_build(tmp_path) -> None:
     colmap_path = tmp_path / "colmap"
     colmap_path.write_text(

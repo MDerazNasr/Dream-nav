@@ -1,6 +1,6 @@
 from json import loads
 from os import utime
-from threading import Event, Thread
+from threading import Event, Semaphore, Thread
 
 from fastapi.testclient import TestClient
 from unittest.mock import patch
@@ -55,6 +55,7 @@ def test_submit_job_returns_remote_job_id_and_posts_callback(tmp_path) -> None:
     assert result["status"] == "completed"
     assert result["backend"] == "mock"
     assert result["error"] is None
+    assert result["training_view_diagnostics"] is None
 
 
 def test_submit_job_records_failed_status_when_callback_fails(tmp_path) -> None:
@@ -83,6 +84,7 @@ def test_submit_job_records_failed_status_when_callback_fails(tmp_path) -> None:
     assert result["status"] == "failed"
     assert result["backend"] == "mock"
     assert result["error"] == "callback failed"
+    assert result["training_view_diagnostics"] is None
 
 
 def test_job_status_route_returns_recorded_remote_result(tmp_path) -> None:
@@ -107,6 +109,43 @@ def test_job_status_route_returns_recorded_remote_result(tmp_path) -> None:
     assert status_response.status_code == 200
     assert status_response.json()["status"] == "completed"
     assert status_response.json()["backend"] == "mock"
+
+
+def test_process_submission_records_training_view_diagnostics(tmp_path) -> None:
+    settings = RemoteDenseSettings(repo_root=tmp_path, backend="auto")
+    submissions_root = settings.submissions_root
+    job_root = submissions_root / "remote_diag"
+    job_root.mkdir(parents=True, exist_ok=True)
+    bundle = job_root / "bundle.zip"
+    bundle.write_bytes(build_bundle_bytes())
+    manifest = {"job_id": "scene_diag", "source_video": "diag.mov", "frame_count": 10}
+
+    def fake_callback_sender(*_args):
+        return None
+
+    with patch("remote_dense_app.main.build_dense_result") as fake_build:
+        fake_build.return_value = DenseBuildResult(
+            backend="gaussian_command",
+            dense_ply=b"ply\nformat ascii 1.0\nend_header\n",
+            warnings=[],
+            metadata=None,
+            diagnostics={"mean_mae": 9.5, "worst_frames": [{"label": "frame_0003", "mae": 20.0, "mse": 400.0}]},
+        )
+        _process_submission(
+            bundle,
+            job_root,
+            manifest,
+            "https://dreamnav.example/jobs/scene_diag/remote-dense-result",
+            "callback-secret",
+            "remote_diag",
+            settings,
+            fake_callback_sender,
+            Semaphore(1),
+        )
+
+    result = loads((job_root / "result.json").read_text(encoding="utf-8"))
+    assert result["status"] == "completed"
+    assert result["training_view_diagnostics"]["mean_mae"] == 9.5
 
 
 def test_submit_job_prunes_old_remote_workspaces(tmp_path) -> None:

@@ -28,6 +28,7 @@ class DenseBuildResult:
     dense_ply: bytes
     warnings: list[str]
     metadata: dict[str, object] | None = None
+    diagnostics: dict[str, object] | None = None
 
 
 def build_dense_result(
@@ -52,12 +53,13 @@ def build_dense_result(
         raise RemoteDenseBackendError(f"Unsupported remote dense backend: {backend}")
 
     if normalized_backend == "gaussian_command":
-        dense_ply, metadata = build_gaussian_command_ply(extracted_root, workspace_root, gaussian_command)
+        dense_ply, metadata, diagnostics = build_gaussian_command_ply(extracted_root, workspace_root, gaussian_command)
         return DenseBuildResult(
             backend="gaussian_command",
             dense_ply=dense_ply,
             warnings=warnings,
             metadata=metadata,
+            diagnostics=diagnostics,
         )
 
     if normalized_backend == "command":
@@ -88,7 +90,7 @@ def build_gaussian_command_ply(
     extracted_root: Path,
     workspace_root: Path,
     gaussian_command: str | None,
-) -> tuple[bytes, dict[str, object] | None]:
+) -> tuple[bytes, dict[str, object] | None, dict[str, object] | None]:
     resolved_command = _resolve_dense_command(gaussian_command)
     if not resolved_command:
         raise RemoteDenseBackendError("DREAMNAV_REMOTE_GAUSSIAN_COMMAND was not found.")
@@ -115,7 +117,11 @@ def build_gaussian_command_ply(
         details = completed.stderr.strip() or completed.stdout.strip() or "Remote trained Gaussian backend failed."
         raise RemoteDenseBackendError(details)
 
-    return _normalize_dense_output(output_ply), _gaussian_import_metadata(workspace_root)
+    return (
+        _normalize_dense_output(output_ply),
+        _gaussian_import_metadata(workspace_root),
+        _gaussian_training_diagnostics(workspace_root),
+    )
 
 
 def detect_colmap_dense_support(colmap_command: str | None) -> tuple[bool, str | None]:
@@ -273,8 +279,31 @@ def _gaussian_import_metadata(workspace_root: Path) -> dict[str, object] | None:
     }
 
 
+def _gaussian_training_diagnostics(workspace_root: Path) -> dict[str, object] | None:
+    manifest_path = _find_diagnostics_manifest_path(workspace_root)
+    if manifest_path is None:
+        return None
+    try:
+        import json
+
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    summary = payload.get("error_summary")
+    return summary if isinstance(summary, dict) else None
+
+
 def _find_dataparser_transform_path(workspace_root: Path) -> Path | None:
     candidates = sorted(workspace_root.glob("nerfstudio-splatfacto-workspace/outputs/**/dataparser_transforms.json"))
+    if not candidates:
+        return None
+    return candidates[-1]
+
+
+def _find_diagnostics_manifest_path(workspace_root: Path) -> Path | None:
+    candidates = sorted(workspace_root.glob("nerfstudio-splatfacto-workspace/diagnostics/**/diagnostics_manifest.json"))
+    if not candidates:
+        candidates = sorted(workspace_root.glob("nerfstudio-splatfacto-workspace/**/diagnostics_manifest.json"))
     if not candidates:
         return None
     return candidates[-1]

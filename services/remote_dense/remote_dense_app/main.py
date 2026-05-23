@@ -97,6 +97,7 @@ def create_app(settings: RemoteDenseSettings | None = None) -> FastAPI:
             backend=resolved_settings.backend,
             warnings=[],
             error=None,
+            diagnostics=None,
         )
         background_tasks.add_task(
             _process_submission,
@@ -197,6 +198,7 @@ def _process_submission(
                 backend=settings.backend,
                 warnings=[],
                 error=None,
+                diagnostics=None,
             )
             dense_result = build_dense_result(
                 submission_bundle,
@@ -224,6 +226,7 @@ def _process_submission(
             backend=settings.backend,
             warnings=[],
             error=str(error),
+            diagnostics=None,
         )
         return
 
@@ -234,6 +237,7 @@ def _process_submission(
         backend=dense_result.backend,
         warnings=dense_result.warnings,
         error=None,
+        diagnostics=dense_result.diagnostics,
     )
 
 
@@ -244,6 +248,7 @@ def _write_job_result_metadata(
     backend: str | None,
     warnings: list[str],
     error: str | None,
+    diagnostics: dict[str, object] | None,
 ) -> None:
     payload = {
         "job_id": manifest.get("job_id"),
@@ -253,6 +258,7 @@ def _write_job_result_metadata(
         "backend": backend,
         "warnings": warnings,
         "error": error,
+        "training_view_diagnostics": diagnostics,
     }
     (job_root / "result.json").write_text(dumps(payload, indent=2), encoding="utf-8")
 
