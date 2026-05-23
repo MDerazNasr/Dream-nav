@@ -57,25 +57,27 @@ button {
   display: grid;
   min-height: 100vh;
   place-items: center;
-  padding: 24px;
+  padding: 28px;
   background:
-    linear-gradient(135deg, rgba(119, 215, 200, 0.14), transparent 32%),
-    linear-gradient(315deg, rgba(216, 139, 74, 0.12), transparent 36%),
+    linear-gradient(135deg, rgba(119, 215, 200, 0.1), transparent 34%),
+    linear-gradient(315deg, rgba(216, 139, 74, 0.1), transparent 38%),
     #111412;
 }
 
 .workflow-panel {
-  width: min(720px, 100%);
+  width: min(760px, 100%);
   border: 1px solid rgba(245, 247, 244, 0.14);
   border-radius: 8px;
-  background: rgba(17, 20, 18, 0.9);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
+  overflow: hidden;
+  background: rgba(17, 20, 18, 0.92);
+  box-shadow: 0 20px 56px rgba(0, 0, 0, 0.28);
 }
 
 .workflow-heading {
   display: flex;
-  gap: 14px;
-  padding: 22px;
+  gap: 16px;
+  padding: 24px 24px 18px;
+  align-items: flex-start;
 }
 
 .workflow-heading h1 {
@@ -85,9 +87,9 @@ button {
 }
 
 .workflow-heading p {
-  margin: 6px 0 0;
+  margin: 8px 0 0;
   color: #b8c6bd;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
 .workflow-icon {
@@ -109,9 +111,9 @@ button {
 
 .upload-target {
   display: grid;
-  gap: 10px;
-  margin: 0 22px;
-  padding: 18px;
+  gap: 12px;
+  margin: 0 24px;
+  padding: 20px;
   border: 1px dashed rgba(245, 247, 244, 0.28);
   border-radius: 8px;
   background: rgba(245, 247, 244, 0.05);
@@ -135,8 +137,8 @@ button {
   align-items: center;
   justify-content: center;
   width: fit-content;
-  min-height: 36px;
-  padding: 0 12px;
+  min-height: 40px;
+  padding: 0 14px;
   border: 1px solid rgba(245, 247, 244, 0.16);
   border-radius: 8px;
   background: rgba(245, 247, 244, 0.08);
@@ -176,8 +178,8 @@ button {
 
 .import-review {
   display: grid;
-  gap: 10px;
-  padding: 12px;
+  gap: 12px;
+  padding: 14px;
   border: 1px solid rgba(245, 247, 244, 0.12);
   border-radius: 8px;
   background: rgba(245, 247, 244, 0.04);
@@ -212,7 +214,7 @@ button {
 .remote-dense-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 
 .remote-dense-grid article {
@@ -232,15 +234,15 @@ button {
 }
 
 .demo-row {
-  padding: 16px 22px 0;
+  padding: 18px 24px 0;
 }
 
 .demo-scene {
   display: grid;
   width: 100%;
-  gap: 5px;
-  min-height: 72px;
-  padding: 14px;
+  gap: 6px;
+  min-height: 80px;
+  padding: 16px;
   border: 1px solid rgba(245, 247, 244, 0.14);
   border-radius: 8px;
   background: rgba(245, 247, 244, 0.07);
@@ -283,8 +285,8 @@ button {
 }
 
 .reconstruction-panel {
-  margin: 16px 22px 0;
-  padding: 16px;
+  margin: 18px 24px 0;
+  padding: 18px;
   border: 1px solid rgba(245, 247, 244, 0.14);
   border-radius: 8px;
   background: rgba(245, 247, 244, 0.05);
@@ -305,7 +307,7 @@ button {
 
 .reconstruction-summary {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .reconstruction-list {
@@ -323,7 +325,8 @@ button {
   flex-wrap: wrap;
   gap: 10px;
   justify-content: flex-end;
-  padding: 22px;
+  padding: 18px 24px 24px;
+  border-top: 1px solid rgba(245, 247, 244, 0.08);
 }
 
 .primary-action,
@@ -332,10 +335,14 @@ button {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 40px;
+  min-height: 42px;
   padding: 0 16px;
   border-radius: 8px;
   cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    transform 120ms ease;
 }
 
 .primary-action {
@@ -356,14 +363,14 @@ button {
 }
 
 .workflow-error {
-  margin: 12px 22px 0;
+  margin: 12px 24px 0;
   color: #ffb196;
   font-size: 13px;
 }
 
 .failure-panel {
-  margin: 14px 22px 0;
-  padding: 14px;
+  margin: 16px 24px 0;
+  padding: 16px;
   border: 1px solid rgba(255, 177, 150, 0.3);
   border-radius: 8px;
   background: rgba(255, 177, 150, 0.08);
@@ -389,7 +396,7 @@ button {
 
 .progress-track {
   height: 8px;
-  margin: 0 22px;
+  margin: 0 24px;
   overflow: hidden;
   border-radius: 999px;
   background: rgba(245, 247, 244, 0.08);
@@ -409,14 +416,14 @@ button {
 .progress-meta {
   display: flex;
   justify-content: space-between;
-  padding: 8px 22px 10px;
+  padding: 10px 24px 12px;
 }
 
 .stage-list {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   margin: 0;
-  padding: 8px 22px 0;
+  padding: 8px 24px 0;
   list-style: none;
 }
 
@@ -436,26 +443,58 @@ button {
   color: #ffd0bf;
 }
 
+@media (hover: hover) {
+  .primary-action:hover:not(:disabled),
+  .file-picker:hover,
+  .demo-scene:hover {
+    border-color: rgba(119, 215, 200, 0.55);
+    background: rgba(119, 215, 200, 0.14);
+  }
+
+  .secondary-action:hover,
+  .report-copy:hover {
+    border-color: rgba(245, 247, 244, 0.24);
+    background: rgba(245, 247, 244, 0.12);
+  }
+}
+
+.primary-action:focus-visible,
+.secondary-action:focus-visible,
+.demo-scene:focus-visible {
+  outline: 2px solid #77d7c8;
+  outline-offset: 2px;
+}
+
 @media (max-width: 720px) {
-  .top-bar,
-  .right-panel,
-  .left-panel,
-  .bottom-bar {
-    left: 12px;
-    right: 12px;
+  .workflow-screen {
+    padding: 18px;
   }
 
-  .right-panel {
-    top: auto;
-    bottom: 112px;
-    width: auto;
+  .workflow-heading,
+  .workflow-actions {
+    padding-left: 18px;
+    padding-right: 18px;
   }
 
-  .left-panel {
-    display: none;
+  .upload-target,
+  .reconstruction-panel,
+  .failure-panel {
+    margin-left: 18px;
+    margin-right: 18px;
   }
 
-  .bottom-bar {
-    justify-content: flex-start;
+  .demo-row,
+  .progress-track,
+  .progress-meta,
+  .stage-list,
+  .workflow-error {
+    margin-left: 18px;
+    margin-right: 18px;
+  }
+
+  .upload-target,
+  .reconstruction-panel,
+  .failure-panel {
+    padding: 16px;
   }
 }

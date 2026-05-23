@@ -129,11 +129,11 @@ export function ExplorerShell({ sceneBundle }: ExplorerShellProps) {
         zoneArtifacts={sceneBundle.zoneArtifacts}
       />
 
-      <header className="top-bar">
-        <span className="badge">
+      <header className="top-bar panel top-bar-panel">
+        <span className="badge scene-badge">
           <Video size={15} aria-hidden="true" />
         </span>
-        <div>
+        <div className="scene-title-block">
           <h1 className="scene-title">{sceneBundle.metadata.title}</h1>
           <p className="scene-meta">
             {sceneBundle.metadata.pose_backend} · {sceneBundle.metadata.frame_count} frames
