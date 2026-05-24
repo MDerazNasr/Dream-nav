@@ -303,6 +303,95 @@ def test_run_backend_allows_enabling_official_colmap_collider(tmp_path: Path, mo
     assert output_ply.is_file()
 
 
+def test_official_colmap_filter_dedupes_near_identical_consecutive_poses(tmp_path: Path, monkeypatch) -> None:
+    bundle_root = tmp_path / "bundle"
+    artifacts_root = bundle_root / "artifacts"
+    frames_root = bundle_root / "frames"
+    colmap_root = artifacts_root / "colmap"
+    output_ply = tmp_path / "gaussian_result.ply"
+    frames_root.mkdir(parents=True, exist_ok=True)
+    colmap_root.mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setenv("DREAMNAV_NERFSTUDIO_MIN_IMAGE_POINT_SUPPORT", "0")
+    monkeypatch.setenv("DREAMNAV_NERFSTUDIO_MIN_RETAINED_IMAGES", "2")
+    monkeypatch.setenv("DREAMNAV_NERFSTUDIO_MIN_TRANSLATION_DELTA", "0.02")
+    monkeypatch.setenv("DREAMNAV_NERFSTUDIO_MIN_ROTATION_DELTA_DEGREES", "1.0")
+
+    for index in range(1, 5):
+        (frames_root / f"frame_{index:04d}.jpg").write_bytes(f"jpg{index}".encode())
+
+    (artifacts_root / "camera_path.json").write_text(
+        json.dumps(
+            {
+                "intrinsics": {"width": 1280, "height": 720, "fx": 800, "fy": 810, "cx": 640, "cy": 360},
+                "poses": [{"frame_index": 0, "position": [0.0, 0.0, 0.0], "rotation_xyzw": [0.0, 0.0, 0.0, 1.0]}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (colmap_root / "cameras.txt").write_text(
+        "1 SIMPLE_RADIAL 1280 720 700.0 640.0 360.0 0.0\n",
+        encoding="utf-8",
+    )
+    (colmap_root / "images.txt").write_text(
+        "1 1 0 0 0 0 0 0 1 frame_0001.jpg\n0 0 1 1 0 2\n"
+        "2 0.99999 0 0.001 0 0.001 0 0 1 frame_0002.jpg\n0 0 1 1 0 2\n"
+        "3 1 0 0 0 -0.5 0 0 1 frame_0003.jpg\n0 0 1 1 0 2\n"
+        "4 1 0 0 0 -1.0 0 0 1 frame_0004.jpg\n0 0 1 1 0 2\n",
+        encoding="utf-8",
+    )
+    (colmap_root / "points3D.txt").write_text(
+        "1 0.0 1.0 2.0 255 0 0 0.5 1 1 2 1 3 1 4\n"
+        "2 1.0 2.0 3.0 0 255 0 0.5 1 1 2 1 3 1 4\n",
+        encoding="utf-8",
+    )
+
+    train_script = tmp_path / "fake_ns_train.py"
+    train_script.write_text(
+        "#!/usr/bin/env python3\n"
+        "from pathlib import Path\n"
+        "from sys import argv\n"
+        "data_root = Path(argv[argv.index('--data') + 1])\n"
+        "images_text = (data_root / 'colmap' / 'sparse' / '0' / 'images.txt').read_text(encoding='utf-8')\n"
+        "assert 'frame_0002.jpg' not in images_text\n"
+        "assert 'frame_0001.jpg' in images_text\n"
+        "assert 'frame_0003.jpg' in images_text\n"
+        "assert 'frame_0004.jpg' in images_text\n"
+        "(Path.cwd() / 'outputs' / 'run').mkdir(parents=True, exist_ok=True)\n"
+        "(Path.cwd() / 'outputs' / 'run' / 'config.yml').write_text('trainer: ok\\n', encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    train_script.chmod(0o755)
+
+    export_script = tmp_path / "fake_ns_export.py"
+    export_script.write_text(
+        "#!/usr/bin/env python3\n"
+        "from pathlib import Path\n"
+        "from sys import argv\n"
+        "output_dir = Path(argv[argv.index('--output-dir') + 1])\n"
+        "output_dir.mkdir(parents=True, exist_ok=True)\n"
+        "(output_dir / 'splat.ply').write_text(\n"
+        "    'ply\\nformat ascii 1.0\\nelement vertex 1\\nproperty float x\\nproperty float y\\nproperty float z\\nproperty uchar red\\nproperty uchar green\\nproperty uchar blue\\nend_header\\n0 0 0 255 255 255\\n',\n"
+        "    encoding='utf-8',\n"
+        ")\n",
+        encoding="utf-8",
+    )
+    export_script.chmod(0o755)
+
+    nerfstudio_splatfacto_backend.run_backend(
+        bundle_root=bundle_root,
+        artifacts_root=artifacts_root,
+        frames_root=frames_root,
+        camera_path=artifacts_root / "camera_path.json",
+        colmap_root=colmap_root,
+        output_ply=output_ply,
+        train_command=str(train_script),
+        export_command=str(export_script),
+    )
+
+    assert output_ply.is_file()
+
+
 def test_run_backend_filters_low_support_colmap_frames(tmp_path: Path, monkeypatch) -> None:
     bundle_root = tmp_path / "bundle"
     artifacts_root = bundle_root / "artifacts"

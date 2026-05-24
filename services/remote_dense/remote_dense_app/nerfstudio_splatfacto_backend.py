@@ -7,6 +7,7 @@ from pathlib import Path
 from shutil import copy2, which
 from subprocess import run
 from sys import argv, exit
+from math import acos, sqrt
 
 try:
     from remote_dense_app.nerfstudio_backend_error import NerfstudioSplatfactoBackendError
@@ -276,7 +277,7 @@ def _materialize_colmap_dataset(colmap_root: Path, target_root: Path) -> bool:
         return False
 
     minimum_support = _configured_minimum_colmap_support()
-    if minimum_support > 0 and (colmap_root / "points3D.txt").is_file():
+    if (minimum_support > 0 or _consecutive_dedupe_enabled()) and (colmap_root / "points3D.txt").is_file():
         retained_count = _write_filtered_colmap_dataset(colmap_root, target_root, minimum_support)
         if retained_count is not None:
             return True
@@ -308,6 +309,26 @@ def _configured_minimum_retained_images() -> int:
         return max(1, int(raw_value))
     except ValueError:
         return 24
+
+
+def _configured_minimum_translation_delta() -> float:
+    raw_value = environ.get("DREAMNAV_NERFSTUDIO_MIN_TRANSLATION_DELTA", "0.02").strip()
+    try:
+        return max(0.0, float(raw_value))
+    except ValueError:
+        return 0.02
+
+
+def _configured_minimum_rotation_delta_degrees() -> float:
+    raw_value = environ.get("DREAMNAV_NERFSTUDIO_MIN_ROTATION_DELTA_DEGREES", "1.0").strip()
+    try:
+        return max(0.0, float(raw_value))
+    except ValueError:
+        return 1.0
+
+
+def _consecutive_dedupe_enabled() -> bool:
+    return _configured_minimum_translation_delta() > 0.0 or _configured_minimum_rotation_delta_degrees() > 0.0
 
 
 def _diagnostics_enabled() -> bool:
@@ -350,6 +371,9 @@ def _write_filtered_colmap_dataset(colmap_root: Path, target_root: Path, minimum
     minimum_retained = _configured_minimum_retained_images()
     if len(selected_entries) < minimum_retained:
         return None
+    deduped_entries = _dedupe_consecutive_entries(selected_entries)
+    if len(deduped_entries) >= minimum_retained:
+        selected_entries = deduped_entries
     if len(selected_entries) == len(image_entries):
         return None
 
@@ -410,6 +434,8 @@ def _parse_colmap_images(images_path: Path) -> tuple[list[dict[str, object]], li
             raise NerfstudioSplatfactoBackendError("COLMAP images.txt contains a malformed image row.")
         if index + 1 >= len(lines):
             raise NerfstudioSplatfactoBackendError("COLMAP images.txt is missing a points row.")
+        quaternion = tuple(float(component) for component in parts[1:5])
+        translation = tuple(float(component) for component in parts[5:8])
         points_line = lines[index + 1].strip()
         point_tokens = points_line.split()
         support_count = sum(1 for token_index in range(2, len(point_tokens), 3) if point_tokens[token_index] != "-1")
@@ -420,6 +446,8 @@ def _parse_colmap_images(images_path: Path) -> tuple[list[dict[str, object]], li
                 "image_line": raw_line,
                 "points_line": lines[index + 1],
                 "support_count": support_count,
+                "camera_center": _camera_center(quaternion, translation),
+                "quaternion_wxyz": quaternion,
             }
         )
         index += 2
@@ -451,6 +479,62 @@ def _filter_colmap_points(points_path: Path, selected_image_ids: set[int]) -> tu
             continue
         filtered_lines.append(" ".join(parts[:8] + retained_track))
     return comments, filtered_lines
+
+
+def _dedupe_consecutive_entries(entries: list[dict[str, object]]) -> list[dict[str, object]]:
+    minimum_translation = _configured_minimum_translation_delta()
+    minimum_rotation_degrees = _configured_minimum_rotation_delta_degrees()
+    if minimum_translation <= 0.0 and minimum_rotation_degrees <= 0.0:
+        return entries
+
+    deduped: list[dict[str, object]] = []
+    previous_retained: dict[str, object] | None = None
+    for entry in entries:
+        if previous_retained is None:
+            deduped.append(entry)
+            previous_retained = entry
+            continue
+        translation_delta = _distance(
+            previous_retained["camera_center"],  # type: ignore[arg-type]
+            entry["camera_center"],  # type: ignore[arg-type]
+        )
+        rotation_delta = _quaternion_angle_degrees(
+            previous_retained["quaternion_wxyz"],  # type: ignore[arg-type]
+            entry["quaternion_wxyz"],  # type: ignore[arg-type]
+        )
+        if translation_delta < minimum_translation and rotation_delta < minimum_rotation_degrees:
+            continue
+        deduped.append(entry)
+        previous_retained = entry
+    return deduped
+
+
+def _distance(left: tuple[float, float, float], right: tuple[float, float, float]) -> float:
+    return sqrt(sum((left[index] - right[index]) ** 2 for index in range(3)))
+
+
+def _quaternion_angle_degrees(left: tuple[float, float, float, float], right: tuple[float, float, float, float]) -> float:
+    dot = abs(sum(left[index] * right[index] for index in range(4)))
+    clamped = min(1.0, max(-1.0, dot))
+    return 2.0 * acos(clamped) * (180.0 / 3.141592653589793)
+
+
+def _camera_center(
+    quaternion_wxyz: tuple[float, float, float, float],
+    translation_xyz: tuple[float, float, float],
+) -> tuple[float, float, float]:
+    qw, qx, qy, qz = quaternion_wxyz
+    tx, ty, tz = translation_xyz
+    rotation = (
+        (1 - 2 * qy * qy - 2 * qz * qz, 2 * qx * qy - 2 * qz * qw, 2 * qx * qz + 2 * qy * qw),
+        (2 * qx * qy + 2 * qz * qw, 1 - 2 * qx * qx - 2 * qz * qz, 2 * qy * qz - 2 * qx * qw),
+        (2 * qx * qz - 2 * qy * qw, 2 * qy * qz + 2 * qx * qw, 1 - 2 * qx * qx - 2 * qy * qy),
+    )
+    return (
+        -(rotation[0][0] * tx + rotation[1][0] * ty + rotation[2][0] * tz),
+        -(rotation[0][1] * tx + rotation[1][1] * ty + rotation[2][1] * tz),
+        -(rotation[0][2] * tx + rotation[1][2] * ty + rotation[2][2] * tz),
+    )
 
 
 if __name__ == "__main__":
