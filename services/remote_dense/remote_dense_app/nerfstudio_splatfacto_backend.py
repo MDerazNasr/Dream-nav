@@ -312,19 +312,19 @@ def _configured_minimum_retained_images() -> int:
 
 
 def _configured_minimum_translation_delta() -> float:
-    raw_value = environ.get("DREAMNAV_NERFSTUDIO_MIN_TRANSLATION_DELTA", "0.02").strip()
+    raw_value = environ.get("DREAMNAV_NERFSTUDIO_MIN_TRANSLATION_DELTA", "0.05").strip()
     try:
         return max(0.0, float(raw_value))
     except ValueError:
-        return 0.02
+        return 0.05
 
 
 def _configured_minimum_rotation_delta_degrees() -> float:
-    raw_value = environ.get("DREAMNAV_NERFSTUDIO_MIN_ROTATION_DELTA_DEGREES", "1.0").strip()
+    raw_value = environ.get("DREAMNAV_NERFSTUDIO_MIN_ROTATION_DELTA_DEGREES", "2.0").strip()
     try:
         return max(0.0, float(raw_value))
     except ValueError:
-        return 1.0
+        return 2.0
 
 
 def _consecutive_dedupe_enabled() -> bool:
